@@ -22,6 +22,8 @@ import {
   LogOut,
   Settings,
   Bell,
+  FileSignature,
+  PenTool,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,9 +32,11 @@ const navItems = [
   { path: "/", label: "لوحة التحكم", icon: LayoutDashboard },
   { path: "/crm", label: "إدارة العملاء", icon: Users, badge: 3 },
   { path: "/quotations", label: "عروض الأسعار", icon: FileText, badge: 2 },
+  { path: "/contracts", label: "العقود الهندسية", icon: FileSignature, badge: 1 },
   { path: "/projects", label: "المشاريع", icon: FolderKanban },
   { path: "/tasks", label: "المهام", icon: ListChecks, badge: 5 },
   { path: "/documents", label: "المستندات", icon: FolderOpen },
+  { path: "/sign", label: "التوقيع الإلكتروني", icon: PenTool },
   { path: "/payments", label: "الدفعات", icon: CreditCard },
   { path: "/client-portal", label: "بوابة العميل", icon: Globe },
   { path: "/reports", label: "التقارير", icon: BarChart3 },

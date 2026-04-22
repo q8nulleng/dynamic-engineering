@@ -13,6 +13,8 @@ import Documents from "./pages/Documents";
 import Payments from "./pages/Payments";
 import ClientPortal from "./pages/ClientPortal";
 import Reports from "./pages/Reports";
+import Contracts from "./pages/Contracts";
+import SignTemplates from "./pages/SignTemplates";
 import DashboardLayout from "./components/DashboardLayout";
 
 function Router() {
@@ -27,6 +29,8 @@ function Router() {
       <Route path="/payments" component={Payments} />
       <Route path="/client-portal" component={ClientPortal} />
       <Route path="/reports" component={Reports} />
+      <Route path="/contracts" component={Contracts} />
+      <Route path="/sign" component={SignTemplates} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

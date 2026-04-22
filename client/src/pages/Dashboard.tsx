@@ -14,13 +14,15 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle2,
+  FileSignature,
+  PenTool,
 } from "lucide-react";
 
 const kpis = [
-  { label: "المشاريع النشطة", value: "12", icon: FolderKanban, change: "+2 هذا الشهر", color: "oklch(0.30 0.05 250)" },
-  { label: "عروض الأسعار المعلقة", value: "5", icon: FileText, change: "3 جديدة", color: "oklch(0.72 0.10 60)" },
-  { label: "العملاء الجدد", value: "8", icon: Users, change: "+15% عن الشهر الماضي", color: "oklch(0.55 0.15 150)" },
-  { label: "الإيرادات (د.ك)", value: "4,250", icon: CreditCard, change: "+22% عن الشهر الماضي", color: "oklch(0.60 0.12 30)" },
+  { label: "المشاريع النشطة", value: "7", icon: FolderKanban, change: "+2 هذا الشهر", color: "oklch(0.30 0.05 250)" },
+  { label: "عروض الأسعار", value: "6", icon: FileText, change: "3 مرسلة", color: "oklch(0.72 0.10 60)" },
+  { label: "العقود النشطة", value: "5", icon: FileSignature, change: "1 بانتظار التوقيع", color: "oklch(0.55 0.15 150)" },
+  { label: "الإيرادات (د.ك)", value: "4,950", icon: CreditCard, change: "+22% عن الشهر الماضي", color: "oklch(0.60 0.12 30)" },
 ];
 
 const recentProjects = [
@@ -31,11 +33,11 @@ const recentProjects = [
 ];
 
 const recentActivity = [
-  { text: "تم تأكيد عرض سعر S00012 - فيلا السالمية", time: "منذ 15 دقيقة", icon: CheckCircle2, color: "text-green-600" },
-  { text: "مهمة متأخرة: التصميم الإنشائي - مبنى حولي", time: "منذ ساعة", icon: AlertTriangle, color: "text-amber-500" },
-  { text: "عميل جديد: شركة البناء الحديث", time: "منذ 3 ساعات", icon: Users, color: "text-blue-600" },
-  { text: "تم رفع المخططات المعمارية - مجمع الفحيحيل", time: "منذ 5 ساعات", icon: FileText, color: "text-purple-600" },
-  { text: "دفعة مستلمة: 500 د.ك - فيلا السالمية", time: "أمس", icon: CreditCard, color: "text-green-600" },
+  { text: "تم توقيع عقد CON-2026-001 - تهاني خالد", time: "منذ 15 دقيقة", icon: CheckCircle2, color: "text-green-600" },
+  { text: "عرض سعر S00048 مرسل - فهد العتيبي", time: "منذ ساعة", icon: FileText, color: "text-blue-600" },
+  { text: "فاتورة INV/2026/00004 متأخرة - شركة الخليج", time: "منذ ساعتين", icon: AlertTriangle, color: "text-amber-500" },
+  { text: "فرصة جديدة: شركة النور - تجاري", time: "منذ 3 ساعات", icon: Users, color: "text-blue-600" },
+  { text: "دفعة مستلمة: 250 د.ك - هدم السالمية", time: "أمس", icon: CreditCard, color: "text-green-600" },
 ];
 
 const pendingTasks = [
