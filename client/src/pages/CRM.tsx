@@ -1,7 +1,6 @@
 /*
- * Design: Desert Oasis Professional
- * CRM - Kanban board with detailed lead forms
- * Updated with Odoo.sh fields + New Opportunity Dialog
+ * CRM - Simplified view with collapsible sections
+ * Each stage is a clickable button that expands to show leads
  */
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,10 +22,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Plus, Phone, Mail, MoreVertical, Star, DollarSign, User,
-  Calendar, FileText, Trophy, X, MessageCircle, Send, Activity,
-  ChevronDown, ChevronUp, TrendingUp, Building, MapPin, Hash,
-  Percent, Tag, UserCheck, Save, ClipboardList
+  Plus, Phone, Mail, Star, DollarSign, User,
+  Calendar, FileText, Trophy, X, ChevronDown, ChevronUp,
+  Building, Hash, Percent, Tag, UserCheck, Save,
+  ClipboardList, MessageCircle, Activity, Users, ArrowLeft
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -47,13 +46,13 @@ interface Lead {
   civilId?: string;
   notes?: string;
   serviceType?: string;
-  stage?: string;
 }
 
-const initialColumns: { title: string; color: string; leads: Lead[] }[] = [
+const stages: { title: string; color: string; icon: typeof Users; leads: Lead[] }[] = [
   {
     title: "استفسار جديد",
     color: "oklch(0.55 0.15 250)",
+    icon: Users,
     leads: [
       {
         name: "فهد العتيبي", phone: "9876 5432", email: "fahad@email.com", type: "سكن خاص", source: "اتصال", date: "اليوم",
@@ -75,6 +74,7 @@ const initialColumns: { title: string; color: string; leads: Lead[] }[] = [
   {
     title: "تم التواصل",
     color: "oklch(0.72 0.10 60)",
+    icon: Phone,
     leads: [
       {
         name: "سالم المطيري", phone: "9911 2233", email: "salem@email.com", type: "استثماري", source: "زيارة", date: "منذ يومين",
@@ -86,6 +86,7 @@ const initialColumns: { title: string; color: string; leads: Lead[] }[] = [
   {
     title: "عرض سعر مرسل",
     color: "oklch(0.60 0.15 280)",
+    icon: FileText,
     leads: [
       {
         name: "أحمد الكويتي", phone: "9955 6677", email: "ahmad@email.com", type: "سكن خاص", source: "اتصال", date: "منذ 3 أيام",
@@ -102,6 +103,7 @@ const initialColumns: { title: string; color: string; leads: Lead[] }[] = [
   {
     title: "تم التعاقد",
     color: "oklch(0.55 0.15 150)",
+    icon: Trophy,
     leads: [
       {
         name: "خالد الرشيدي", phone: "9988 7766", email: "khaled@email.com", type: "سكن خاص", source: "واتساب", date: "هذا الأسبوع",
@@ -112,289 +114,219 @@ const initialColumns: { title: string; color: string; leads: Lead[] }[] = [
   },
 ];
 
-const priorityLabels = ["", "متوسط", "مرتفع", "مرتفع جداً"];
+const priorityStars = (p: number) => (
+  <div className="flex gap-0.5">
+    {[1, 2, 3].map((s) => (
+      <Star key={s} className={`w-3 h-3 ${s <= p ? "fill-yellow-400 text-yellow-400" : "text-gray-200"}`} />
+    ))}
+  </div>
+);
 
 const emptyForm = {
-  name: "",
-  phone: "",
-  email: "",
-  civilId: "",
-  type: "",
-  serviceType: "",
-  source: "",
-  salesperson: "",
-  expectedRevenue: "",
-  probability: "",
-  expectedClosing: "",
-  priority: "",
-  tags: "",
-  notes: "",
+  name: "", phone: "", email: "", civilId: "", type: "", serviceType: "",
+  source: "", salesperson: "", expectedRevenue: "", probability: "",
+  expectedClosing: "", priority: "", tags: "", notes: "",
 };
 
 export default function CRM() {
-  const [columns, setColumns] = useState(initialColumns);
-  const [expandedLead, setExpandedLead] = useState<string | null>(null);
+  const [data] = useState(stages);
+  const [openStage, setOpenStage] = useState<number | null>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [activeTab, setActiveTab] = useState<"basic" | "details" | "notes">("basic");
 
-  const totalRevenue = columns.reduce((sum, col) =>
-    sum + col.leads.reduce((s, l) => s + parseFloat(l.expectedRevenue.replace(",", "") || "0"), 0), 0);
-  const totalLeads = columns.reduce((sum, col) => sum + col.leads.length, 0);
-  const avgProbability = totalLeads > 0 ? Math.round(columns.reduce((sum, col) =>
-    sum + col.leads.reduce((s, l) => s + l.probability, 0), 0) / totalLeads) : 0;
+  const totalLeads = data.reduce((s, c) => s + c.leads.length, 0);
+  const totalRevenue = data.reduce((s, c) => s + c.leads.reduce((a, l) => a + parseFloat(l.expectedRevenue.replace(",", "")), 0), 0);
 
-  const handleFormChange = (field: string, value: string) => {
-    setForm(prev => ({ ...prev, [field]: value }));
-  };
+  const handleFormChange = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
 
   const handleSubmit = () => {
-    if (!form.name.trim()) {
-      toast.error("يرجى إدخال اسم العميل");
-      return;
-    }
-    if (!form.phone.trim()) {
-      toast.error("يرجى إدخال رقم الهاتف");
-      return;
-    }
-
-    const newLead: Lead = {
-      name: form.name,
-      phone: form.phone,
-      email: form.email,
-      civilId: form.civilId || undefined,
-      type: form.type || "سكن خاص",
-      serviceType: form.serviceType || "بناء جديد",
-      source: form.source || "اتصال",
-      salesperson: form.salesperson || "أحمد",
-      expectedRevenue: form.expectedRevenue || "0",
-      probability: parseInt(form.probability) || 10,
-      expectedClosing: form.expectedClosing || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-      priority: (parseInt(form.priority) || 1) as 0 | 1 | 2 | 3,
-      tags: form.tags ? form.tags.split(",").map(t => t.trim()).filter(Boolean) : [form.serviceType || "بناء جديد"],
-      quotations: 0,
-      date: "الآن",
-      notes: form.notes || undefined,
-    };
-
-    setColumns(prev => {
-      const updated = [...prev];
-      updated[0] = { ...updated[0], leads: [newLead, ...updated[0].leads] };
-      return updated;
-    });
-
+    if (!form.name.trim()) { toast.error("يرجى إدخال اسم العميل"); return; }
+    if (!form.phone.trim()) { toast.error("يرجى إدخال رقم الهاتف"); return; }
     setForm(emptyForm);
     setActiveTab("basic");
     setShowNewDialog(false);
-    toast.success(`تمت إضافة فرصة "${form.name}" بنجاح`, {
-      description: "تم إضافتها في مرحلة 'استفسار جديد'",
-    });
+    toast.success(`تمت إضافة فرصة "${form.name}" بنجاح`);
   };
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <p className="text-sm text-muted-foreground">تتبع العملاء من الاستفسار حتى التعاقد</p>
+    <div className="space-y-5">
+      {/* Header - Simple */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">تتبع العملاء من الاستفسار حتى التعاقد</p>
+        <Button onClick={() => setShowNewDialog(true)} style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>
+          <Plus className="w-4 h-4 ml-2" />
+          فرصة جديدة
+        </Button>
+      </div>
+
+      {/* Summary Row - Compact */}
+      <div className="flex gap-4 text-sm">
+        <div className="flex items-center gap-2">
+          <Users className="w-4 h-4 text-muted-foreground" />
+          <span className="font-bold" style={{ fontFamily: "'Space Grotesk'" }}>{totalLeads}</span>
+          <span className="text-muted-foreground">فرصة</span>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Mail className="w-4 h-4 ml-1" />
-            بريد إلكتروني
-          </Button>
-          <Button variant="outline" size="sm">
-            <MessageCircle className="w-4 h-4 ml-1" />
-            SMS
-          </Button>
-          <Button
-            style={{ backgroundColor: "oklch(0.30 0.05 250)" }}
-            onClick={() => setShowNewDialog(true)}
-          >
-            <Plus className="w-4 h-4 ml-2" />
-            فرصة جديدة
-          </Button>
+        <div className="w-px h-5 bg-border" />
+        <div className="flex items-center gap-2">
+          <DollarSign className="w-4 h-4 text-muted-foreground" />
+          <span className="font-bold" style={{ fontFamily: "'Space Grotesk'" }}>{totalRevenue.toLocaleString()}</span>
+          <span className="text-muted-foreground">د.ك</span>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-blue-50">
-              <User className="w-4 h-4 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">إجمالي الفرص</p>
-              <p className="text-lg font-bold" style={{ fontFamily: "'Space Grotesk'" }}>{totalLeads}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "oklch(0.72 0.10 60 / 0.15)" }}>
-              <DollarSign className="w-4 h-4" style={{ color: "oklch(0.72 0.10 60)" }} />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">الإيرادات المتوقعة</p>
-              <p className="text-lg font-bold" style={{ fontFamily: "'Space Grotesk'" }}>{totalRevenue.toLocaleString()} <span className="text-xs font-normal">د.ك</span></p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-green-50">
-              <TrendingUp className="w-4 h-4 text-green-600" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">متوسط الاحتمالية</p>
-              <p className="text-lg font-bold" style={{ fontFamily: "'Space Grotesk'" }}>{avgProbability}%</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-purple-50">
-              <Trophy className="w-4 h-4 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">تم التعاقد</p>
-              <p className="text-lg font-bold" style={{ fontFamily: "'Space Grotesk'" }}>{columns[3].leads.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* ===== Stage Buttons ===== */}
+      <div className="space-y-3">
+        {data.map((stage, si) => {
+          const isOpen = openStage === si;
+          const stageRevenue = stage.leads.reduce((s, l) => s + parseFloat(l.expectedRevenue.replace(",", "")), 0);
+          const Icon = stage.icon;
 
-      {/* Kanban Board */}
-      <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: "calc(100vh - 320px)" }}>
-        {columns.map((col, ci) => (
-          <div key={ci} className="min-w-[320px] w-[320px] shrink-0">
-            {/* Column Header */}
-            <div className="flex items-center gap-2 mb-3 px-1">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: col.color }} />
-              <h3 className="text-sm font-bold">{col.title}</h3>
-              <Badge variant="secondary" className="text-xs mr-auto">{col.leads.length}</Badge>
-              <span className="text-xs text-muted-foreground" style={{ fontFamily: "'Space Grotesk'" }}>
-                {col.leads.reduce((s, l) => s + parseFloat(l.expectedRevenue.replace(",", "")), 0).toLocaleString()} د.ك
-              </span>
-            </div>
+          return (
+            <div key={si}>
+              {/* Stage Button */}
+              <button
+                onClick={() => { setOpenStage(isOpen ? null : si); setSelectedLead(null); }}
+                className="w-full flex items-center gap-4 p-4 rounded-xl border transition-all hover:shadow-sm"
+                style={{
+                  borderColor: isOpen ? stage.color : undefined,
+                  backgroundColor: isOpen ? `color-mix(in oklch, ${stage.color} 5%, white)` : undefined,
+                }}
+              >
+                {/* Icon */}
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: `color-mix(in oklch, ${stage.color} 15%, white)` }}>
+                  <Icon className="w-5 h-5" style={{ color: stage.color }} />
+                </div>
 
-            {/* Cards */}
-            <div className="space-y-3">
-              {col.leads.map((lead, li) => {
-                const isExpanded = expandedLead === `${ci}-${li}`;
-                return (
-                  <Card key={li} className="border-0 shadow-sm hover:shadow-md transition-all cursor-pointer"
-                    onClick={() => setExpandedLead(isExpanded ? null : `${ci}-${li}`)}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-2">
+                {/* Title + Count */}
+                <div className="flex-1 text-right">
+                  <h3 className="font-bold text-sm">{stage.title}</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {stage.leads.length} عميل · {stageRevenue.toLocaleString()} د.ك
+                  </p>
+                </div>
+
+                {/* Badge + Arrow */}
+                <Badge
+                  className="text-white text-xs px-2.5 py-1"
+                  style={{ backgroundColor: stage.color }}
+                >
+                  {stage.leads.length}
+                </Badge>
+                {isOpen ? (
+                  <ChevronUp className="w-5 h-5 text-muted-foreground shrink-0" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-muted-foreground shrink-0" />
+                )}
+              </button>
+
+              {/* Expanded Leads List */}
+              {isOpen && (
+                <div className="mt-2 mr-4 border-r-2 pr-4 space-y-2" style={{ borderColor: stage.color }}>
+                  {stage.leads.map((lead, li) => (
+                    <div
+                      key={li}
+                      onClick={() => setSelectedLead(selectedLead === lead ? null : lead)}
+                      className={`p-3 rounded-lg border cursor-pointer transition-all hover:shadow-sm ${
+                        selectedLead === lead ? "shadow-sm" : ""
+                      }`}
+                      style={selectedLead === lead ? { borderColor: stage.color, backgroundColor: `color-mix(in oklch, ${stage.color} 3%, white)` } : {}}
+                    >
+                      {/* Lead Row */}
+                      <div className="flex items-center gap-3">
+                        {/* Avatar */}
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+                          style={{ backgroundColor: stage.color }}>
+                          {lead.name.charAt(0)}
+                        </div>
+
+                        {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-bold truncate">{lead.name}</h4>
-                          {/* Priority Stars */}
-                          <div className="flex items-center gap-0.5 mt-0.5">
-                            {[1, 2, 3].map((s) => (
-                              <Star key={s} className={`w-3 h-3 ${s <= lead.priority ? "fill-yellow-400 text-yellow-400" : "text-gray-200"}`} />
-                            ))}
-                            {lead.priority > 0 && (
-                              <span className="text-[10px] text-muted-foreground mr-1">{priorityLabels[lead.priority]}</span>
-                            )}
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold truncate">{lead.name}</h4>
+                            {priorityStars(lead.priority)}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                            <span dir="ltr">{lead.phone}</span>
+                            <span>·</span>
+                            <span>{lead.type}</span>
                           </div>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 -mt-1 -ml-1" onClick={(e) => e.stopPropagation()}>
-                          <MoreVertical className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
 
-                      {/* Contact Info */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Phone className="w-3 h-3" />
-                          <span dir="ltr">{lead.phone}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Mail className="w-3 h-3" />
-                          <span className="truncate">{lead.email}</span>
-                        </div>
-                      </div>
-
-                      {/* Revenue & Probability */}
-                      <div className="flex items-center justify-between mt-3 pt-2 border-t">
-                        <div className="flex items-center gap-1">
-                          <span className="text-sm font-bold" style={{ color: "oklch(0.72 0.10 60)", fontFamily: "'Space Grotesk'" }}>
-                            {lead.expectedRevenue}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">د.ك</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-12 h-1.5 rounded-full bg-gray-200 overflow-hidden">
-                            <div className="h-full rounded-full" style={{
-                              width: `${lead.probability}%`,
-                              backgroundColor: lead.probability >= 70 ? "oklch(0.55 0.15 150)" : lead.probability >= 40 ? "oklch(0.72 0.10 60)" : "oklch(0.55 0.15 250)"
-                            }} />
-                          </div>
-                          <span className="text-[10px] text-muted-foreground" style={{ fontFamily: "'Space Grotesk'" }}>{lead.probability}%</span>
-                        </div>
-                      </div>
-
-                      {/* Tags */}
-                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                        <Badge variant="outline" className="text-[10px]">{lead.type}</Badge>
-                        <Badge variant="secondary" className="text-[10px]">{lead.source}</Badge>
-                        {lead.tags.map((tag, ti) => (
-                          <Badge key={ti} className="text-[10px] text-white" style={{ backgroundColor: "oklch(0.55 0.15 150)" }}>{tag}</Badge>
-                        ))}
-                      </div>
-
-                      {/* Smart Buttons */}
-                      <div className="flex items-center gap-2 mt-2">
-                        {lead.quotations > 0 && (
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-600">
-                            <FileText className="w-3 h-3 inline ml-0.5" />
-                            {lead.quotations} عرض سعر
-                          </span>
-                        )}
-                        <span className="text-[10px] text-muted-foreground mr-auto">
-                          <User className="w-3 h-3 inline ml-0.5" />
-                          {lead.salesperson}
-                        </span>
-                      </div>
-
-                      {/* Expanded Details */}
-                      {isExpanded && (
-                        <div className="mt-3 pt-3 border-t space-y-3" onClick={(e) => e.stopPropagation()}>
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                              <span className="text-muted-foreground">تاريخ الإغلاق المتوقع:</span>
-                              <p className="font-medium" dir="ltr">{lead.expectedClosing}</p>
+                        {/* Revenue */}
+                        <div className="text-left shrink-0">
+                          <p className="text-sm font-bold" style={{ color: stage.color, fontFamily: "'Space Grotesk'" }}>
+                            {lead.expectedRevenue} <span className="text-[10px] font-normal text-muted-foreground">د.ك</span>
+                          </p>
+                          <div className="flex items-center gap-1 justify-end mt-0.5">
+                            <div className="w-10 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${lead.probability}%`, backgroundColor: stage.color }} />
                             </div>
-                            <div>
-                              <span className="text-muted-foreground">المصدر:</span>
-                              <p className="font-medium">{lead.source}</p>
+                            <span className="text-[10px] text-muted-foreground" style={{ fontFamily: "'Space Grotesk'" }}>{lead.probability}%</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Expanded Lead Details */}
+                      {selectedLead === lead && (
+                        <div className="mt-3 pt-3 border-t space-y-3" onClick={(e) => e.stopPropagation()}>
+                          {/* Contact Details */}
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                            <div className="flex items-center gap-2">
+                              <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span className="truncate">{lead.email}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span dir="ltr">{lead.expectedClosing}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <User className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span>{lead.salesperson}</span>
                             </div>
                             {lead.civilId && (
-                              <div>
-                                <span className="text-muted-foreground">الرقم المدني:</span>
-                                <p className="font-medium" dir="ltr" style={{ fontFamily: "'Space Grotesk'" }}>{lead.civilId}</p>
+                              <div className="flex items-center gap-2">
+                                <Hash className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span dir="ltr" style={{ fontFamily: "'Space Grotesk'" }}>{lead.civilId}</span>
                               </div>
                             )}
                             {lead.serviceType && (
-                              <div>
-                                <span className="text-muted-foreground">نوع الخدمة:</span>
-                                <p className="font-medium">{lead.serviceType}</p>
+                              <div className="flex items-center gap-2">
+                                <ClipboardList className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span>{lead.serviceType}</span>
                               </div>
                             )}
-                          </div>
-                          {lead.notes && (
-                            <div className="text-xs">
-                              <span className="text-muted-foreground">ملاحظات:</span>
-                              <p className="font-medium mt-0.5">{lead.notes}</p>
+                            <div className="flex items-center gap-2">
+                              <Activity className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span>{lead.source}</span>
                             </div>
-                          )}
-                          {/* Action Buttons */}
+                          </div>
+
+                          {/* Tags */}
                           <div className="flex gap-1.5 flex-wrap">
+                            {lead.tags.map((tag, ti) => (
+                              <Badge key={ti} variant="secondary" className="text-[10px]">{tag}</Badge>
+                            ))}
+                            {lead.quotations > 0 && (
+                              <Badge className="text-[10px] text-white bg-blue-500">{lead.quotations} عرض سعر</Badge>
+                            )}
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex gap-2 flex-wrap">
                             <Button size="sm" className="text-xs h-7" style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>
                               <FileText className="w-3 h-3 ml-1" />
-                              عرض سعر جديد
+                              عرض سعر
+                            </Button>
+                            <Button size="sm" variant="outline" className="text-xs h-7">
+                              <Phone className="w-3 h-3 ml-1" />
+                              اتصال
+                            </Button>
+                            <Button size="sm" variant="outline" className="text-xs h-7">
+                              <MessageCircle className="w-3 h-3 ml-1" />
+                              واتساب
                             </Button>
                             <Button size="sm" variant="outline" className="text-xs h-7 text-green-600 border-green-200">
                               <Trophy className="w-3 h-3 ml-1" />
@@ -407,28 +339,18 @@ export default function CRM() {
                           </div>
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-
-              {/* Add card button */}
-              <button
-                className="w-full py-3 border-2 border-dashed rounded-lg text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors flex items-center justify-center gap-2"
-                onClick={() => setShowNewDialog(true)}
-              >
-                <Plus className="w-4 h-4" />
-                إضافة
-              </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ==================== New Opportunity Dialog ==================== */}
       <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
-          {/* Dialog Header */}
           <div className="sticky top-0 z-10 bg-background border-b">
             <DialogHeader className="p-5 pb-0">
               <DialogTitle className="text-lg font-bold flex items-center gap-2">
@@ -438,21 +360,17 @@ export default function CRM() {
                 فرصة جديدة
               </DialogTitle>
             </DialogHeader>
-
-            {/* Tabs */}
             <div className="flex gap-0 px-5 pt-4">
-              {[
+              {([
                 { key: "basic" as const, label: "البيانات الأساسية", icon: User },
                 { key: "details" as const, label: "تفاصيل المشروع", icon: Building },
                 { key: "notes" as const, label: "ملاحظات", icon: ClipboardList },
-              ].map((tab) => (
+              ]).map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
                   className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === tab.key
-                      ? "border-current text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
+                    activeTab === tab.key ? "border-current text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
                   }`}
                   style={activeTab === tab.key ? { borderColor: "oklch(0.72 0.10 60)" } : {}}
                 >
@@ -463,82 +381,49 @@ export default function CRM() {
             </div>
           </div>
 
-          {/* Form Content */}
           <div className="p-5 space-y-5">
-            {/* ===== Tab 1: البيانات الأساسية ===== */}
             {activeTab === "basic" && (
               <div className="space-y-5">
-                {/* اسم العميل + الهاتف */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5">
                       <User className="w-3.5 h-3.5 text-muted-foreground" />
                       اسم العميل <span className="text-red-500">*</span>
                     </label>
-                    <Input
-                      placeholder="أدخل اسم العميل الكامل"
-                      value={form.name}
-                      onChange={(e) => handleFormChange("name", e.target.value)}
-                    />
+                    <Input placeholder="أدخل اسم العميل الكامل" value={form.name} onChange={(e) => handleFormChange("name", e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5">
                       <Phone className="w-3.5 h-3.5 text-muted-foreground" />
                       رقم الهاتف <span className="text-red-500">*</span>
                     </label>
-                    <Input
-                      placeholder="9XXX XXXX"
-                      dir="ltr"
-                      className="text-right"
-                      value={form.phone}
-                      onChange={(e) => handleFormChange("phone", e.target.value)}
-                    />
+                    <Input placeholder="9XXX XXXX" dir="ltr" className="text-right" value={form.phone} onChange={(e) => handleFormChange("phone", e.target.value)} />
                   </div>
                 </div>
-
-                {/* البريد + الرقم المدني */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5">
                       <Mail className="w-3.5 h-3.5 text-muted-foreground" />
                       البريد الإلكتروني
                     </label>
-                    <Input
-                      type="email"
-                      placeholder="example@email.com"
-                      dir="ltr"
-                      className="text-right"
-                      value={form.email}
-                      onChange={(e) => handleFormChange("email", e.target.value)}
-                    />
+                    <Input type="email" placeholder="example@email.com" dir="ltr" className="text-right" value={form.email} onChange={(e) => handleFormChange("email", e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5">
                       <Hash className="w-3.5 h-3.5 text-muted-foreground" />
                       الرقم المدني
                     </label>
-                    <Input
-                      placeholder="أدخل الرقم المدني (12 رقم)"
-                      dir="ltr"
-                      className="text-right"
-                      maxLength={12}
-                      value={form.civilId}
-                      onChange={(e) => handleFormChange("civilId", e.target.value)}
-                    />
+                    <Input placeholder="12 رقم" dir="ltr" className="text-right" maxLength={12} value={form.civilId} onChange={(e) => handleFormChange("civilId", e.target.value)} />
                   </div>
                 </div>
-
-                {/* المسؤول + المصدر */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5">
                       <UserCheck className="w-3.5 h-3.5 text-muted-foreground" />
-                      المسؤول (Salesperson)
+                      المسؤول
                     </label>
                     <Select value={form.salesperson} onValueChange={(v) => handleFormChange("salesperson", v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="اختر المسؤول" />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="اختر المسؤول" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="أحمد">م. أحمد</SelectItem>
                         <SelectItem value="محمد">م. محمد</SelectItem>
@@ -557,9 +442,7 @@ export default function CRM() {
                       مصدر العميل
                     </label>
                     <Select value={form.source} onValueChange={(v) => handleFormChange("source", v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="كيف وصل العميل؟" />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="كيف وصل العميل؟" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="اتصال">اتصال هاتفي</SelectItem>
                         <SelectItem value="واتساب">واتساب</SelectItem>
@@ -572,8 +455,6 @@ export default function CRM() {
                     </Select>
                   </div>
                 </div>
-
-                {/* الأولوية */}
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium flex items-center gap-1.5">
                     <Star className="w-3.5 h-3.5 text-muted-foreground" />
@@ -585,15 +466,10 @@ export default function CRM() {
                       { value: "2", label: "مرتفع", stars: 2 },
                       { value: "3", label: "مرتفع جداً", stars: 3 },
                     ].map((p) => (
-                      <button
-                        key={p.value}
-                        onClick={() => handleFormChange("priority", p.value)}
+                      <button key={p.value} onClick={() => handleFormChange("priority", p.value)}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition-all ${
-                          form.priority === p.value
-                            ? "border-yellow-400 bg-yellow-50 text-yellow-700"
-                            : "border-border hover:border-yellow-200"
-                        }`}
-                      >
+                          form.priority === p.value ? "border-yellow-400 bg-yellow-50 text-yellow-700" : "border-border hover:border-yellow-200"
+                        }`}>
                         <div className="flex gap-0.5">
                           {[1, 2, 3].map((s) => (
                             <Star key={s} className={`w-3.5 h-3.5 ${s <= p.stars ? "fill-yellow-400 text-yellow-400" : "text-gray-200"}`} />
@@ -607,10 +483,8 @@ export default function CRM() {
               </div>
             )}
 
-            {/* ===== Tab 2: تفاصيل المشروع ===== */}
             {activeTab === "details" && (
               <div className="space-y-5">
-                {/* نوع العقار + نوع الخدمة */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5">
@@ -618,9 +492,7 @@ export default function CRM() {
                       نوع العقار
                     </label>
                     <Select value={form.type} onValueChange={(v) => handleFormChange("type", v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="اختر نوع العقار" />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="اختر نوع العقار" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="سكن خاص">سكن خاص</SelectItem>
                         <SelectItem value="استثماري">استثماري</SelectItem>
@@ -639,9 +511,7 @@ export default function CRM() {
                       نوع الخدمة
                     </label>
                     <Select value={form.serviceType} onValueChange={(v) => handleFormChange("serviceType", v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="اختر نوع الخدمة" />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="اختر نوع الخدمة" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="بناء جديد">بناء جديد</SelectItem>
                         <SelectItem value="هدم">هدم</SelectItem>
@@ -652,154 +522,72 @@ export default function CRM() {
                     </Select>
                   </div>
                 </div>
-
-                {/* الإيرادات المتوقعة + الاحتمالية */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5">
                       <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
                       الإيرادات المتوقعة (د.ك)
                     </label>
-                    <Input
-                      type="number"
-                      placeholder="0"
-                      dir="ltr"
-                      className="text-right"
-                      value={form.expectedRevenue}
-                      onChange={(e) => handleFormChange("expectedRevenue", e.target.value)}
-                    />
+                    <Input type="number" placeholder="0" dir="ltr" className="text-right" value={form.expectedRevenue} onChange={(e) => handleFormChange("expectedRevenue", e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5">
                       <Percent className="w-3.5 h-3.5 text-muted-foreground" />
                       احتمالية التعاقد (%)
                     </label>
-                    <Input
-                      type="number"
-                      placeholder="10"
-                      min="0"
-                      max="100"
-                      dir="ltr"
-                      className="text-right"
-                      value={form.probability}
-                      onChange={(e) => handleFormChange("probability", e.target.value)}
-                    />
+                    <Input type="number" placeholder="10" min="0" max="100" dir="ltr" className="text-right" value={form.probability} onChange={(e) => handleFormChange("probability", e.target.value)} />
                   </div>
                 </div>
-
-                {/* تاريخ الإغلاق المتوقع + الوسوم */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
                       تاريخ الإغلاق المتوقع
                     </label>
-                    <Input
-                      type="date"
-                      dir="ltr"
-                      className="text-right"
-                      value={form.expectedClosing}
-                      onChange={(e) => handleFormChange("expectedClosing", e.target.value)}
-                    />
+                    <Input type="date" dir="ltr" className="text-right" value={form.expectedClosing} onChange={(e) => handleFormChange("expectedClosing", e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5">
                       <Tag className="w-3.5 h-3.5 text-muted-foreground" />
-                      الوسوم (Tags)
+                      الوسوم
                     </label>
-                    <Input
-                      placeholder="مثال: بناء جديد, ذهبية (مفصولة بفاصلة)"
-                      value={form.tags}
-                      onChange={(e) => handleFormChange("tags", e.target.value)}
-                    />
+                    <Input placeholder="بناء جديد, ذهبية (مفصولة بفاصلة)" value={form.tags} onChange={(e) => handleFormChange("tags", e.target.value)} />
                   </div>
-                </div>
-
-                {/* Info Box */}
-                <div className="rounded-lg p-3 text-xs text-muted-foreground" style={{ backgroundColor: "oklch(0.72 0.10 60 / 0.08)" }}>
-                  <p className="font-medium mb-1" style={{ color: "oklch(0.55 0.10 60)" }}>💡 ملاحظة</p>
-                  <p>سيتم تحديد الباقة الهندسية المناسبة تلقائياً بناءً على نوع العقار ونوع الخدمة عند إنشاء عرض السعر.</p>
                 </div>
               </div>
             )}
 
-            {/* ===== Tab 3: ملاحظات ===== */}
             {activeTab === "notes" && (
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium flex items-center gap-1.5">
-                    <ClipboardList className="w-3.5 h-3.5 text-muted-foreground" />
-                    ملاحظات داخلية
-                  </label>
-                  <Textarea
-                    placeholder="أضف أي ملاحظات أو تفاصيل إضافية عن هذه الفرصة..."
-                    rows={5}
-                    value={form.notes}
-                    onChange={(e) => handleFormChange("notes", e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">هذه الملاحظات داخلية ولن تظهر للعميل</p>
+                  <label className="text-sm font-medium">ملاحظات داخلية</label>
+                  <Textarea placeholder="أضف ملاحظات عن هذه الفرصة..." rows={5} value={form.notes} onChange={(e) => handleFormChange("notes", e.target.value)} />
                 </div>
-
-                {/* Quick Summary */}
-                <div className="rounded-lg border p-4 space-y-3">
+                <div className="rounded-lg border p-4 space-y-2">
                   <h4 className="text-sm font-bold">ملخص الفرصة</h4>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-muted-foreground">العميل:</span>
-                      <p className="font-medium">{form.name || "—"}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">الهاتف:</span>
-                      <p className="font-medium" dir="ltr">{form.phone || "—"}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">نوع العقار:</span>
-                      <p className="font-medium">{form.type || "—"}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">نوع الخدمة:</span>
-                      <p className="font-medium">{form.serviceType || "—"}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">الإيرادات المتوقعة:</span>
-                      <p className="font-medium">{form.expectedRevenue ? `${form.expectedRevenue} د.ك` : "—"}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">المسؤول:</span>
-                      <p className="font-medium">{form.salesperson || "—"}</p>
-                    </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><span className="text-muted-foreground">العميل:</span> <span className="font-medium">{form.name || "—"}</span></div>
+                    <div><span className="text-muted-foreground">الهاتف:</span> <span className="font-medium" dir="ltr">{form.phone || "—"}</span></div>
+                    <div><span className="text-muted-foreground">نوع العقار:</span> <span className="font-medium">{form.type || "—"}</span></div>
+                    <div><span className="text-muted-foreground">نوع الخدمة:</span> <span className="font-medium">{form.serviceType || "—"}</span></div>
+                    <div><span className="text-muted-foreground">الإيرادات:</span> <span className="font-medium">{form.expectedRevenue ? `${form.expectedRevenue} د.ك` : "—"}</span></div>
+                    <div><span className="text-muted-foreground">المسؤول:</span> <span className="font-medium">{form.salesperson || "—"}</span></div>
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Footer Actions */}
           <div className="sticky bottom-0 bg-background border-t p-4 flex items-center justify-between gap-3">
-            <Button variant="outline" onClick={() => { setShowNewDialog(false); setForm(emptyForm); setActiveTab("basic"); }}>
-              إلغاء
-            </Button>
+            <Button variant="outline" onClick={() => { setShowNewDialog(false); setForm(emptyForm); setActiveTab("basic"); }}>إلغاء</Button>
             <div className="flex gap-2">
               {activeTab !== "basic" && (
-                <Button
-                  variant="outline"
-                  onClick={() => setActiveTab(activeTab === "notes" ? "details" : "basic")}
-                >
-                  السابق
-                </Button>
+                <Button variant="outline" onClick={() => setActiveTab(activeTab === "notes" ? "details" : "basic")}>السابق</Button>
               )}
               {activeTab !== "notes" ? (
-                <Button
-                  onClick={() => setActiveTab(activeTab === "basic" ? "details" : "notes")}
-                  style={{ backgroundColor: "oklch(0.30 0.05 250)" }}
-                >
-                  التالي
-                </Button>
+                <Button onClick={() => setActiveTab(activeTab === "basic" ? "details" : "notes")} style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>التالي</Button>
               ) : (
-                <Button
-                  onClick={handleSubmit}
-                  style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
-                >
+                <Button onClick={handleSubmit} style={{ backgroundColor: "oklch(0.55 0.15 150)" }}>
                   <Save className="w-4 h-4 ml-2" />
                   حفظ الفرصة
                 </Button>
