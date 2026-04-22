@@ -15,6 +15,7 @@ import ClientPortal from "./pages/ClientPortal";
 import Reports from "./pages/Reports";
 import Contracts from "./pages/Contracts";
 import SignTemplates from "./pages/SignTemplates";
+import ProjectDetail from "./pages/ProjectDetail";
 import DashboardLayout from "./components/DashboardLayout";
 
 function Router() {
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/crm" component={CRM} />
       <Route path="/quotations" component={Quotations} />
       <Route path="/projects" component={Projects} />
+      <Route path="/projects/:id" component={ProjectDetail} />
       <Route path="/tasks" component={Tasks} />
       <Route path="/documents" component={Documents} />
       <Route path="/payments" component={Payments} />
