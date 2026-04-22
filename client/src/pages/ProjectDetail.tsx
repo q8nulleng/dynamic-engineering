@@ -1,7 +1,11 @@
 /*
  * ProjectDetail - صفحة تفاصيل المشروع الداخلية
  * تعرض مراحل المشروع بنظام Kanban حسب نوع المشروع والخدمة
- * المراحل مبنية بدقة من Odoo.sh
+ * 4 أنواع مشاريع مدروسة من Odoo.sh:
+ *   1. بناء جديد سكن خاص (S00048) - 5 مراحل - 39 مهمة
+ *   2. بناء جديد صناعي (S00049) - 4 مراحل - 28 مهمة
+ *   3. تعديل واضافة سكن خاص (S00047) - 4 مراحل - 42 مهمة
+ *   4. تعديل سكن خاص (S00050) - 4 مراحل
  */
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,15 +27,37 @@ interface ProjectData {
 }
 
 /* ========================================================================
-   بيانات المشاريع - مراحل بناء جديد من Odoo S00048 بالتفصيل
+   قوالب المراحل حسب نوع المشروع - من Odoo.sh
+   ======================================================================== */
+
+/* --- مراحل الصب والأعمدة (مشتركة) --- */
+const structuralSubTasks = (done: boolean[]): SubTask[] => [
+  { name: "مرحلة الحفر", done: done[0] ?? false },
+  { name: "مرحلة القواعد", done: done[1] ?? false },
+  { name: "مرحلة أعمدة السرداب", done: done[2] ?? false },
+  { name: "مرحلة صب سقف السرداب", done: done[3] ?? false },
+  { name: "مرحلة أعمدة الدور الأرضي", done: done[4] ?? false },
+  { name: "مرحلة صب سقف الدور الأرضي", done: done[5] ?? false },
+  { name: "مرحلة أعمدة الدور الأول", done: done[6] ?? false },
+  { name: "مرحلة صب سقف الدور الأول", done: done[7] ?? false },
+  { name: "مرحلة أعمدة الدور الثاني", done: done[8] ?? false },
+  { name: "مرحلة صب سقف الدور الثاني", done: done[9] ?? false },
+  { name: "مرحلة أعمدة السطح", done: done[10] ?? false },
+  { name: "مرحلة صب سقف السطح", done: done[11] ?? false },
+];
+
+/* ========================================================================
+   بيانات المشاريع - 4 أنواع من Odoo.sh
    ======================================================================== */
 const projectsDB: Record<string, ProjectData> = {
 
-  /* ===== S00048 - فيلا ذهبية - بناء جديد سكن خاص (المرجع الأساسي) ===== */
+  /* ═══════════════════════════════════════════════════════════════════════
+     النوع 1: بناء جديد سكن خاص (S00048 - نت - 39 مهمة - 5 مراحل)
+     ═══════════════════════════════════════════════════════════════════════ */
   "S00048": {
-    id: "S00048", name: "فيلا ذهبية - الجهراء", client: "فهد العتيبي",
+    id: "S00048", name: "بناء جديد سكن خاص - نت", client: "فهد العتيبي",
     type: "سكن خاص", serviceType: "بناء جديد", area: "الجهراء", quotation: "S00048",
-    progress: 70, currentPhase: 3,
+    progress: 55, currentPhase: 3,
     phases: [
       {
         title: "المرحلة الأولى", subtitle: "تجهيز الملف",
@@ -67,14 +93,8 @@ const projectsDB: Record<string, ProjectData> = {
       {
         title: "المرحلة الرابعة", subtitle: "الكراسة والمخططات",
         tasks: [
-          { name: "تصميم المخطط الإنشائي", status: "in_progress", assignee: "م. أمين", subTasks: [
-            { name: "مرحلة الحفر", done: true }, { name: "مرحلة القواعد", done: true },
-            { name: "مرحلة أعمدة السرداب", done: true }, { name: "مرحلة صب سقف السرداب", done: true },
-            { name: "مرحلة أعمدة الدور الأرضي", done: true }, { name: "مرحلة صب سقف الدور الأرضي", done: true },
-            { name: "مرحلة أعمدة الدور الأول", done: false }, { name: "مرحلة صب سقف الدور الأول", done: false },
-            { name: "مرحلة أعمدة الدور الثاني", done: false }, { name: "مرحلة صب سقف الدور الثاني", done: false },
-            { name: "مرحلة أعمدة السطح", done: false }, { name: "مرحلة صب سقف السطح", done: false },
-          ]},
+          { name: "تصميم المخطط الإنشائي", status: "in_progress", assignee: "م. أمين",
+            subTasks: structuralSubTasks([true,true,true,true,true,true,false,false,false,false,false,false]) },
           { name: "تصميم مخطط الصحي", status: "pending", assignee: "م. أمين" },
           { name: "تصميم مخطط الكهرباء", status: "pending", assignee: "م. أمين" },
           { name: "تصميم مخطط الفرش", status: "pending", assignee: "م. مصطفى" },
@@ -85,14 +105,8 @@ const projectsDB: Record<string, ProjectData> = {
         title: "المرحلة الخامسة", subtitle: "الإشراف",
         tasks: [
           { name: "إصدار تعهد الإشراف", status: "pending", assignee: "محمد ثروت" },
-          { name: "الإشراف على التنفيذ", status: "pending", assignee: "م. فداء", subTasks: [
-            { name: "مرحلة الحفر", done: false }, { name: "مرحلة القواعد", done: false },
-            { name: "مرحلة أعمدة السرداب", done: false }, { name: "مرحلة صب سقف السرداب", done: false },
-            { name: "مرحلة أعمدة الدور الأرضي", done: false }, { name: "مرحلة صب سقف الدور الأرضي", done: false },
-            { name: "مرحلة أعمدة الدور الأول", done: false }, { name: "مرحلة صب سقف الدور الأول", done: false },
-            { name: "مرحلة أعمدة الدور الثاني", done: false }, { name: "مرحلة صب سقف الدور الثاني", done: false },
-            { name: "مرحلة أعمدة السطح", done: false }, { name: "مرحلة صب سقف السطح", done: false },
-          ]},
+          { name: "الإشراف على التنفيذ", status: "pending", assignee: "م. فداء",
+            subTasks: structuralSubTasks([false,false,false,false,false,false,false,false,false,false,false,false]) },
           { name: "كتب البنك", status: "pending", assignee: "محمد ثروت" },
           { name: "إنهاء الإشراف", status: "pending", assignee: "م. فداء" },
         ],
@@ -100,188 +114,16 @@ const projectsDB: Record<string, ProjectData> = {
     ],
   },
 
-  /* ===== S00047 - تعديل وإضافة سكن خاص ===== */
-  "S00047": {
-    id: "S00047", name: "تعديل وإضافة - مشرف", client: "تهاني خالد محمد بورسلي",
-    type: "سكن خاص", serviceType: "تعديل وإضافة", area: "مشرف - حولي", quotation: "S00047",
-    progress: 15, currentPhase: 0,
-    phases: [
-      {
-        title: "المرحلة الأولى", subtitle: "تجهيز الملف",
-        tasks: [
-          { name: "دراسة المخطط الإنشائي القديم", status: "in_progress", assignee: "م. أمين", subTasks: [
-            { name: "مراجعة المخططات القديمة", done: true, assignee: "م. أمين" },
-            { name: "تحليل الهيكل الإنشائي", done: false, assignee: "م. أمين" },
-            { name: "تقرير الحالة الإنشائية", done: false, assignee: "م. أمين" },
-          ]},
-          { name: "كشف على العقار", status: "done", assignee: "م. فداء" },
-          { name: "كروكي", status: "done", assignee: "م. مارك" },
-          { name: "تجميع المستندات", status: "in_progress", assignee: "محمد ثروت", subTasks: [
-            { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: false },
-          ]},
-          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد ثروت" },
-        ],
-      },
-      {
-        title: "المرحلة الثانية", subtitle: "التصميم",
-        tasks: [
-          { name: "سيستم الأعمدة", status: "blocked", assignee: "م. أمين" },
-          { name: "رسم مخطط البلدية", status: "pending", assignee: "عرفان" },
-        ],
-      },
-      {
-        title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد",
-        tasks: [
-          { name: "إرسال للبلدية", status: "pending", assignee: "محمد ثروت" },
-          { name: "اعتماد البلدية", status: "pending", assignee: "محمد ثروت" },
-          { name: "تحصيل الدفعة الأخيرة من العقد", status: "pending", assignee: "محمد ثروت" },
-        ],
-      },
-      {
-        title: "المرحلة الرابعة", subtitle: "الكراسة والمخططات",
-        tasks: [
-          { name: "تصميم المخطط الإنشائي", status: "pending", assignee: "م. أمين", subTasks: [
-            { name: "مرحلة الحفر", done: false }, { name: "مرحلة القواعد", done: false },
-            { name: "مرحلة أعمدة السرداب", done: false }, { name: "مرحلة صب سقف السرداب", done: false },
-            { name: "مرحلة أعمدة الدور الأرضي", done: false }, { name: "مرحلة صب سقف الدور الأرضي", done: false },
-            { name: "مرحلة أعمدة الدور الأول", done: false }, { name: "مرحلة صب سقف الدور الأول", done: false },
-            { name: "مرحلة أعمدة الدور الثاني", done: false }, { name: "مرحلة صب سقف الدور الثاني", done: false },
-            { name: "مرحلة أعمدة السطح", done: false }, { name: "مرحلة صب سقف السطح", done: false },
-          ]},
-          { name: "تصميم مخطط الصحي", status: "pending", assignee: "م. أمين" },
-          { name: "تصميم مخطط الكهرباء", status: "pending", assignee: "م. أمين" },
-          { name: "تصميم مخطط الفرش", status: "pending", assignee: "م. مصطفى" },
-          { name: "تجهيز الكراسة النهائية", status: "pending", assignee: "م. مارك" },
-        ],
-      },
-      {
-        title: "المرحلة الخامسة", subtitle: "الإشراف",
-        tasks: [
-          { name: "إصدار تعهد الإشراف", status: "pending", assignee: "محمد ثروت" },
-          { name: "الإشراف على التنفيذ", status: "pending", assignee: "م. فداء", subTasks: [
-            { name: "مرحلة الحفر", done: false }, { name: "مرحلة القواعد", done: false },
-            { name: "مرحلة الأعمدة", done: false }, { name: "مرحلة صب السقف", done: false },
-            { name: "مرحلة العزل", done: false }, { name: "مرحلة البلوك", done: false },
-          ]},
-          { name: "كتب البنك", status: "pending", assignee: "محمد ثروت" },
-          { name: "إنهاء الإشراف", status: "pending", assignee: "م. فداء" },
-        ],
-      },
-    ],
-  },
-
-  /* ===== S00046 - هدم سكن خاص ===== */
-  "S00046": {
-    id: "S00046", name: "هدم - السالمية", client: "أحمد الكويتي",
-    type: "سكن خاص", serviceType: "هدم", area: "السالمية - حولي", quotation: "S00046",
-    progress: 35, currentPhase: 1,
-    phases: [
-      {
-        title: "المرحلة الأولى", subtitle: "تجهيز الملف",
-        tasks: [
-          { name: "كشف على العقار", status: "done", assignee: "م. فداء" },
-          { name: "تجميع المستندات", status: "done", assignee: "محمد ثروت", subTasks: [
-            { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: true },
-          ]},
-          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد ثروت" },
-          { name: "كروكي", status: "done", assignee: "م. مارك" },
-        ],
-      },
-      {
-        title: "المرحلة الثانية", subtitle: "التصميم",
-        tasks: [
-          { name: "سيستم الأعمدة", status: "done", assignee: "م. أمين" },
-          { name: "رسم مخطط البلدية", status: "in_progress", assignee: "عرفان" },
-        ],
-      },
-      {
-        title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد",
-        tasks: [
-          { name: "إرسال للبلدية", status: "pending", assignee: "محمد ثروت" },
-          { name: "اعتماد البلدية", status: "pending", assignee: "محمد ثروت" },
-        ],
-      },
-    ],
-  },
-
-  /* ===== S00049 - مبنى تجاري بناء جديد ===== */
+  /* ═══════════════════════════════════════════════════════════════════════
+     النوع 2: بناء جديد صناعي (S00049 - 28 مهمة - 4 مراحل)
+     الفرق: المرحلة الثالثة فيها مطافي + تنظيم + بلدية (7 مهام)
+     المرحلة الرابعة أبسط (3 مهام بدون كهرباء وفرش)
+     لا يوجد مرحلة إشراف
+     ═══════════════════════════════════════════════════════════════════════ */
   "S00049": {
-    id: "S00049", name: "مبنى تجاري - حولي", client: "شركة الخليج",
-    type: "تجاري", serviceType: "بناء جديد", area: "حولي", quotation: "S00049",
-    progress: 55, currentPhase: 2,
-    phases: [
-      {
-        title: "المرحلة الأولى", subtitle: "تجهيز الملف",
-        tasks: [
-          { name: "تصميم الكروكي", status: "done", assignee: "م. مارك" },
-          { name: "تجميع المستندات", status: "done", assignee: "محمد ثروت", subTasks: [
-            { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: true },
-          ]},
-          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد ثروت" },
-          { name: "تجهيز النماذج والتعهدات والتوقيع", status: "done", assignee: "محمد ثروت" },
-          { name: "فحص التربة - كتاب الكهرباء", status: "done", assignee: "محمد ثروت", subTasks: [
-            { name: "فحص التربة تم الإرسال", done: true }, { name: "فحص التربة تم الاعتماد", done: true },
-            { name: "الكهرباء تم الإرسال", done: true }, { name: "الكهرباء تم الاعتماد", done: true },
-          ]},
-        ],
-      },
-      {
-        title: "المرحلة الثانية", subtitle: "التصميم",
-        tasks: [
-          { name: "سيستم الأعمدة", status: "done", assignee: "م. أمين" },
-          { name: "الواجهات", status: "done", assignee: "م. مصطفى" },
-          { name: "رسم مخطط البلدية", status: "done", assignee: "عرفان" },
-        ],
-      },
-      {
-        title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد",
-        tasks: [
-          { name: "إرسال للبلدية", status: "in_progress", assignee: "محمد ثروت" },
-          { name: "اعتماد البلدية", status: "pending", assignee: "محمد ثروت" },
-          { name: "تحصيل الدفعة الأخيرة من العقد", status: "pending", assignee: "محمد ثروت" },
-        ],
-      },
-      {
-        title: "المرحلة الرابعة", subtitle: "الكراسة والمخططات",
-        tasks: [
-          { name: "تصميم المخطط الإنشائي", status: "pending", assignee: "م. أمين", subTasks: [
-            { name: "مرحلة الحفر", done: false }, { name: "مرحلة القواعد", done: false },
-            { name: "مرحلة أعمدة السرداب", done: false }, { name: "مرحلة صب سقف السرداب", done: false },
-            { name: "مرحلة أعمدة الدور الأرضي", done: false }, { name: "مرحلة صب سقف الدور الأرضي", done: false },
-            { name: "مرحلة أعمدة الدور الأول", done: false }, { name: "مرحلة صب سقف الدور الأول", done: false },
-            { name: "مرحلة أعمدة الدور الثاني", done: false }, { name: "مرحلة صب سقف الدور الثاني", done: false },
-            { name: "مرحلة أعمدة السطح", done: false }, { name: "مرحلة صب سقف السطح", done: false },
-          ]},
-          { name: "تصميم مخطط الصحي", status: "pending", assignee: "م. أمين" },
-          { name: "تصميم مخطط الكهرباء", status: "pending", assignee: "م. أمين" },
-          { name: "تصميم مخطط الفرش", status: "pending", assignee: "م. مصطفى" },
-          { name: "تجهيز الكراسة النهائية", status: "pending", assignee: "م. مارك" },
-        ],
-      },
-      {
-        title: "المرحلة الخامسة", subtitle: "الإشراف",
-        tasks: [
-          { name: "إصدار تعهد الإشراف", status: "pending", assignee: "محمد ثروت" },
-          { name: "الإشراف على التنفيذ", status: "pending", assignee: "م. فداء", subTasks: [
-            { name: "مرحلة الحفر", done: false }, { name: "مرحلة القواعد", done: false },
-            { name: "مرحلة أعمدة السرداب", done: false }, { name: "مرحلة صب سقف السرداب", done: false },
-            { name: "مرحلة أعمدة الدور الأرضي", done: false }, { name: "مرحلة صب سقف الدور الأرضي", done: false },
-            { name: "مرحلة أعمدة الدور الأول", done: false }, { name: "مرحلة صب سقف الدور الأول", done: false },
-            { name: "مرحلة أعمدة الدور الثاني", done: false }, { name: "مرحلة صب سقف الدور الثاني", done: false },
-            { name: "مرحلة أعمدة السطح", done: false }, { name: "مرحلة صب سقف السطح", done: false },
-          ]},
-          { name: "كتب البنك", status: "pending", assignee: "محمد ثروت" },
-          { name: "إنهاء الإشراف", status: "pending", assignee: "م. فداء" },
-        ],
-      },
-    ],
-  },
-
-  /* ===== S00050 - مجمع استثماري بناء جديد ===== */
-  "S00050": {
-    id: "S00050", name: "مجمع - الفحيحيل", client: "محمد العلي",
-    type: "استثماري", serviceType: "بناء جديد", area: "الفحيحيل - الأحمدي", quotation: "S00050",
-    progress: 20, currentPhase: 1,
+    id: "S00049", name: "بناء جديد صناعي", client: "شركة الخليج",
+    type: "صناعي", serviceType: "بناء جديد", area: "حولي", quotation: "S00049",
+    progress: 30, currentPhase: 1,
     phases: [
       {
         title: "المرحلة الأولى", subtitle: "تجهيز الملف",
@@ -302,114 +144,190 @@ const projectsDB: Record<string, ProjectData> = {
         title: "المرحلة الثانية", subtitle: "التصميم",
         tasks: [
           { name: "سيستم الأعمدة", status: "in_progress", assignee: "م. أمين" },
-          { name: "الواجهات", status: "pending", assignee: "م. مصطفى" },
-          { name: "رسم مخطط البلدية", status: "pending", assignee: "عرفان" },
+          { name: "الواجهات", status: "blocked", assignee: "م. مصطفى" },
+          { name: "رسم مخطط البلدية", status: "blocked", assignee: "عرفان" },
         ],
       },
       {
-        title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد",
+        title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد (مطافي + تنظيم + بلدية)",
         tasks: [
-          { name: "إرسال للبلدية", status: "pending", assignee: "محمد ثروت" },
-          { name: "اعتماد البلدية", status: "pending", assignee: "محمد ثروت" },
-          { name: "تحصيل الدفعة الأخيرة من العقد", status: "pending", assignee: "محمد ثروت" },
+          { name: "إرسال للمطافي", status: "blocked", assignee: "محمد ثروت" },
+          { name: "اعتماد المطافي", status: "blocked", assignee: "محمد ثروت" },
+          { name: "إرسال للتنظيم", status: "blocked", assignee: "محمد ثروت" },
+          { name: "اعتماد التنظيم", status: "blocked", assignee: "محمد ثروت" },
+          { name: "إرسال للبلدية", status: "blocked", assignee: "محمد ثروت" },
+          { name: "اعتماد البلدية", status: "blocked", assignee: "محمد ثروت" },
+          { name: "تحصيل الدفعة الأخيرة من العقد", status: "blocked", assignee: "محمد ثروت" },
         ],
       },
       {
-        title: "المرحلة الرابعة", subtitle: "الكراسة والمخططات",
+        title: "المرحلة الرابعة", subtitle: "الكراسة",
         tasks: [
-          { name: "تصميم المخطط الإنشائي", status: "pending", assignee: "م. أمين" },
-          { name: "تصميم مخطط الصحي", status: "pending", assignee: "م. أمين" },
-          { name: "تصميم مخطط الكهرباء", status: "pending", assignee: "م. أمين" },
-          { name: "تصميم مخطط الفرش", status: "pending", assignee: "م. مصطفى" },
-          { name: "تجهيز الكراسة النهائية", status: "pending", assignee: "م. مارك" },
-        ],
-      },
-      {
-        title: "المرحلة الخامسة", subtitle: "الإشراف",
-        tasks: [
-          { name: "إصدار تعهد الإشراف", status: "pending", assignee: "محمد ثروت" },
-          { name: "الإشراف على التنفيذ", status: "pending", assignee: "م. فداء" },
-          { name: "كتب البنك", status: "pending", assignee: "محمد ثروت" },
-          { name: "إنهاء الإشراف", status: "pending", assignee: "م. فداء" },
+          { name: "تصميم المخطط الإنشائي", status: "blocked", assignee: "م. أمين" },
+          { name: "تصميم مخطط الصحي", status: "blocked", assignee: "م. أمين" },
+          { name: "تجهيز الكراسة النهائية", status: "blocked", assignee: "م. مارك" },
         ],
       },
     ],
   },
 
-  /* ===== S00051 - فيلا بناء جديد سكن خاص (بداية) ===== */
-  "S00051": {
-    id: "S00051", name: "فيلا - الجهراء", client: "عبدالله السعيد",
-    type: "سكن خاص", serviceType: "بناء جديد", area: "الجهراء", quotation: "S00051",
-    progress: 10, currentPhase: 0,
+  /* ═══════════════════════════════════════════════════════════════════════
+     النوع 3: تعديل واضافة سكن خاص (S00047 - 42 مهمة - 4 مراحل)
+     الفرق: المرحلة الأولى تبدأ بدراسة المخطط القديم + كشف على العقار
+     لا يوجد فحص تربة أو كتاب كهرباء أو نماذج وتعهدات
+     المرحلة الثانية بدون واجهات
+     المرحلة الرابعة: مخطط إنشائي كامل + كراسة (بدون صحي وكهرباء وفرش)
+     ═══════════════════════════════════════════════════════════════════════ */
+  "S00047": {
+    id: "S00047", name: "تعديل وإضافة سكن خاص - مشرف", client: "تهاني خالد محمد بورسلي",
+    type: "سكن خاص", serviceType: "تعديل وإضافة", area: "مشرف - حولي", quotation: "S00047",
+    progress: 15, currentPhase: 0,
     phases: [
       {
         title: "المرحلة الأولى", subtitle: "تجهيز الملف",
         tasks: [
-          { name: "تصميم الكروكي", status: "done", assignee: "م. مارك" },
-          { name: "تجميع المستندات", status: "in_progress", assignee: "محمد ثروت", subTasks: [
+          { name: "دراسة المخطط الإنشائي القديم", status: "in_progress", assignee: "م. أمين",
+            subTasks: structuralSubTasks([false,false,false,false,false,false,false,false,false,false,false,false]) },
+          { name: "كشف على العقار", status: "done", assignee: "م. فداء" },
+          { name: "كروكي", status: "done", assignee: "م. مارك" },
+          { name: "جمع الوثائق والمستندات", status: "in_progress", assignee: "محمد ثروت", subTasks: [
             { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: false },
           ]},
-          { name: "العقد وتحصيل الدفعة الأولى", status: "pending", assignee: "محمد ثروت" },
-          { name: "تجهيز النماذج والتعهدات والتوقيع", status: "pending", assignee: "محمد ثروت" },
-          { name: "فحص التربة - كتاب الكهرباء", status: "pending", assignee: "محمد ثروت", subTasks: [
-            { name: "فحص التربة تم الإرسال", done: false }, { name: "فحص التربة تم الاعتماد", done: false },
-            { name: "الكهرباء تم الإرسال", done: false }, { name: "الكهرباء تم الاعتماد", done: false },
-          ]},
+          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد ثروت" },
         ],
       },
       {
         title: "المرحلة الثانية", subtitle: "التصميم",
         tasks: [
-          { name: "سيستم الأعمدة", status: "pending", assignee: "م. أمين" },
-          { name: "الواجهات", status: "pending", assignee: "م. مصطفى" },
-          { name: "رسم مخطط البلدية", status: "pending", assignee: "عرفان" },
+          { name: "سيستم الأعمدة", status: "blocked", assignee: "م. أمين" },
+          { name: "رسم البلدية", status: "blocked", assignee: "عرفان" },
         ],
       },
       {
         title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد",
         tasks: [
-          { name: "إرسال للبلدية", status: "pending", assignee: "محمد ثروت" },
-          { name: "اعتماد البلدية", status: "pending", assignee: "محمد ثروت" },
-          { name: "تحصيل الدفعة الأخيرة من العقد", status: "pending", assignee: "محمد ثروت" },
+          { name: "إرسال للبلدية", status: "blocked", assignee: "محمد ثروت" },
+          { name: "اعتماد البلدية", status: "blocked", assignee: "محمد ثروت" },
+          { name: "تحصيل الدفعة الأخيرة من العقد", status: "blocked", assignee: "محمد ثروت" },
         ],
       },
       {
-        title: "المرحلة الرابعة", subtitle: "الكراسة والمخططات",
+        title: "المرحلة الرابعة", subtitle: "الكراسة والإشراف",
         tasks: [
-          { name: "تصميم المخطط الإنشائي", status: "pending", assignee: "م. أمين", subTasks: [
-            { name: "مرحلة الحفر", done: false }, { name: "مرحلة القواعد", done: false },
-            { name: "مرحلة أعمدة السرداب", done: false }, { name: "مرحلة صب سقف السرداب", done: false },
-            { name: "مرحلة أعمدة الدور الأرضي", done: false }, { name: "مرحلة صب سقف الدور الأرضي", done: false },
-            { name: "مرحلة أعمدة الدور الأول", done: false }, { name: "مرحلة صب سقف الدور الأول", done: false },
-            { name: "مرحلة أعمدة الدور الثاني", done: false }, { name: "مرحلة صب سقف الدور الثاني", done: false },
-            { name: "مرحلة أعمدة السطح", done: false }, { name: "مرحلة صب سقف السطح", done: false },
-          ]},
-          { name: "تصميم مخطط الصحي", status: "pending", assignee: "م. أمين" },
-          { name: "تصميم مخطط الكهرباء", status: "pending", assignee: "م. أمين" },
-          { name: "تصميم مخطط الفرش", status: "pending", assignee: "م. مصطفى" },
-          { name: "تجهيز الكراسة النهائية", status: "pending", assignee: "م. مارك" },
-        ],
-      },
-      {
-        title: "المرحلة الخامسة", subtitle: "الإشراف",
-        tasks: [
-          { name: "إصدار تعهد الإشراف", status: "pending", assignee: "محمد ثروت" },
-          { name: "الإشراف على التنفيذ", status: "pending", assignee: "م. فداء", subTasks: [
-            { name: "مرحلة الحفر", done: false }, { name: "مرحلة القواعد", done: false },
-            { name: "مرحلة أعمدة السرداب", done: false }, { name: "مرحلة صب سقف السرداب", done: false },
-            { name: "مرحلة أعمدة الدور الأرضي", done: false }, { name: "مرحلة صب سقف الدور الأرضي", done: false },
-            { name: "مرحلة أعمدة الدور الأول", done: false }, { name: "مرحلة صب سقف الدور الأول", done: false },
-            { name: "مرحلة أعمدة الدور الثاني", done: false }, { name: "مرحلة صب سقف الدور الثاني", done: false },
-            { name: "مرحلة أعمدة السطح", done: false }, { name: "مرحلة صب سقف السطح", done: false },
-          ]},
-          { name: "كتب البنك", status: "pending", assignee: "محمد ثروت" },
-          { name: "إنهاء الإشراف", status: "pending", assignee: "م. فداء" },
+          { name: "مخطط إنشائي كامل", status: "blocked", assignee: "م. أمين",
+            subTasks: structuralSubTasks([false,false,false,false,false,false,false,false,false,false,false,false]) },
+          { name: "تجهيز الكراسة النهائية", status: "blocked", assignee: "م. مارك" },
         ],
       },
     ],
   },
 
-  /* ===== S00045 - فيلا بناء جديد (شبه مكتمل) ===== */
+  /* ═══════════════════════════════════════════════════════════════════════
+     النوع 4: تعديل سكن خاص (S00050 - 4 مراحل)
+     مشابه لتعديل واضافة لكن بدون مراحل الإضافة
+     المرحلة الأولى: دراسة مخطط قديم + كشف + مستندات + عقد (بدون كروكي)
+     المرحلة الثانية: سيستم أعمدة + رسم بلدية
+     المرحلة الثالثة: بلدية واعتماد
+     المرحلة الرابعة: كراسة
+     ═══════════════════════════════════════════════════════════════════════ */
+  "S00050": {
+    id: "S00050", name: "تعديل سكن خاص", client: "سالم المطيري",
+    type: "سكن خاص", serviceType: "تعديل", area: "السالمية - حولي", quotation: "S00050",
+    progress: 40, currentPhase: 1,
+    phases: [
+      {
+        title: "المرحلة الأولى", subtitle: "تجهيز الملف",
+        tasks: [
+          { name: "دراسة المخطط الإنشائي القديم", status: "done", assignee: "م. أمين",
+            subTasks: structuralSubTasks([true,true,true,true,true,true,true,true,true,true,true,true]) },
+          { name: "كشف على العقار", status: "done", assignee: "م. فداء" },
+          { name: "جمع الوثائق والمستندات", status: "done", assignee: "محمد ثروت", subTasks: [
+            { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: true },
+          ]},
+          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد ثروت" },
+        ],
+      },
+      {
+        title: "المرحلة الثانية", subtitle: "التصميم",
+        tasks: [
+          { name: "سيستم الأعمدة", status: "in_progress", assignee: "م. أمين" },
+          { name: "رسم البلدية", status: "blocked", assignee: "عرفان" },
+        ],
+      },
+      {
+        title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد",
+        tasks: [
+          { name: "إرسال للبلدية", status: "blocked", assignee: "محمد ثروت" },
+          { name: "اعتماد البلدية", status: "blocked", assignee: "محمد ثروت" },
+          { name: "تحصيل الدفعة الأخيرة من العقد", status: "blocked", assignee: "محمد ثروت" },
+        ],
+      },
+      {
+        title: "المرحلة الرابعة", subtitle: "الكراسة",
+        tasks: [
+          { name: "مخطط إنشائي كامل", status: "blocked", assignee: "م. أمين",
+            subTasks: structuralSubTasks([false,false,false,false,false,false,false,false,false,false,false,false]) },
+          { name: "تجهيز الكراسة النهائية", status: "blocked", assignee: "م. مارك" },
+        ],
+      },
+    ],
+  },
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     النوع 2 (مثال ثاني): تعديل صناعي (S00051 - 5 مراحل)
+     مزيج بين تعديل سكن خاص + متطلبات الصناعي (مطافي + تنظيم)
+     ═══════════════════════════════════════════════════════════════════════ */
+  "S00051": {
+    id: "S00051", name: "تعديل صناعي", client: "مؤسسة البناء",
+    type: "صناعي", serviceType: "تعديل", area: "الشويخ الصناعية", quotation: "S00051",
+    progress: 10, currentPhase: 0,
+    phases: [
+      {
+        title: "المرحلة الأولى", subtitle: "تجهيز الملف",
+        tasks: [
+          { name: "دراسة المخطط الإنشائي القديم", status: "in_progress", assignee: "م. أمين",
+            subTasks: structuralSubTasks([true,true,false,false,false,false,false,false,false,false,false,false]) },
+          { name: "كشف على العقار", status: "done", assignee: "م. فداء" },
+          { name: "جمع الوثائق والمستندات", status: "in_progress", assignee: "محمد ثروت", subTasks: [
+            { name: "الموقع العام", done: true }, { name: "المدنية", done: false }, { name: "الوثيقة", done: false },
+          ]},
+          { name: "العقد وتحصيل الدفعة الأولى", status: "pending", assignee: "محمد ثروت" },
+        ],
+      },
+      {
+        title: "المرحلة الثانية", subtitle: "التصميم",
+        tasks: [
+          { name: "سيستم الأعمدة", status: "blocked", assignee: "م. أمين" },
+          { name: "رسم البلدية", status: "blocked", assignee: "عرفان" },
+        ],
+      },
+      {
+        title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد (مطافي + تنظيم + بلدية)",
+        tasks: [
+          { name: "إرسال للمطافي", status: "blocked", assignee: "محمد ثروت" },
+          { name: "اعتماد المطافي", status: "blocked", assignee: "محمد ثروت" },
+          { name: "إرسال للتنظيم", status: "blocked", assignee: "محمد ثروت" },
+          { name: "اعتماد التنظيم", status: "blocked", assignee: "محمد ثروت" },
+          { name: "إرسال للبلدية", status: "blocked", assignee: "محمد ثروت" },
+          { name: "اعتماد البلدية", status: "blocked", assignee: "محمد ثروت" },
+          { name: "تحصيل الدفعة الأخيرة من العقد", status: "blocked", assignee: "محمد ثروت" },
+        ],
+      },
+      {
+        title: "المرحلة الرابعة", subtitle: "الكراسة",
+        tasks: [
+          { name: "مخطط إنشائي كامل", status: "blocked", assignee: "م. أمين" },
+          { name: "تصميم مخطط الصحي", status: "blocked", assignee: "م. أمين" },
+          { name: "تجهيز الكراسة النهائية", status: "blocked", assignee: "م. مارك" },
+        ],
+      },
+    ],
+  },
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     مثال إضافي: بناء جديد سكن خاص (S00045 - شبه مكتمل)
+     لتوضيح مشروع في مرحلة الإشراف
+     ═══════════════════════════════════════════════════════════════════════ */
   "S00045": {
     id: "S00045", name: "فيلا - صباح الأحمد", client: "خالد الرشيدي",
     type: "سكن خاص", serviceType: "بناء جديد", area: "صباح الأحمد - مبارك الكبير", quotation: "S00045",
@@ -455,14 +373,8 @@ const projectsDB: Record<string, ProjectData> = {
         title: "المرحلة الخامسة", subtitle: "الإشراف",
         tasks: [
           { name: "إصدار تعهد الإشراف", status: "done", assignee: "محمد ثروت" },
-          { name: "الإشراف على التنفيذ", status: "in_progress", assignee: "م. فداء", subTasks: [
-            { name: "مرحلة الحفر", done: true }, { name: "مرحلة القواعد", done: true },
-            { name: "مرحلة أعمدة السرداب", done: true }, { name: "مرحلة صب سقف السرداب", done: true },
-            { name: "مرحلة أعمدة الدور الأرضي", done: true }, { name: "مرحلة صب سقف الدور الأرضي", done: true },
-            { name: "مرحلة أعمدة الدور الأول", done: true }, { name: "مرحلة صب سقف الدور الأول", done: true },
-            { name: "مرحلة أعمدة الدور الثاني", done: true }, { name: "مرحلة صب سقف الدور الثاني", done: true },
-            { name: "مرحلة أعمدة السطح", done: true }, { name: "مرحلة صب سقف السطح", done: true },
-          ]},
+          { name: "الإشراف على التنفيذ", status: "in_progress", assignee: "م. فداء",
+            subTasks: structuralSubTasks([true,true,true,true,true,true,true,true,true,true,true,true]) },
           { name: "كتب البنك", status: "done", assignee: "محمد ثروت" },
           { name: "إنهاء الإشراف", status: "pending", assignee: "م. فداء" },
         ],
