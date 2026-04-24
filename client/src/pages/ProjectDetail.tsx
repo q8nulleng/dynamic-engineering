@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useRoute, Link } from "wouter";
+import SketchTaskPanel from "@/components/SketchTaskPanel";
 
 /* ===== Types ===== */
 interface SubTask { name: string; done: boolean; assignee?: string; }
@@ -650,6 +651,8 @@ export default function ProjectDetail() {
   const projectId = params?.id || "";
   const project = projectsDB[projectId];
   const [selectedTask, setSelectedTask] = useState<{ task: Task; phaseTitle: string; phaseColor: string } | null>(null);
+  const [showSketchPanel, setShowSketchPanel] = useState(false);
+  const [sketchPanelColor, setSketchPanelColor] = useState("");
 
   if (!project) {
     return (
@@ -678,6 +681,12 @@ export default function ProjectDetail() {
           phaseTitle={selectedTask.phaseTitle}
           phaseColor={selectedTask.phaseColor}
           onClose={() => setSelectedTask(null)}
+        />
+      )}
+      {showSketchPanel && (
+        <SketchTaskPanel
+          phaseColor={sketchPanelColor}
+          onClose={() => setShowSketchPanel(false)}
         />
       )}
 
@@ -786,7 +795,14 @@ export default function ProjectDetail() {
                       key={ti}
                       className="p-3 rounded-xl border bg-background transition-all cursor-pointer hover:shadow-md hover:border-opacity-80 group"
                       style={{ borderColor: "transparent", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
-                      onClick={() => setSelectedTask({ task, phaseTitle: phase.title, phaseColor: color })}
+                      onClick={() => {
+                        if (task.name === "تصميم الكروكي") {
+                          setSketchPanelColor(color);
+                          setShowSketchPanel(true);
+                        } else {
+                          setSelectedTask({ task, phaseTitle: phase.title, phaseColor: color });
+                        }
+                      }}
                       onMouseEnter={e => (e.currentTarget.style.borderColor = color)}
                       onMouseLeave={e => (e.currentTarget.style.borderColor = "transparent")}
                     >
