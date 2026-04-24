@@ -24,7 +24,13 @@ interface Meeting {
 /* ─── Static project data (filled once) ─── */
 const PROJECT_INFO = {
   plot: { area: "400 م²", shape: "زاوية", facing: "شمال", location: "الجهراء - ق12", blocked: ["جنوب", "شرق", "غرب"] },
-  floors: ["سرداب", "أرضي", "أول", "ثاني", "سطح"],
+  floors: [
+    { name: "سرداب",  rooms: "خادمة، مغسلة، مستودع، كهرباء",                         notes: "مدخل سيارات مزدوج، ارتفاع 3م" },
+    { name: "أرضي",   rooms: "مجلس رجال، استقبال، ضيوف، مطبخ، حديقة",               notes: "مجلس رجال بمدخل مستقل" },
+    { name: "أول",    rooms: "ماستر + دريسنج، 3 غرف أطفال، صالة، مطبخ صغير",         notes: "ماستر بإطلالة على الحديقة" },
+    { name: "ثاني",   rooms: "غرفة والدين، غرفة إضافية، صالة",                       notes: "مدخل مستقل للوالدين" },
+    { name: "سطح",    rooms: "ملحق: غرفة + حمام، مجلس مكشوف، مسبح 8×4م",            notes: "مظلة للمجلس المكشوف" },
+  ],
   style: "موديرن كلاسيك",
   colors: "بيج + رمادي + أبيض",
   materials: "حجر طبيعي + زجاج",
@@ -169,11 +175,17 @@ export default function SketchTaskPanel({ onClose, phaseColor }: { onClose: () =
 
               {/* Floors + Style in one row */}
               <div className="grid grid-cols-2 gap-2">
-                <div className="bg-background rounded-lg px-2.5 py-2 border border-border/40">
-                  <p className="text-[9px] text-muted-foreground mb-1 flex items-center gap-1"><Building2 className="w-2.5 h-2.5" />الأدوار</p>
-                  <div className="flex flex-wrap gap-1">
+                <div className="bg-background rounded-lg px-2.5 py-2 border border-border/40 col-span-2">
+                  <p className="text-[9px] text-muted-foreground mb-1.5 flex items-center gap-1"><Building2 className="w-2.5 h-2.5" />متطلبات الأدوار</p>
+                  <div className="space-y-1.5">
                     {PROJECT_INFO.floors.map(f => (
-                      <span key={f} className="text-[9px] px-1.5 py-0.5 rounded-md bg-muted/50">{f}</span>
+                      <div key={f.name} className="flex gap-2 text-[10px] rounded-lg bg-muted/30 px-2 py-1.5">
+                        <span className="font-bold shrink-0 w-8" style={{ color: phaseColor }}>{f.name}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="leading-snug">{f.rooms}</p>
+                          <p className="text-[9px] text-muted-foreground mt-0.5">📌 {f.notes}</p>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
