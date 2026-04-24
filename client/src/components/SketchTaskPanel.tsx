@@ -1,54 +1,90 @@
 /*
- * SketchTaskPanel - نافذة تصميم الكروكي المتخصصة (مختصرة)
- * تصميم مكثف يحافظ على: القسيمة، الأدوار، طابع التصميم، الاجتماعات
+ * SketchTaskPanel - كرت تصميم الكروكي
+ * - معلومات المشروع الثابتة (قسيمة + أدوار + تصميم) → مختصرة في أعلى الكرت، قابلة للطي
+ * - الجزء الرئيسي → سجل الجلسات مع المالك
  */
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  X, PenLine, MapPin, Building2, Palette, Users,
-  CheckCircle2, Clock, Plus, Calendar, ChevronRight,
-  ChevronDown, ChevronUp, Layers, Home, Compass
+  X, PenLine, MapPin, ChevronRight, ChevronDown, ChevronUp,
+  Calendar, Users, CheckCircle2, Plus, Clock, Edit3,
+  Building2, Palette, Layers, Trash2, Save
 } from "lucide-react";
 
 /* ─── Types ─── */
 interface Meeting {
-  id: number; date: string; attendees: string[];
-  agreed: string[]; changes: string; status: "confirmed" | "pending";
+  id: number;
+  date: string;
+  attendees: string[];
+  agreed: string[];
+  changes: string;
+  status: "confirmed" | "pending";
 }
 
-const FLOORS = [
-  { key: "سرداب", label: "السرداب", rooms: "خادمة، مغسلة، مستودع، كهرباء", notes: "مدخل سيارات مزدوج، ارتفاع 3م", color: "oklch(0.55 0.10 200)", icon: Layers },
-  { key: "أرضي", label: "الأرضي", rooms: "مجلس رجال، استقبال، ضيوف، مطبخ، حديقة", notes: "مجلس رجال بمدخل مستقل", color: "oklch(0.60 0.12 30)", icon: Home },
-  { key: "أول", label: "الأول", rooms: "ماستر + دريسنج، 3 غرف أطفال، صالة، مطبخ صغير", notes: "ماستر بإطلالة على الحديقة", color: "oklch(0.55 0.15 250)", icon: Building2 },
-  { key: "ثاني", label: "الثاني", rooms: "غرفة والدين، غرفة إضافية، صالة", notes: "مدخل مستقل للوالدين", color: "oklch(0.60 0.15 280)", icon: Building2 },
-  { key: "سطح", label: "السطح", rooms: "ملحق: غرفة + حمام، مجلس مكشوف، مسبح 8×4م", notes: "مظلة للمجلس المكشوف", color: "oklch(0.55 0.15 150)", icon: Compass },
-];
+/* ─── Static project data (filled once) ─── */
+const PROJECT_INFO = {
+  plot: { area: "400 م²", shape: "زاوية", facing: "شمال", location: "الجهراء - ق12", blocked: ["جنوب", "شرق", "غرب"] },
+  floors: ["سرداب", "أرضي", "أول", "ثاني", "سطح"],
+  style: "موديرن كلاسيك",
+  colors: "بيج + رمادي + أبيض",
+  materials: "حجر طبيعي + زجاج",
+};
 
-const MEETINGS: Meeting[] = [
-  { id: 1, date: "2026-04-10", attendees: ["م. مارك", "فهد العتيبي"],
+/* ─── Initial meetings ─── */
+const INITIAL_MEETINGS: Meeting[] = [
+  {
+    id: 1, date: "2026-04-10", attendees: ["م. مارك", "فهد العتيبي"],
     agreed: ["مساحة 400م²", "واجهة شمالية", "موديرن كلاسيك", "مدخل رجال شرقي"],
-    changes: "جلسة أولى — لا تعديلات", status: "confirmed" },
-  { id: 2, date: "2026-04-14", attendees: ["م. مارك", "م. مصطفى", "فهد العتيبي"],
+    changes: "جلسة أولى — لا تعديلات", status: "confirmed",
+  },
+  {
+    id: 2, date: "2026-04-14", attendees: ["م. مارك", "م. مصطفى", "فهد العتيبي"],
     agreed: ["مسبح في السطح", "تعديل موقع المطبخ", "دريسنج للماستر"],
-    changes: "نقل المطبخ للجهة الغربية", status: "confirmed" },
-  { id: 3, date: "2026-04-20", attendees: ["م. مارك", "فهد العتيبي"],
+    changes: "نقل المطبخ للجهة الغربية", status: "confirmed",
+  },
+  {
+    id: 3, date: "2026-04-20", attendees: ["م. مارك", "فهد العتيبي"],
     agreed: ["مراجعة الكروكي الأول", "تعديل الواجهة", "اعتماد التوزيع"],
-    changes: "إضافة أعمدة كلاسيكية للواجهة", status: "pending" },
+    changes: "إضافة أعمدة كلاسيكية للواجهة", status: "pending",
+  },
 ];
 
-type Tab = "plot" | "floors" | "style" | "meetings";
+/* ─── New meeting form default ─── */
+const EMPTY_MEETING = { date: "", attendees: "", agreed: "", changes: "" };
 
 export default function SketchTaskPanel({ onClose, phaseColor }: { onClose: () => void; phaseColor: string }) {
-  const [tab, setTab] = useState<Tab>("plot");
-  const [openMeeting, setOpenMeeting] = useState<number | null>(1);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [meetings, setMeetings] = useState<Meeting[]>(INITIAL_MEETINGS);
+  const [openMeeting, setOpenMeeting] = useState<number | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [form, setForm] = useState(EMPTY_MEETING);
 
-  const tabs: { id: Tab; label: string; icon: React.ElementType; badge?: number }[] = [
-    { id: "plot",     label: "القسيمة",      icon: MapPin },
-    { id: "floors",   label: "الأدوار",       icon: Building2, badge: 5 },
-    { id: "style",    label: "التصميم",       icon: Palette },
-    { id: "meetings", label: "الاجتماعات",    icon: Users, badge: 3 },
-  ];
+  function addMeeting() {
+    if (!form.date || !form.agreed) return;
+    const newM: Meeting = {
+      id: meetings.length + 1,
+      date: form.date,
+      attendees: form.attendees.split("،").map(s => s.trim()).filter(Boolean),
+      agreed: form.agreed.split("\n").map(s => s.trim()).filter(Boolean),
+      changes: form.changes || "—",
+      status: "pending",
+    };
+    setMeetings(prev => [...prev, newM]);
+    setForm(EMPTY_MEETING);
+    setShowAddForm(false);
+    setOpenMeeting(newM.id);
+  }
+
+  function confirmMeeting(id: number) {
+    setMeetings(prev => prev.map(m => m.id === id ? { ...m, status: "confirmed" } : m));
+  }
+
+  function deleteMeeting(id: number) {
+    setMeetings(prev => prev.filter(m => m.id !== id));
+  }
+
+  const totalAgreed = meetings.reduce((s, m) => s + m.agreed.length, 0);
+  const totalChanges = meetings.filter(m => m.changes !== "—" && !m.changes.includes("لا تعديلات")).length;
 
   return (
     <div className="fixed inset-0 z-50 flex" dir="rtl" onClick={onClose}>
@@ -58,8 +94,8 @@ export default function SketchTaskPanel({ onClose, phaseColor }: { onClose: () =
         style={{ borderRight: `3px solid ${phaseColor}` }}
         onClick={e => e.stopPropagation()}
       >
-        {/* ── Header ── */}
-        <div className="px-4 pt-3 pb-2 border-b">
+        {/* ══ Header ══ */}
+        <div className="px-4 pt-3 pb-2 border-b shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
               style={{ background: `color-mix(in oklch, ${phaseColor} 15%, white)` }}>
@@ -68,259 +104,276 @@ export default function SketchTaskPanel({ onClose, phaseColor }: { onClose: () =
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
                 <span>المشاريع</span><ChevronRight className="w-2.5 h-2.5" />
-                <span style={{ color: phaseColor }}>المرحلة الأولى</span><ChevronRight className="w-2.5 h-2.5" />
-                <span className="text-foreground">تصميم الكروكي</span>
+                <span style={{ color: phaseColor }}>المرحلة الأولى</span>
               </div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-sm font-bold">تصميم الكروكي المعماري</span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200">يحتاج تعديل</span>
-              </div>
+              <p className="text-sm font-bold">تصميم الكروكي المعماري</p>
             </div>
             <button onClick={onClose} className="p-1 rounded-lg hover:bg-muted shrink-0">
               <X className="w-4 h-4 text-muted-foreground" />
             </button>
           </div>
-
-          {/* Meta row */}
-          <div className="flex items-center gap-3 mt-1.5 text-[9px] text-muted-foreground">
-            <span className="flex items-center gap-1"><Clock className="w-2.5 h-2.5" />الإصدار 3 · 2026-04-20</span>
-            <span className="flex items-center gap-1"><Users className="w-2.5 h-2.5" />3 اجتماعات · 10 بنود</span>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex gap-0.5 mt-2 bg-muted/40 rounded-lg p-0.5">
-            {tabs.map(t => {
-              const Icon = t.icon;
-              const active = tab === t.id;
-              return (
-                <button key={t.id} onClick={() => setTab(t.id)}
-                  className={`flex-1 flex items-center justify-center gap-1 py-1 px-1.5 rounded-md text-[10px] font-medium transition-all ${active ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                  style={active ? { color: phaseColor } : {}}>
-                  <Icon className="w-3 h-3" />
-                  <span>{t.label}</span>
-                  {t.badge && <span className="text-[8px] px-1 rounded-full bg-muted/60">{t.badge}</span>}
-                </button>
-              );
-            })}
-          </div>
         </div>
 
-        {/* ── Body ── */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-
-          {/* ══ القسيمة ══ */}
-          {tab === "plot" && (
-            <>
-              {/* Visual plot */}
-              <div className="relative h-28 rounded-xl border-2 border-dashed bg-muted/10 flex items-center justify-center"
-                style={{ borderColor: `color-mix(in oklch, ${phaseColor} 35%, transparent)` }}>
-                <div className="absolute top-1.5 left-2 text-[8px] text-muted-foreground flex flex-col items-center gap-0.5">
-                  <span>ش</span><Compass className="w-3 h-3" /><span>ج</span>
-                </div>
-                <div className="flex flex-col items-center gap-1">
-                  <div className="w-16 h-12 rounded-lg border-2 flex items-center justify-center text-xs font-bold relative"
-                    style={{ borderColor: phaseColor, background: `color-mix(in oklch, ${phaseColor} 8%, white)` }}>
-                    <span style={{ color: phaseColor }}>400 م²</span>
-                    <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-3/4 h-0.5 rounded bg-red-300" />
-                    <div className="absolute top-1/2 -translate-y-1/2 -left-0.5 h-3/4 w-0.5 rounded bg-red-300" />
-                    <div className="absolute top-1/2 -translate-y-1/2 -right-0.5 h-3/4 w-0.5 rounded bg-red-300" />
-                  </div>
-                  <span className="text-[8px] text-muted-foreground">واجهة: شمال</span>
-                </div>
-                <div className="absolute bottom-1.5 right-2 text-[8px] text-muted-foreground">زاوية</div>
+        {/* ══ معلومات المشروع الثابتة (قابلة للطي) ══ */}
+        <div className="border-b shrink-0">
+          <button
+            className="w-full flex items-center gap-2 px-4 py-2 hover:bg-muted/20 transition-colors text-right"
+            onClick={() => setInfoOpen(!infoOpen)}
+          >
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <MapPin className="w-3 h-3 shrink-0" style={{ color: phaseColor }} />
+              <span className="text-[11px] font-semibold text-muted-foreground">معلومات المشروع</span>
+              {/* Quick summary chips */}
+              <div className="flex items-center gap-1 mr-1 overflow-hidden">
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted/50 text-muted-foreground shrink-0">{PROJECT_INFO.plot.area}</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted/50 text-muted-foreground shrink-0">{PROJECT_INFO.plot.facing}</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted/50 text-muted-foreground shrink-0">{PROJECT_INFO.style}</span>
               </div>
+            </div>
+            {infoOpen
+              ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+          </button>
 
-              {/* Info grid */}
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: "الموقع", value: "الجهراء - ق12 - ق5", icon: MapPin },
-                  { label: "المساحة", value: "400 م²", icon: Layers },
-                  { label: "شكل القسيمة", value: "زاوية", icon: Compass },
-                  { label: "وجه القسيمة", value: "شمال", icon: Compass },
-                ].map(item => (
-                  <div key={item.label} className="flex items-center gap-2 p-2 rounded-lg bg-muted/20 border border-border/40">
-                    <item.icon className="w-3.5 h-3.5 shrink-0" style={{ color: phaseColor }} />
-                    <div className="min-w-0">
-                      <p className="text-[9px] text-muted-foreground">{item.label}</p>
-                      <p className="text-xs font-semibold truncate">{item.value}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Blocked sides */}
+          {infoOpen && (
+            <div className="px-4 pb-3 space-y-2.5 bg-muted/10">
+              {/* Plot */}
               <div>
-                <p className="text-[10px] font-semibold text-muted-foreground mb-1.5">الجهات</p>
-                <div className="flex gap-1.5 flex-wrap">
-                  {["شمال", "جنوب", "شرق", "غرب"].map(dir => {
-                    const blocked = ["جنوب", "شرق", "غرب"].includes(dir);
+                <p className="text-[9px] font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                  <Layers className="w-2.5 h-2.5" />القسيمة
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[
+                    { l: "الموقع", v: PROJECT_INFO.plot.location },
+                    { l: "المساحة", v: PROJECT_INFO.plot.area },
+                    { l: "الشكل", v: PROJECT_INFO.plot.shape },
+                    { l: "الواجهة", v: PROJECT_INFO.plot.facing },
+                  ].map(i => (
+                    <div key={i.l} className="flex items-center gap-1.5 bg-background rounded-lg px-2 py-1 border border-border/40">
+                      <span className="text-[9px] text-muted-foreground">{i.l}:</span>
+                      <span className="text-[10px] font-semibold">{i.v}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-1 mt-1.5 flex-wrap">
+                  {["شمال", "جنوب", "شرق", "غرب"].map(d => {
+                    const blocked = PROJECT_INFO.plot.blocked.includes(d);
                     return (
-                      <span key={dir} className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${blocked ? "bg-red-50 text-red-600 border-red-200" : "bg-green-50 text-green-600 border-green-200"}`}>
-                        {blocked ? "🔴" : "🟢"} {dir}
+                      <span key={d} className={`text-[9px] px-1.5 py-0.5 rounded-full ${blocked ? "bg-red-50 text-red-600 border border-red-200" : "bg-green-50 text-green-600 border border-green-200"}`}>
+                        {blocked ? "🔴" : "🟢"} {d}
                       </span>
                     );
                   })}
                 </div>
               </div>
-            </>
-          )}
 
-          {/* ══ الأدوار ══ */}
-          {tab === "floors" && (
-            <div className="space-y-2">
-              {FLOORS.map((floor) => {
-                const Icon = floor.icon;
-                return (
-                  <div key={floor.key} className="rounded-xl border overflow-hidden">
-                    <div className="flex items-center gap-2.5 px-3 py-2"
-                      style={{ background: `color-mix(in oklch, ${floor.color} 8%, white)` }}>
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0"
-                        style={{ backgroundColor: floor.color }}>
-                        <Icon className="w-3.5 h-3.5" />
-                      </div>
-                      <p className="text-xs font-bold flex-1">{floor.label}</p>
-                      <Badge variant="outline" className="text-[8px] px-1.5" style={{ borderColor: floor.color, color: floor.color }}>{floor.key}</Badge>
-                    </div>
-                    <div className="px-3 py-2 space-y-1.5 bg-background">
-                      <p className="text-[11px] leading-relaxed">{floor.rooms}</p>
-                      <div className="flex items-start gap-1 bg-muted/30 rounded-lg px-2 py-1">
-                        <span className="text-[9px] shrink-0 mt-0.5">📌</span>
-                        <p className="text-[10px] text-muted-foreground">{floor.notes}</p>
-                      </div>
-                    </div>
+              {/* Floors + Style in one row */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-background rounded-lg px-2.5 py-2 border border-border/40">
+                  <p className="text-[9px] text-muted-foreground mb-1 flex items-center gap-1"><Building2 className="w-2.5 h-2.5" />الأدوار</p>
+                  <div className="flex flex-wrap gap-1">
+                    {PROJECT_INFO.floors.map(f => (
+                      <span key={f} className="text-[9px] px-1.5 py-0.5 rounded-md bg-muted/50">{f}</span>
+                    ))}
                   </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* ══ طابع التصميم ══ */}
-          {tab === "style" && (
-            <div className="space-y-3">
-              {/* Style hero - compact */}
-              <div className="rounded-xl p-3 border text-center"
-                style={{ background: `linear-gradient(135deg, color-mix(in oklch, ${phaseColor} 8%, white), color-mix(in oklch, oklch(0.60 0.12 30) 8%, white))` }}>
-                <span className="text-xl">🏛️</span>
-                <p className="text-sm font-bold mt-0.5">موديرن كلاسيك</p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-2">
-                {[
-                  { label: "مواد الواجهة", value: "حجر طبيعي + زجاج" },
-                  { label: "لوحة الألوان", value: "بيج فاتح + رمادي + أبيض" },
-                ].map(item => (
-                  <div key={item.label} className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/20 border border-border/40">
-                    <Palette className="w-3.5 h-3.5 shrink-0" style={{ color: phaseColor }} />
-                    <div>
-                      <p className="text-[9px] text-muted-foreground">{item.label}</p>
-                      <p className="text-xs font-semibold">{item.value}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-muted/20 rounded-xl p-2.5 border border-border/40">
-                <p className="text-[9px] text-muted-foreground mb-1">متطلبات خاصة</p>
-                <p className="text-xs leading-relaxed">مدخل رئيسي واسع، بركة ماء في الحديقة، مصعد داخلي</p>
-              </div>
-
-              <div>
-                <p className="text-[10px] font-semibold text-muted-foreground mb-1.5">عناصر التصميم</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {["أعمدة كلاسيكية", "نوافذ عالية", "مداخل مقوسة", "إضاءة خارجية", "حجر طبيعي", "زجاج مزدوج"].map(tag => (
-                    <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-muted/50 border border-border/60 text-foreground/70">{tag}</span>
-                  ))}
+                </div>
+                <div className="bg-background rounded-lg px-2.5 py-2 border border-border/40">
+                  <p className="text-[9px] text-muted-foreground mb-1 flex items-center gap-1"><Palette className="w-2.5 h-2.5" />التصميم</p>
+                  <p className="text-[10px] font-semibold">{PROJECT_INFO.style}</p>
+                  <p className="text-[9px] text-muted-foreground mt-0.5">{PROJECT_INFO.materials}</p>
+                  <p className="text-[9px] text-muted-foreground">{PROJECT_INFO.colors}</p>
                 </div>
               </div>
             </div>
           )}
+        </div>
 
-          {/* ══ الاجتماعات ══ */}
-          {tab === "meetings" && (
-            <div className="space-y-2">
-              {/* Stats row */}
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { v: 3, l: "اجتماع", c: phaseColor },
-                  { v: 10, l: "بند متفق", c: "oklch(0.55 0.15 150)" },
-                  { v: 2, l: "تعديل", c: "oklch(0.60 0.12 30)" },
-                ].map(s => (
-                  <div key={s.l} className="text-center p-2 rounded-xl border bg-background">
-                    <p className="text-lg font-bold" style={{ color: s.c }}>{s.v}</p>
-                    <p className="text-[9px] text-muted-foreground">{s.l}</p>
-                  </div>
-                ))}
+        {/* ══ سجل الجلسات (الجزء الرئيسي) ══ */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Stats bar */}
+          <div className="flex items-center gap-0 border-b">
+            {[
+              { v: meetings.length, l: "جلسة", color: phaseColor },
+              { v: totalAgreed, l: "بند متفق", color: "oklch(0.55 0.15 150)" },
+              { v: totalChanges, l: "تعديل", color: "oklch(0.60 0.12 30)" },
+            ].map((s, i) => (
+              <div key={i} className="flex-1 text-center py-2 border-l last:border-l-0">
+                <p className="text-base font-bold" style={{ color: s.color }}>{s.v}</p>
+                <p className="text-[9px] text-muted-foreground">{s.l}</p>
               </div>
+            ))}
+          </div>
 
-              {/* Meeting cards */}
-              {MEETINGS.map(m => {
-                const open = openMeeting === m.id;
-                return (
-                  <div key={m.id} className="rounded-xl border overflow-hidden">
-                    <button className="w-full flex items-center gap-2.5 px-3 py-2 text-right hover:bg-muted/20 transition-colors"
-                      onClick={() => setOpenMeeting(open ? null : m.id)}>
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                        style={{ backgroundColor: phaseColor }}>{m.id}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-bold">الاجتماع {m.id}</span>
-                          <span className={`text-[8px] px-1.5 py-0.5 rounded-full ${m.status === "confirmed" ? "bg-green-50 text-green-600" : "bg-yellow-50 text-yellow-600"}`}>
-                            {m.status === "confirmed" ? "✓ مؤكد" : "⏳ معلق"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5 text-[9px] text-muted-foreground">
-                          <span className="flex items-center gap-0.5"><Calendar className="w-2.5 h-2.5" />{m.date}</span>
-                          <span>· {m.agreed.length} بنود</span>
-                        </div>
+          <div className="p-3 space-y-2">
+            {/* Add meeting button */}
+            {!showAddForm && (
+              <button
+                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border-2 border-dashed text-[11px] font-medium transition-colors hover:bg-muted/20"
+                style={{ borderColor: `color-mix(in oklch, ${phaseColor} 40%, transparent)`, color: phaseColor }}
+                onClick={() => setShowAddForm(true)}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                تسجيل جلسة جديدة
+              </button>
+            )}
+
+            {/* Add meeting form */}
+            {showAddForm && (
+              <div className="rounded-xl border-2 p-3 space-y-2.5 bg-muted/10"
+                style={{ borderColor: `color-mix(in oklch, ${phaseColor} 40%, transparent)` }}>
+                <p className="text-xs font-bold flex items-center gap-1.5" style={{ color: phaseColor }}>
+                  <Edit3 className="w-3.5 h-3.5" />تسجيل جلسة جديدة
+                </p>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[9px] text-muted-foreground block mb-0.5">التاريخ *</label>
+                    <input type="date" value={form.date}
+                      onChange={e => setForm(p => ({ ...p, date: e.target.value }))}
+                      className="w-full text-xs px-2 py-1.5 rounded-lg border bg-background focus:outline-none focus:ring-1"
+                      style={{ "--tw-ring-color": phaseColor } as React.CSSProperties} />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-muted-foreground block mb-0.5">الحضور</label>
+                    <input type="text" value={form.attendees} placeholder="م. مارك، العميل"
+                      onChange={e => setForm(p => ({ ...p, attendees: e.target.value }))}
+                      className="w-full text-xs px-2 py-1.5 rounded-lg border bg-background focus:outline-none focus:ring-1" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[9px] text-muted-foreground block mb-0.5">البنود المتفق عليها * (كل بند في سطر)</label>
+                  <textarea value={form.agreed} rows={3} placeholder="بند 1&#10;بند 2&#10;بند 3"
+                    onChange={e => setForm(p => ({ ...p, agreed: e.target.value }))}
+                    className="w-full text-xs px-2 py-1.5 rounded-lg border bg-background resize-none focus:outline-none focus:ring-1" />
+                </div>
+
+                <div>
+                  <label className="text-[9px] text-muted-foreground block mb-0.5">التعديلات المطلوبة</label>
+                  <input type="text" value={form.changes} placeholder="وصف التعديل أو اكتب: لا تعديلات"
+                    onChange={e => setForm(p => ({ ...p, changes: e.target.value }))}
+                    className="w-full text-xs px-2 py-1.5 rounded-lg border bg-background focus:outline-none focus:ring-1" />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button size="sm" className="flex-1 text-xs h-8 text-white gap-1"
+                    style={{ backgroundColor: phaseColor }} onClick={addMeeting}>
+                    <Save className="w-3 h-3" />حفظ الجلسة
+                  </Button>
+                  <Button size="sm" variant="outline" className="flex-1 text-xs h-8"
+                    onClick={() => { setShowAddForm(false); setForm(EMPTY_MEETING); }}>
+                    إلغاء
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Meeting list */}
+            {[...meetings].reverse().map(m => {
+              const open = openMeeting === m.id;
+              return (
+                <div key={m.id} className="rounded-xl border overflow-hidden">
+                  {/* Meeting header */}
+                  <button
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-right hover:bg-muted/10 transition-colors"
+                    onClick={() => setOpenMeeting(open ? null : m.id)}
+                  >
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                      style={{ backgroundColor: phaseColor }}>{m.id}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-bold">الجلسة {m.id}</span>
+                        <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-medium ${m.status === "confirmed" ? "bg-green-50 text-green-600 border border-green-200" : "bg-yellow-50 text-yellow-600 border border-yellow-200"}`}>
+                          {m.status === "confirmed" ? "✓ مؤكدة" : "⏳ معلقة"}
+                        </span>
                       </div>
-                      {open ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
-                    </button>
+                      <div className="flex items-center gap-2 mt-0.5 text-[9px] text-muted-foreground">
+                        <span className="flex items-center gap-0.5"><Calendar className="w-2.5 h-2.5" />{m.date}</span>
+                        <span>·</span>
+                        <span className="flex items-center gap-0.5"><CheckCircle2 className="w-2.5 h-2.5" />{m.agreed.length} بنود</span>
+                        <span>·</span>
+                        <span className="flex items-center gap-0.5"><Users className="w-2.5 h-2.5" />{m.attendees.length} حضور</span>
+                      </div>
+                    </div>
+                    {open ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+                  </button>
 
-                    {open && (
-                      <div className="border-t bg-muted/10 px-3 py-2.5 space-y-2.5">
-                        {/* Attendees */}
-                        <div className="flex gap-1.5 flex-wrap">
-                          {m.attendees.map((a, i) => (
-                            <span key={i} className="flex items-center gap-1 text-[10px] bg-background border rounded-full px-2 py-0.5">
-                              <div className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] font-bold"
-                                style={{ background: `color-mix(in oklch, ${phaseColor} 20%, white)`, color: phaseColor }}>
-                                {a.replace("م. ", "").charAt(0)}
-                              </div>
-                              {a}
-                            </span>
-                          ))}
-                        </div>
-                        {/* Agreed */}
-                        <div className="space-y-1">
-                          {m.agreed.map((p, i) => (
-                            <div key={i} className="flex items-start gap-1.5 text-[11px]">
-                              <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0 mt-0.5" />
-                              <span>{p}</span>
+                  {/* Meeting details */}
+                  {open && (
+                    <div className="border-t bg-muted/5 px-3 py-2.5 space-y-2.5">
+                      {/* Attendees */}
+                      <div className="flex gap-1.5 flex-wrap">
+                        {m.attendees.map((a, i) => (
+                          <span key={i} className="flex items-center gap-1 text-[10px] bg-background border rounded-full px-2 py-0.5">
+                            <div className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] font-bold text-white"
+                              style={{ backgroundColor: phaseColor }}>
+                              {a.replace("م. ", "").charAt(0)}
                             </div>
-                          ))}
-                        </div>
-                        {/* Changes */}
-                        <div className="flex items-start gap-1.5 bg-orange-50 rounded-lg px-2 py-1.5">
-                          <span className="text-xs shrink-0">🔄</span>
+                            {a}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Agreed points */}
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-semibold text-muted-foreground">البنود المتفق عليها</p>
+                        {m.agreed.map((p, i) => (
+                          <div key={i} className="flex items-start gap-1.5 text-[11px]">
+                            <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0 mt-0.5" />
+                            <span>{p}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Changes */}
+                      <div className="flex items-start gap-1.5 rounded-lg px-2.5 py-2 bg-orange-50 border border-orange-100">
+                        <span className="text-xs shrink-0">🔄</span>
+                        <div>
+                          <p className="text-[9px] font-semibold text-orange-700 mb-0.5">التعديلات</p>
                           <p className="text-[10px] text-orange-600">{m.changes}</p>
                         </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
 
-              <button className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 border-dashed text-[11px] text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors">
-                <Plus className="w-3.5 h-3.5" />إضافة اجتماع جديد
-              </button>
-            </div>
-          )}
+                      {/* Actions */}
+                      <div className="flex gap-1.5">
+                        {m.status === "pending" && (
+                          <button
+                            className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-lg text-white font-medium"
+                            style={{ backgroundColor: phaseColor }}
+                            onClick={() => confirmMeeting(m.id)}
+                          >
+                            <CheckCircle2 className="w-3 h-3" />تأكيد الجلسة
+                          </button>
+                        )}
+                        <button
+                          className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-lg bg-red-50 text-red-500 border border-red-100 hover:bg-red-100 transition-colors mr-auto"
+                          onClick={() => deleteMeeting(m.id)}
+                        >
+                          <Trash2 className="w-3 h-3" />حذف
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {meetings.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <Clock className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                <p className="text-xs">لا توجد جلسات مسجلة بعد</p>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* ── Footer ── */}
-        <div className="px-3 py-2.5 border-t bg-muted/10 flex gap-2">
+        {/* ══ Footer ══ */}
+        <div className="px-3 py-2.5 border-t bg-muted/10 flex gap-2 shrink-0">
           <Button className="flex-1 text-white text-xs h-8" style={{ backgroundColor: phaseColor }} onClick={onClose}>إغلاق</Button>
-          <Button variant="outline" size="sm" className="flex-1 text-xs h-8">تعديل المتطلبات</Button>
+          <Button variant="outline" size="sm" className="flex-1 text-xs h-8"
+            onClick={() => { setInfoOpen(true); }}>
+            تعديل معلومات المشروع
+          </Button>
         </div>
       </div>
     </div>
