@@ -12,14 +12,25 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   ArrowRight, Users, MapPin, Link2, CheckCircle2, Circle,
-  Clock, ChevronDown, ChevronUp, AlertCircle
+  Clock, AlertCircle, User, FileText, Calendar, X, MessageSquare,
+  Paperclip, Star, ChevronRight, Flag
 } from "lucide-react";
 import { useState } from "react";
 import { useRoute, Link } from "wouter";
 
 /* ===== Types ===== */
 interface SubTask { name: string; done: boolean; assignee?: string; }
-interface Task { name: string; status: "done" | "in_progress" | "blocked" | "pending"; subTasks?: SubTask[]; assignee?: string; }
+interface Comment { author: string; text: string; time: string; }
+interface Task {
+  name: string;
+  status: "done" | "in_progress" | "blocked" | "pending";
+  subTasks?: SubTask[];
+  assignee?: string;
+  description?: string;
+  priority?: "high" | "normal";
+  deadline?: string;
+  comments?: Comment[];
+}
 interface Phase { title: string; subtitle?: string; tasks: Task[]; }
 interface ProjectData {
   id: string; name: string; client: string; type: string; serviceType: string;
@@ -62,53 +73,76 @@ const projectsDB: Record<string, ProjectData> = {
       {
         title: "المرحلة الأولى", subtitle: "تجهيز الملف",
         tasks: [
-          { name: "تصميم الكروكي", status: "done", assignee: "م. مارك" },
-          { name: "تجميع المستندات", status: "done", assignee: "محمد ثروت", subTasks: [
-            { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: true },
-          ]},
-          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد ثروت" },
-          { name: "تجهيز النماذج والتعهدات والتوقيع", status: "done", assignee: "محمد ثروت" },
-          { name: "فحص التربة - كتاب الكهرباء", status: "done", assignee: "محمد ثروت", subTasks: [
-            { name: "فحص التربة تم الإرسال", done: true }, { name: "فحص التربة تم الاعتماد", done: true },
-            { name: "الكهرباء تم الإرسال", done: true }, { name: "الكهرباء تم الاعتماد", done: true },
-          ]},
+          { name: "تصميم الكروكي", status: "done", assignee: "م. مارك", priority: "high",
+            description: "تصميم الكروكي المعماري الأولي للمشروع بناءً على متطلبات العميل ومساحة الأرض.",
+            comments: [{ author: "م. مارك", text: "تم إنجاز الكروكي وإرساله للعميل للمراجعة", time: "منذ 3 أيام" }] },
+          { name: "تجميع المستندات", status: "done", assignee: "محمد ثروت", priority: "high",
+            description: "جمع جميع المستندات المطلوبة من العميل لتجهيز الملف.",
+            subTasks: [
+              { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: true },
+            ]},
+          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد ثروت", priority: "high",
+            description: "توقيع عقد الخدمة مع العميل وتحصيل الدفعة الأولى." },
+          { name: "تجهيز النماذج والتعهدات والتوقيع", status: "done", assignee: "محمد ثروت",
+            description: "تجهيز جميع النماذج الرسمية والتعهدات المطلوبة من البلدية." },
+          { name: "فحص التربة - كتاب الكهرباء", status: "done", assignee: "محمد ثروت", priority: "high",
+            description: "إرسال طلب فحص التربة وكتاب إيصال التيار الكهربائي للجهات المختصة.",
+            subTasks: [
+              { name: "فحص التربة تم الإرسال", done: true }, { name: "فحص التربة تم الاعتماد", done: true },
+              { name: "الكهرباء تم الإرسال", done: true }, { name: "الكهرباء تم الاعتماد", done: true },
+            ]},
         ],
       },
       {
         title: "المرحلة الثانية", subtitle: "التصميم",
         tasks: [
-          { name: "سيستم الأعمدة", status: "done", assignee: "م. أمين" },
-          { name: "الواجهات", status: "done", assignee: "م. مصطفى" },
-          { name: "رسم مخطط البلدية", status: "done", assignee: "عرفان" },
+          { name: "سيستم الأعمدة", status: "done", assignee: "م. أمين", priority: "high",
+            description: "تصميم سيستم الأعمدة الإنشائية بناءً على نتائج فحص التربة والكروكي المعتمد." },
+          { name: "الواجهات", status: "done", assignee: "م. مصطفى",
+            description: "تصميم الواجهات المعمارية للمبنى." },
+          { name: "رسم مخطط البلدية", status: "done", assignee: "عرفان",
+            description: "رسم المخططات الرسمية المطلوبة لتقديمها لبلدية الكويت." },
         ],
       },
       {
         title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد",
         tasks: [
-          { name: "إرسال للبلدية", status: "done", assignee: "محمد ثروت" },
-          { name: "اعتماد البلدية", status: "done", assignee: "محمد ثروت" },
-          { name: "تحصيل الدفعة الأخيرة من العقد", status: "done", assignee: "محمد ثروت" },
+          { name: "إرسال للبلدية", status: "done", assignee: "محمد ثروت",
+            description: "تقديم ملف المشروع كاملاً لبلدية الكويت للحصول على رخصة البناء." },
+          { name: "اعتماد البلدية", status: "done", assignee: "محمد ثروت", priority: "high",
+            description: "متابعة اعتماد المخططات من قبل بلدية الكويت وإصدار رخصة البناء." },
+          { name: "تحصيل الدفعة الأخيرة من العقد", status: "done", assignee: "محمد ثروت",
+            description: "تحصيل الدفعة الأخيرة من العميل بعد اعتماد البلدية." },
         ],
       },
       {
         title: "المرحلة الرابعة", subtitle: "الكراسة والمخططات",
         tasks: [
-          { name: "تصميم المخطط الإنشائي", status: "in_progress", assignee: "م. أمين",
+          { name: "تصميم المخطط الإنشائي", status: "in_progress", assignee: "م. أمين", priority: "high",
+            description: "تصميم المخططات الإنشائية الكاملة للمشروع شاملة جميع الأدوار.",
             subTasks: structuralSubTasks([true,true,true,true,true,true,false,false,false,false,false,false]) },
-          { name: "تصميم مخطط الصحي", status: "pending", assignee: "م. أمين" },
-          { name: "تصميم مخطط الكهرباء", status: "pending", assignee: "م. أمين" },
-          { name: "تصميم مخطط الفرش", status: "pending", assignee: "م. مصطفى" },
-          { name: "تجهيز الكراسة النهائية", status: "pending", assignee: "م. مارك" },
+          { name: "تصميم مخطط الصحي", status: "pending", assignee: "م. أمين",
+            description: "تصميم شبكة الصرف الصحي والمياه للمشروع." },
+          { name: "تصميم مخطط الكهرباء", status: "pending", assignee: "م. أمين",
+            description: "تصميم شبكة الكهرباء والإضاءة للمشروع." },
+          { name: "تصميم مخطط الفرش", status: "pending", assignee: "م. مصطفى",
+            description: "تصميم مخطط الفرش والتوزيع الداخلي للمشروع." },
+          { name: "تجهيز الكراسة النهائية", status: "pending", assignee: "م. مارك",
+            description: "تجميع جميع المخططات في كراسة هندسية نهائية متكاملة." },
         ],
       },
       {
         title: "المرحلة الخامسة", subtitle: "الإشراف",
         tasks: [
-          { name: "إصدار تعهد الإشراف", status: "pending", assignee: "محمد ثروت" },
-          { name: "الإشراف على التنفيذ", status: "pending", assignee: "م. فداء",
+          { name: "إصدار تعهد الإشراف", status: "pending", assignee: "محمد ثروت",
+            description: "إصدار وثيقة تعهد الإشراف الهندسي على التنفيذ." },
+          { name: "الإشراف على التنفيذ", status: "pending", assignee: "م. فداء", priority: "high",
+            description: "الإشراف الميداني على تنفيذ المشروع بزيارات لا تقل عن 3 مرات أسبوعياً.",
             subTasks: structuralSubTasks([false,false,false,false,false,false,false,false,false,false,false,false]) },
-          { name: "كتب البنك", status: "pending", assignee: "محمد ثروت" },
-          { name: "إنهاء الإشراف", status: "pending", assignee: "م. فداء" },
+          { name: "كتب البنك", status: "pending", assignee: "محمد ثروت",
+            description: "إصدار خطابات البنك المطلوبة لصرف دفعات القرض العقاري." },
+          { name: "إنهاء الإشراف", status: "pending", assignee: "م. فداء",
+            description: "إنهاء مرحلة الإشراف وتسليم شهادة الإتمام." },
         ],
       },
     ],
@@ -116,9 +150,6 @@ const projectsDB: Record<string, ProjectData> = {
 
   /* ═══════════════════════════════════════════════════════════════════════
      النوع 2: بناء جديد صناعي (S00049 - 28 مهمة - 4 مراحل)
-     الفرق: المرحلة الثالثة فيها مطافي + تنظيم + بلدية (7 مهام)
-     المرحلة الرابعة أبسط (3 مهام بدون كهرباء وفرش)
-     لا يوجد مرحلة إشراف
      ═══════════════════════════════════════════════════════════════════════ */
   "S00049": {
     id: "S00049", name: "بناء جديد صناعي", client: "شركة الخليج",
@@ -128,7 +159,7 @@ const projectsDB: Record<string, ProjectData> = {
       {
         title: "المرحلة الأولى", subtitle: "تجهيز الملف",
         tasks: [
-          { name: "تصميم الكروكي", status: "done", assignee: "م. مارك" },
+          { name: "تصميم الكروكي", status: "done", assignee: "م. مارك", priority: "high" },
           { name: "تجميع المستندات", status: "done", assignee: "محمد ثروت", subTasks: [
             { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: true },
           ]},
@@ -143,7 +174,7 @@ const projectsDB: Record<string, ProjectData> = {
       {
         title: "المرحلة الثانية", subtitle: "التصميم",
         tasks: [
-          { name: "سيستم الأعمدة", status: "in_progress", assignee: "م. أمين" },
+          { name: "سيستم الأعمدة", status: "in_progress", assignee: "م. أمين", priority: "high" },
           { name: "الواجهات", status: "blocked", assignee: "م. مصطفى" },
           { name: "رسم مخطط البلدية", status: "blocked", assignee: "عرفان" },
         ],
@@ -173,10 +204,6 @@ const projectsDB: Record<string, ProjectData> = {
 
   /* ═══════════════════════════════════════════════════════════════════════
      النوع 3: تعديل واضافة سكن خاص (S00047 - 42 مهمة - 4 مراحل)
-     الفرق: المرحلة الأولى تبدأ بدراسة المخطط القديم + كشف على العقار
-     لا يوجد فحص تربة أو كتاب كهرباء أو نماذج وتعهدات
-     المرحلة الثانية بدون واجهات
-     المرحلة الرابعة: مخطط إنشائي كامل + كراسة (بدون صحي وكهرباء وفرش)
      ═══════════════════════════════════════════════════════════════════════ */
   "S00047": {
     id: "S00047", name: "تعديل وإضافة سكن خاص - مشرف", client: "تهاني خالد محمد بورسلي",
@@ -186,10 +213,13 @@ const projectsDB: Record<string, ProjectData> = {
       {
         title: "المرحلة الأولى", subtitle: "تجهيز الملف",
         tasks: [
-          { name: "دراسة المخطط الإنشائي القديم", status: "in_progress", assignee: "م. أمين",
+          { name: "دراسة المخطط الإنشائي القديم", status: "in_progress", assignee: "م. أمين", priority: "high",
+            description: "دراسة وتحليل المخططات الإنشائية للمبنى القائم لتحديد إمكانية التعديل والإضافة.",
             subTasks: structuralSubTasks([false,false,false,false,false,false,false,false,false,false,false,false]) },
-          { name: "كشف على العقار", status: "done", assignee: "م. فداء" },
-          { name: "كروكي", status: "done", assignee: "م. مارك" },
+          { name: "كشف على العقار", status: "done", assignee: "م. فداء",
+            description: "زيارة ميدانية للعقار لتقييم الوضع الراهن وتحديد متطلبات التعديل." },
+          { name: "كروكي", status: "done", assignee: "م. مارك", priority: "high",
+            description: "رسم كروكي مبدئي للتعديلات والإضافات المطلوبة." },
           { name: "جمع الوثائق والمستندات", status: "in_progress", assignee: "محمد ثروت", subTasks: [
             { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: false },
           ]},
@@ -223,12 +253,7 @@ const projectsDB: Record<string, ProjectData> = {
   },
 
   /* ═══════════════════════════════════════════════════════════════════════
-     النوع 4: تعديل سكن خاص (S00050 - 4 مراحل)
-     مشابه لتعديل واضافة لكن بدون مراحل الإضافة
-     المرحلة الأولى: دراسة مخطط قديم + كشف + مستندات + عقد (بدون كروكي)
-     المرحلة الثانية: سيستم أعمدة + رسم بلدية
-     المرحلة الثالثة: بلدية واعتماد
-     المرحلة الرابعة: كراسة
+     النوع 4: تعديل سكن خاص (S00050)
      ═══════════════════════════════════════════════════════════════════════ */
   "S00050": {
     id: "S00050", name: "تعديل سكن خاص", client: "سالم المطيري",
@@ -274,8 +299,7 @@ const projectsDB: Record<string, ProjectData> = {
   },
 
   /* ═══════════════════════════════════════════════════════════════════════
-     النوع 2 (مثال ثاني): تعديل صناعي (S00051 - 5 مراحل)
-     مزيج بين تعديل سكن خاص + متطلبات الصناعي (مطافي + تنظيم)
+     تعديل صناعي (S00051)
      ═══════════════════════════════════════════════════════════════════════ */
   "S00051": {
     id: "S00051", name: "تعديل صناعي", client: "مؤسسة البناء",
@@ -302,7 +326,7 @@ const projectsDB: Record<string, ProjectData> = {
         ],
       },
       {
-        title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد (مطافي + تنظيم + بلدية)",
+        title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد",
         tasks: [
           { name: "إرسال للمطافي", status: "blocked", assignee: "محمد ثروت" },
           { name: "اعتماد المطافي", status: "blocked", assignee: "محمد ثروت" },
@@ -325,8 +349,7 @@ const projectsDB: Record<string, ProjectData> = {
   },
 
   /* ═══════════════════════════════════════════════════════════════════════
-     مثال إضافي: بناء جديد سكن خاص (S00045 - شبه مكتمل)
-     لتوضيح مشروع في مرحلة الإشراف
+     فيلا - صباح الأحمد (S00045 - شبه مكتمل)
      ═══════════════════════════════════════════════════════════════════════ */
   "S00045": {
     id: "S00045", name: "فيلا - صباح الأحمد", client: "خالد الرشيدي",
@@ -390,19 +413,243 @@ const phaseColors = [
 ];
 
 const statusConfig = {
-  done: { label: "مكتمل", color: "oklch(0.55 0.15 150)", icon: CheckCircle2, bg: "bg-green-50 text-green-700" },
-  in_progress: { label: "قيد العمل", color: "oklch(0.55 0.15 250)", icon: Clock, bg: "bg-blue-50 text-blue-700" },
-  blocked: { label: "معلّق", color: "oklch(0.60 0.12 30)", icon: AlertCircle, bg: "bg-orange-50 text-orange-700" },
-  pending: { label: "لم يبدأ", color: "oklch(0.70 0.00 0)", icon: Circle, bg: "bg-gray-50 text-gray-500" },
+  done: { label: "مكتمل", color: "oklch(0.55 0.15 150)", icon: CheckCircle2, bg: "bg-green-50 text-green-700", dot: "bg-green-500" },
+  in_progress: { label: "قيد العمل", color: "oklch(0.55 0.15 250)", icon: Clock, bg: "bg-blue-50 text-blue-700", dot: "bg-blue-500" },
+  blocked: { label: "معلّق", color: "oklch(0.60 0.12 30)", icon: AlertCircle, bg: "bg-orange-50 text-orange-700", dot: "bg-orange-400" },
+  pending: { label: "لم يبدأ", color: "oklch(0.70 0.00 0)", icon: Circle, bg: "bg-gray-50 text-gray-500", dot: "bg-gray-300" },
 };
+
+/* ===== Assignee Avatar Colors ===== */
+const assigneeColors: Record<string, string> = {
+  "م. مارك": "oklch(0.55 0.15 280)",
+  "م. أمين": "oklch(0.55 0.15 250)",
+  "م. مصطفى": "oklch(0.60 0.12 30)",
+  "م. فداء": "oklch(0.60 0.15 150)",
+  "محمد ثروت": "oklch(0.60 0.12 200)",
+  "عرفان": "oklch(0.65 0.10 60)",
+};
+
+function getAssigneeColor(name?: string) {
+  if (!name) return "oklch(0.70 0.00 0)";
+  return assigneeColors[name] || "oklch(0.55 0.15 280)";
+}
+
+function getInitials(name?: string) {
+  if (!name) return "؟";
+  const cleaned = name.replace("م. ", "");
+  return cleaned.charAt(0);
+}
 
 export { projectsDB };
 
+/* ========================================================================
+   Task Detail Panel - نافذة تفاصيل المهمة الكاملة (مثل Odoo)
+   ======================================================================== */
+interface TaskPanelProps {
+  task: Task;
+  phaseTitle: string;
+  phaseColor: string;
+  onClose: () => void;
+}
+
+function TaskDetailPanel({ task, phaseTitle, phaseColor, onClose }: TaskPanelProps) {
+  const config = statusConfig[task.status];
+  const StatusIcon = config.icon;
+  const subDone = task.subTasks?.filter(s => s.done).length || 0;
+  const subTotal = task.subTasks?.length || 0;
+
+  return (
+    /* Overlay */
+    <div className="fixed inset-0 z-50 flex" dir="rtl" onClick={onClose}>
+      {/* Dark overlay */}
+      <div className="flex-1 bg-black/40" />
+
+      {/* Side Panel */}
+      <div
+        className="w-full max-w-lg bg-background shadow-2xl flex flex-col overflow-hidden"
+        style={{ borderRight: `3px solid ${phaseColor}` }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Panel Header */}
+        <div className="flex items-start gap-3 p-4 border-b bg-muted/20">
+          <div className="flex-1 min-w-0">
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-2">
+              <span>المشاريع</span>
+              <ChevronRight className="w-3 h-3" />
+              <span style={{ color: phaseColor }}>{phaseTitle}</span>
+            </div>
+            {/* Task Name */}
+            <h2 className="text-base font-bold leading-tight">{task.name}</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-muted transition-colors shrink-0 mt-0.5"
+          >
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Panel Body - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-5">
+
+          {/* Status + Priority Row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${config.bg}`}>
+              <StatusIcon className="w-3.5 h-3.5" />
+              {config.label}
+            </div>
+            {task.priority === "high" && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-600">
+                <Flag className="w-3.5 h-3.5" />
+                أولوية عالية
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-muted/50 text-muted-foreground"
+              style={{ borderColor: phaseColor, border: `1px solid ${phaseColor}`, color: phaseColor }}>
+              {phaseTitle}
+            </div>
+          </div>
+
+          {/* Assignee */}
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/50">
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+              style={{ backgroundColor: getAssigneeColor(task.assignee) }}
+            >
+              {getInitials(task.assignee)}
+            </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground mb-0.5">المسؤول عن المهمة</p>
+              <p className="text-sm font-semibold">{task.assignee || "غير محدد"}</p>
+            </div>
+            <div className="mr-auto">
+              <User className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </div>
+
+          {/* Description */}
+          {task.description && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5" />
+                وصف المهمة
+              </p>
+              <p className="text-sm text-foreground/80 leading-relaxed bg-muted/20 rounded-xl p-3 border border-border/40">
+                {task.description}
+              </p>
+            </div>
+          )}
+
+          {/* Sub-tasks */}
+          {task.subTasks && task.subTasks.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  المهام الفرعية
+                </p>
+                <span className="text-xs font-bold" style={{ color: phaseColor, fontFamily: "'Space Grotesk'" }}>
+                  {subDone}/{subTotal}
+                </span>
+              </div>
+              {/* Progress bar */}
+              <div className="h-1.5 rounded-full bg-muted mb-3 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${subTotal > 0 ? (subDone / subTotal) * 100 : 0}%`, backgroundColor: phaseColor }}
+                />
+              </div>
+              <div className="space-y-1">
+                {task.subTasks.map((st, i) => (
+                  <div key={i} className={`flex items-center gap-2.5 py-2 px-3 rounded-lg text-sm transition-colors ${st.done ? "bg-green-50/50" : "bg-muted/20"}`}>
+                    {st.done
+                      ? <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                      : <Circle className="w-4 h-4 text-gray-300 shrink-0" />}
+                    <span className={`flex-1 ${st.done ? "line-through text-muted-foreground" : ""}`}>{st.name}</span>
+                    {st.assignee && (
+                      <span className="text-[10px] text-muted-foreground">{st.assignee}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Comments / Chatter */}
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-1.5">
+              <MessageSquare className="w-3.5 h-3.5" />
+              السجل والتعليقات
+            </p>
+            {task.comments && task.comments.length > 0 ? (
+              <div className="space-y-2">
+                {task.comments.map((c, i) => (
+                  <div key={i} className="flex gap-2.5">
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5"
+                      style={{ backgroundColor: getAssigneeColor(c.author) }}
+                    >
+                      {getInitials(c.author)}
+                    </div>
+                    <div className="flex-1 bg-muted/30 rounded-xl p-2.5">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-semibold">{c.author}</span>
+                        <span className="text-[10px] text-muted-foreground">{c.time}</span>
+                      </div>
+                      <p className="text-xs text-foreground/80">{c.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-5 text-muted-foreground bg-muted/10 rounded-xl border border-dashed border-border">
+                <MessageSquare className="w-6 h-6 mx-auto mb-1.5 opacity-30" />
+                <p className="text-xs">لا توجد تعليقات بعد</p>
+              </div>
+            )}
+          </div>
+
+          {/* Attachments placeholder */}
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+              <Paperclip className="w-3.5 h-3.5" />
+              المرفقات
+            </p>
+            <div className="text-center py-4 text-muted-foreground bg-muted/10 rounded-xl border border-dashed border-border">
+              <Paperclip className="w-5 h-5 mx-auto mb-1.5 opacity-30" />
+              <p className="text-xs">لا توجد مرفقات</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Panel Footer */}
+        <div className="p-4 border-t bg-muted/10 flex gap-2">
+          <Button
+            className="flex-1 text-white"
+            size="sm"
+            style={{ backgroundColor: phaseColor }}
+            onClick={onClose}
+          >
+            إغلاق
+          </Button>
+          <Button variant="outline" size="sm" className="flex-1">
+            تعديل المهمة
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========================================================================
+   Main Component
+   ======================================================================== */
 export default function ProjectDetail() {
   const [, params] = useRoute("/projects/:id");
   const projectId = params?.id || "";
   const project = projectsDB[projectId];
-  const [expandedTask, setExpandedTask] = useState<string | null>(null);
+  const [selectedTask, setSelectedTask] = useState<{ task: Task; phaseTitle: string; phaseColor: string } | null>(null);
 
   if (!project) {
     return (
@@ -424,6 +671,16 @@ export default function ProjectDetail() {
 
   return (
     <div className="space-y-5">
+      {/* Task Detail Panel (Odoo-style) */}
+      {selectedTask && (
+        <TaskDetailPanel
+          task={selectedTask.task}
+          phaseTitle={selectedTask.phaseTitle}
+          phaseColor={selectedTask.phaseColor}
+          onClose={() => setSelectedTask(null)}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link href="/projects">
@@ -498,7 +755,8 @@ export default function ProjectDetail() {
           const phaseDone = phase.tasks.filter(t => t.status === "done").length;
 
           return (
-            <div key={pi} className="min-w-[280px] w-[280px] shrink-0">
+            <div key={pi} className="min-w-[270px] w-[270px] shrink-0">
+              {/* Phase Header */}
               <div className="mb-3 px-1">
                 <div className="flex items-center gap-2 mb-0.5">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
@@ -514,10 +772,9 @@ export default function ProjectDetail() {
                 </div>
               </div>
 
+              {/* Task Cards */}
               <div className="space-y-2">
                 {phase.tasks.map((task, ti) => {
-                  const taskKey = `${pi}-${ti}`;
-                  const isExpanded = expandedTask === taskKey;
                   const config = statusConfig[task.status];
                   const StatusIcon = config.icon;
                   const hasSubTasks = task.subTasks && task.subTasks.length > 0;
@@ -525,39 +782,49 @@ export default function ProjectDetail() {
                   const subTotal = task.subTasks?.length || 0;
 
                   return (
-                    <div key={ti} className={`p-3 rounded-lg border transition-all ${hasSubTasks ? "cursor-pointer" : ""} ${isExpanded ? "shadow-sm" : "hover:shadow-sm"}`}
-                      style={isExpanded ? { borderColor: color } : {}}
-                      onClick={() => hasSubTasks && setExpandedTask(isExpanded ? null : taskKey)}>
+                    <div
+                      key={ti}
+                      className="p-3 rounded-xl border bg-background transition-all cursor-pointer hover:shadow-md hover:border-opacity-80 group"
+                      style={{ borderColor: "transparent", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
+                      onClick={() => setSelectedTask({ task, phaseTitle: phase.title, phaseColor: color })}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = color)}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = "transparent")}
+                    >
+                      {/* Card Top: Status dot + Name */}
                       <div className="flex items-start gap-2">
-                        <StatusIcon className="w-4 h-4 mt-0.5 shrink-0" style={{ color: config.color }} />
+                        <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${config.dot}`} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium leading-tight">{task.name}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge className={`text-[9px] px-1.5 h-4 ${config.bg}`} variant="secondary">{config.label}</Badge>
-                            {task.assignee && <span className="text-[10px] text-muted-foreground">{task.assignee}</span>}
-                          </div>
+                          <p className="text-xs font-semibold leading-snug group-hover:text-foreground">{task.name}</p>
+
+                          {/* Sub-tasks progress bar */}
                           {hasSubTasks && (
-                            <div className="flex items-center gap-2 mt-1.5">
+                            <div className="flex items-center gap-1.5 mt-1.5">
                               <div className="flex-1 h-1 rounded-full bg-gray-100 overflow-hidden">
                                 <div className="h-full rounded-full" style={{ width: `${subTotal > 0 ? (subDone / subTotal) * 100 : 0}%`, backgroundColor: color }} />
                               </div>
                               <span className="text-[9px] text-muted-foreground" style={{ fontFamily: "'Space Grotesk'" }}>{subDone}/{subTotal}</span>
-                              {isExpanded ? <ChevronUp className="w-3 h-3 text-muted-foreground" /> : <ChevronDown className="w-3 h-3 text-muted-foreground" />}
                             </div>
                           )}
                         </div>
                       </div>
-                      {isExpanded && task.subTasks && (
-                        <div className="mt-2 pt-2 border-t space-y-1" onClick={(e) => e.stopPropagation()}>
-                          {task.subTasks.map((st, sti) => (
-                            <div key={sti} className="flex items-center gap-2 py-0.5 text-[11px]">
-                              {st.done ? <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0" /> : <Circle className="w-3 h-3 text-gray-300 shrink-0" />}
-                              <span className={`flex-1 ${st.done ? "line-through text-muted-foreground" : ""}`}>{st.name}</span>
-                              {st.assignee && <span className="text-[9px] text-muted-foreground">{st.assignee}</span>}
+
+                      {/* Card Bottom: Status badge + Assignee */}
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
+                        <Badge className={`text-[9px] px-1.5 h-4 ${config.bg}`} variant="secondary">
+                          {config.label}
+                        </Badge>
+                        {task.assignee && (
+                          <div className="flex items-center gap-1">
+                            <div
+                              className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
+                              style={{ backgroundColor: getAssigneeColor(task.assignee) }}
+                            >
+                              {getInitials(task.assignee)}
                             </div>
-                          ))}
-                        </div>
-                      )}
+                            <span className="text-[10px] text-muted-foreground">{task.assignee}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
