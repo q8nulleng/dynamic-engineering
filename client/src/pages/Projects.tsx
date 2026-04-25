@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { projectsDB } from "./ProjectDetail";
+import NewProjectDialog from "@/components/NewProjectDialog";
+import { toast } from "sonner";
 
 const stageLabel = (progress: number) => {
   if (progress >= 90) return { text: "شبه مكتمل", color: "oklch(0.55 0.15 150)" };
@@ -47,6 +49,7 @@ const allProjects = Object.values(projectsDB);
 export default function Projects() {
   const [mainTab, setMainTab] = useState("all");
   const [subTab,  setSubTab]  = useState("all");
+  const [showNewProject, setShowNewProject] = useState(false);
 
   /* تصفية حسب التصنيف الرئيسي */
   const byMain = mainTab === "all"
@@ -65,6 +68,7 @@ export default function Projects() {
     key === "all" ? byMain.length : byMain.filter(p => p.serviceType === key).length;
 
   return (
+    <>
     <div className="space-y-4">
       {/* ─── Header ─── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -83,7 +87,7 @@ export default function Projects() {
             </span>
           </div>
         </div>
-        <Button style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>
+        <Button onClick={() => setShowNewProject(true)} style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>
           <Plus className="w-4 h-4 ml-2" />
           مشروع جديد
         </Button>
@@ -273,5 +277,18 @@ export default function Projects() {
         </div>
       )}
     </div>
+
+    {/* ─── نموذج مشروع جديد ─── */}
+    <NewProjectDialog
+      open={showNewProject}
+      onClose={() => setShowNewProject(false)}
+      onAdd={(data) => {
+        toast.success(`تم إنشاء المشروع: ${data.name}`, {
+          description: `${data.type} · ${data.serviceType} · ${data.area}`,
+        });
+        setShowNewProject(false);
+      }}
+    />
+    </>
   );
 }
