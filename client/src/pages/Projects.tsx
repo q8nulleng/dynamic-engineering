@@ -68,7 +68,6 @@ export default function Projects() {
     key === "all" ? byMain.length : byMain.filter(p => p.serviceType === key).length;
 
   return (
-    <>
     <div className="space-y-4">
       {/* ─── Header ─── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -276,19 +275,16 @@ export default function Projects() {
           })}
         </div>
       )}
+      <NewProjectDialog
+        open={showNewProject}
+        onClose={() => setShowNewProject(false)}
+        onAdd={(data) => {
+          toast.success(`تم إنشاء المشروع: ${data.name}`, {
+            description: `${data.type} · ${data.serviceType} · ${data.area}`,
+          });
+          setShowNewProject(false);
+        }}
+      />
     </div>
-
-    {/* ─── نموذج مشروع جديد ─── */}
-    <NewProjectDialog
-      open={showNewProject}
-      onClose={() => setShowNewProject(false)}
-      onAdd={(data) => {
-        toast.success(`تم إنشاء المشروع: ${data.name}`, {
-          description: `${data.type} · ${data.serviceType} · ${data.area}`,
-        });
-        setShowNewProject(false);
-      }}
-    />
-    </>
   );
 }
