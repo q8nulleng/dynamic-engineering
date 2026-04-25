@@ -19,6 +19,7 @@ import { useState } from "react";
 import { useRoute, Link } from "wouter";
 import SketchTaskPanel from "@/components/SketchTaskPanel";
 import DocumentsTaskPanel from "@/components/DocumentsTaskPanel";
+import ContractPaymentPanel from "@/components/ContractPaymentPanel";
 
 /* ===== Types ===== */
 interface SubTask { name: string; done: boolean; assignee?: string; }
@@ -655,6 +656,7 @@ export default function ProjectDetail() {
   const [showSketchPanel, setShowSketchPanel] = useState(false);
   const [sketchPanelColor, setSketchPanelColor] = useState("");
   const [showDocsPanel, setShowDocsPanel] = useState(false);
+  const [showContractPanel, setShowContractPanel] = useState(false);
 
   if (!project) {
     return (
@@ -696,6 +698,13 @@ export default function ProjectDetail() {
           open={showDocsPanel}
           onClose={() => setShowDocsPanel(false)}
           taskName="تجميع المستندات"
+          projectName={project.name}
+        />
+      )}
+      {showContractPanel && (
+        <ContractPaymentPanel
+          open={showContractPanel}
+          onClose={() => setShowContractPanel(false)}
           projectName={project.name}
         />
       )}
@@ -810,8 +819,10 @@ export default function ProjectDetail() {
                           setSketchPanelColor(color);
                           setShowSketchPanel(true);
                         } else if (task.name === "تجميع المستندات") {
-                          setShowDocsPanel(true);
-                        } else {
+                           setShowDocsPanel(true);
+                         } else if (task.name.includes("العقد وتحصيل") || task.name.includes("تحصيل الدفعة")) {
+                           setShowContractPanel(true);
+                         } else {
                           setSelectedTask({ task, phaseTitle: phase.title, phaseColor: color });
                         }
                       }}
