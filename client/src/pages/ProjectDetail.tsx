@@ -84,7 +84,7 @@ const projectsDB: Record<string, ProjectData> = {
             subTasks: [
               { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: true },
             ]},
-          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد ثروت", priority: "high",
+          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد المحاسب", priority: "high",
             description: "توقيع عقد الخدمة مع العميل وتحصيل الدفعة الأولى." },
           { name: "تجهيز النماذج والتعهدات والتوقيع", status: "done", assignee: "محمد ثروت",
             description: "تجهيز جميع النماذج الرسمية والتعهدات المطلوبة من البلدية." },
@@ -166,7 +166,7 @@ const projectsDB: Record<string, ProjectData> = {
           { name: "تجميع المستندات", status: "done", assignee: "محمد ثروت", subTasks: [
             { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: true },
           ]},
-          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد ثروت" },
+          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد المحاسب" },
           { name: "تجهيز النماذج والتعهدات والتوقيع", status: "done", assignee: "محمد ثروت" },
           { name: "فحص التربة - كتاب الكهرباء", status: "done", assignee: "محمد ثروت", subTasks: [
             { name: "فحص التربة تم الإرسال", done: true }, { name: "فحص التربة تم الاعتماد", done: true },
@@ -226,7 +226,7 @@ const projectsDB: Record<string, ProjectData> = {
           { name: "جمع الوثائق والمستندات", status: "in_progress", assignee: "محمد ثروت", subTasks: [
             { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: false },
           ]},
-          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد ثروت" },
+          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد المحاسب" },
         ],
       },
       {
@@ -272,7 +272,7 @@ const projectsDB: Record<string, ProjectData> = {
           { name: "جمع الوثائق والمستندات", status: "done", assignee: "محمد ثروت", subTasks: [
             { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: true },
           ]},
-          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد ثروت" },
+          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد المحاسب" },
         ],
       },
       {
@@ -318,7 +318,7 @@ const projectsDB: Record<string, ProjectData> = {
           { name: "جمع الوثائق والمستندات", status: "in_progress", assignee: "محمد ثروت", subTasks: [
             { name: "الموقع العام", done: true }, { name: "المدنية", done: false }, { name: "الوثيقة", done: false },
           ]},
-          { name: "العقد وتحصيل الدفعة الأولى", status: "pending", assignee: "محمد ثروت" },
+          { name: "العقد وتحصيل الدفعة الأولى", status: "pending", assignee: "محمد المحاسب" },
         ],
       },
       {
@@ -364,7 +364,7 @@ const projectsDB: Record<string, ProjectData> = {
         tasks: [
           { name: "تصميم الكروكي", status: "done", assignee: "م. مارك" },
           { name: "تجميع المستندات", status: "done", assignee: "محمد ثروت" },
-          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد ثروت" },
+          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد المحاسب" },
           { name: "تجهيز النماذج والتعهدات والتوقيع", status: "done", assignee: "محمد ثروت" },
           { name: "فحص التربة - كتاب الكهرباء", status: "done", assignee: "محمد ثروت" },
         ],
