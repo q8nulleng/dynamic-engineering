@@ -30,14 +30,14 @@ import { Badge } from "@/components/ui/badge";
 
 const navItems = [
   { path: "/", label: "لوحة التحكم", icon: LayoutDashboard },
-  { path: "/crm", label: "إدارة العملاء", icon: Users, badge: 3 },
-  { path: "/quotations", label: "عروض الأسعار", icon: FileText, badge: 2 },
-  { path: "/contracts", label: "العقود الهندسية", icon: FileSignature, badge: 1 },
+  { path: "/clients", label: "العملاء", icon: Users, badge: 5 },
   { path: "/projects", label: "المشاريع", icon: FolderKanban },
   { path: "/tasks", label: "المهام", icon: ListChecks, badge: 5 },
   { path: "/documents", label: "المستندات", icon: FolderOpen },
-  { path: "/sign", label: "التوقيع الإلكتروني", icon: PenTool },
   { path: "/payments", label: "الدفعات", icon: CreditCard },
+  { path: "/quotations", label: "عروض الأسعار", icon: FileText, badge: 2 },
+  { path: "/contracts", label: "العقود الهندسية", icon: FileSignature, badge: 1 },
+  { path: "/sign", label: "التوقيع الإلكتروني", icon: PenTool },
   { path: "/client-portal", label: "بوابة العميل", icon: Globe },
   { path: "/reports", label: "التقارير", icon: BarChart3 },
 ];
@@ -157,7 +157,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Button>
             <div>
               <h2 className="text-lg font-bold" style={{ color: "oklch(0.22 0.04 250)" }}>
-                {navItems.find((n) => n.path === location)?.label || "لوحة التحكم"}
+                {navItems.find((n) => n.path === location)?.label ||
+                (location.startsWith("/clients/") ? "ملف العميل" :
+                location.startsWith("/projects/") ? "تفاصيل المشروع" :
+                "لوحة التحكم")}
               </h2>
             </div>
           </div>

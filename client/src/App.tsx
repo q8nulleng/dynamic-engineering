@@ -16,6 +16,8 @@ import Reports from "./pages/Reports";
 import Contracts from "./pages/Contracts";
 import SignTemplates from "./pages/SignTemplates";
 import ProjectDetail from "./pages/ProjectDetail";
+import Clients from "./pages/Clients";
+import ClientDetail from "./pages/ClientDetail";
 import DashboardLayout from "./components/DashboardLayout";
 
 function Router() {
@@ -26,6 +28,8 @@ function Router() {
       <Route path="/quotations" component={Quotations} />
       <Route path="/projects" component={Projects} />
       <Route path="/projects/:id" component={ProjectDetail} />
+      <Route path="/clients" component={Clients} />
+      <Route path="/clients/:id" component={ClientDetail} />
       <Route path="/tasks" component={Tasks} />
       <Route path="/documents" component={Documents} />
       <Route path="/payments" component={Payments} />
