@@ -20,6 +20,8 @@ import { useRoute, Link } from "wouter";
 import SketchTaskPanel from "@/components/SketchTaskPanel";
 import DocumentsTaskPanel from "@/components/DocumentsTaskPanel";
 import ContractPaymentPanel from "@/components/ContractPaymentPanel";
+import FormsTaskPanel from "@/components/FormsTaskPanel";
+import SupervisionTaskPanel from "@/components/SupervisionTaskPanel";
 
 /* ===== Types ===== */
 interface SubTask { name: string; done: boolean; assignee?: string; }
@@ -657,6 +659,8 @@ export default function ProjectDetail() {
   const [sketchPanelColor, setSketchPanelColor] = useState("");
   const [showDocsPanel, setShowDocsPanel] = useState(false);
   const [showContractPanel, setShowContractPanel] = useState(false);
+  const [showFormsPanel, setShowFormsPanel] = useState(false);
+  const [showSupervisionPanel, setShowSupervisionPanel] = useState(false);
 
   if (!project) {
     return (
@@ -706,6 +710,23 @@ export default function ProjectDetail() {
           open={showContractPanel}
           onClose={() => setShowContractPanel(false)}
           projectName={project.name}
+        />
+      )}
+      {showFormsPanel && (
+        <FormsTaskPanel
+          open={showFormsPanel}
+          onClose={() => setShowFormsPanel(false)}
+          projectName={project.name}
+          serviceType={project.serviceType}
+          clientId={project.client === "فهد العتيبي" ? "C001" : undefined}
+        />
+      )}
+      {showSupervisionPanel && (
+        <SupervisionTaskPanel
+          open={showSupervisionPanel}
+          onClose={() => setShowSupervisionPanel(false)}
+          projectName={project.name}
+          clientName={project.client}
         />
       )}
 
@@ -822,6 +843,10 @@ export default function ProjectDetail() {
                            setShowDocsPanel(true);
                          } else if (task.name.includes("العقد وتحصيل") || task.name.includes("تحصيل الدفعة")) {
                            setShowContractPanel(true);
+                         } else if (task.name.includes("تجهيز النماذج والتعهدات")) {
+                           setShowFormsPanel(true);
+                         } else if (task.name.includes("الإشراف على التنفيذ")) {
+                           setShowSupervisionPanel(true);
                          } else {
                           setSelectedTask({ task, phaseTitle: phase.title, phaseColor: color });
                         }
