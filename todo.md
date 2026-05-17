@@ -11,3 +11,4 @@
 - [x] Verify all 19 contract templates are present in database
 - [x] Verify all APIs working (clients, projects, CRM, contracts, invoices, templates)
 - [x] Verify UI rendering correctly (dashboard, CRM, contracts page)
+- [x] Fix pnpm-lock.yaml mismatch with package.json for deployment
