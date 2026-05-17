@@ -18,8 +18,8 @@ import ProjectDetail from "./pages/ProjectDetail";
 import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
 import DashboardLayout from "./components/DashboardLayout";
-
 function Router() {
+  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
       <Route path="/" component={Dashboard} />

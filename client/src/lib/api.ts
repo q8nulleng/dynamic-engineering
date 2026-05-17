@@ -531,7 +531,8 @@ export function useDeleteCrmLead() {
   });
 }
 
-// ── Contract Templates ────────────────────────────────────────────────────
+
+// ── Contract Templates — Issue #16 ──────────────────────────────────────
 
 export interface ContractTemplate {
   id: number;
