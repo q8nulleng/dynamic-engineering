@@ -12,3 +12,5 @@
 - [x] Verify all APIs working (clients, projects, CRM, contracts, invoices, templates)
 - [x] Verify UI rendering correctly (dashboard, CRM, contracts page)
 - [x] Fix pnpm-lock.yaml mismatch with package.json for deployment
+- [x] Fix: deployed site shows only 5 contract templates instead of 19
+- [x] Improve PDF output formatting to match original contract documents
