@@ -14,3 +14,4 @@
 - [x] Fix pnpm-lock.yaml mismatch with package.json for deployment
 - [x] Fix: deployed site shows only 5 contract templates instead of 19
 - [x] Improve PDF output formatting to match original contract documents
+- [x] Fix PDF formatting: termsText shows as raw JSON/field names instead of formatted sections

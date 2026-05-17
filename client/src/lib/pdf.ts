@@ -98,6 +98,10 @@ function buildPage(body: string, title: string): string {
     font-size:12px;line-height:2.1;color:#222;padding-right:10px;
     white-space:pre-line;
   }
+  .article-item{
+    font-size:12px;line-height:2.1;color:#222;padding-right:10px;
+    position:relative;
+  }
   .bold-line{font-weight:700;color:#000;}
   .print-btn{
     position:fixed;bottom:20px;left:20px;background:${NAVY};color:#fff;
@@ -125,38 +129,121 @@ function buildPage(body: string, title: string): string {
 </html>`;
 }
 
-// ── Helper: parse template content into articles ─────────────────────────
-function parseTemplateContent(text: string): string {
+// ── Helper: format multi-line text content into HTML ───────────────────────
+function formatTextContent(text: string): string {
   if (!text) return "";
-  // Split by lines and format
   const lines = text.split("\n");
   let html = "";
   for (const line of lines) {
     const trimmed = line.trim();
-    if (!trimmed) {
-      html += "<br/>";
-      continue;
-    }
-    // Detect article headings like "المادة (1):" or "المرحلة الأولى"
-    if (/^(المادة|المرحلة)\s*\(/.test(trimmed) || /^(تمهيد|أولاً|ثانياً|ثالثاً|رابعاً|خامساً|سادساً|سابعاً)/.test(trimmed)) {
-      html += `<div class="article-heading">${trimmed}</div>`;
-    } else if (/^\d+[\.\)]/.test(trimmed) || /^[١٢٣٤٥٦٧٨٩٠]+[\.\)]/.test(trimmed)) {
-      // Numbered items
-      html += `<div class="article-content">${trimmed}</div>`;
+    if (!trimmed) continue;
+    // Detect sub-headings like "المرحلة الأولى" or "آلية الدفع:"
+    if (/^(المرحلة|آلية الدفع|مدة الإشراف|تمديد الإشراف)/.test(trimmed)) {
+      html += `<div class="bold-line" style="margin-top:8px;font-size:12px;">${trimmed}</div>`;
     } else {
-      html += `<div class="article-content">${trimmed}</div>`;
+      html += `<div class="article-item">${trimmed}</div>`;
     }
   }
+  return html;
+}
+
+// ── Helper: render a single article/section ────────────────────────────────
+function renderSection(heading: string, content: string): string {
+  if (!content || !content.trim()) return "";
+  // The content already contains the heading (e.g., "المادة (1): نطاق الخدمات ...")
+  // We need to extract the heading from the first line if it starts with "المادة"
+  const lines = content.split("\n");
+  const firstLine = lines[0]?.trim() || "";
+  
+  let sectionHeading = heading;
+  let sectionBody = content;
+  
+  // If the content starts with "المادة (X):", use it as the heading
+  if (/^المادة\s*\(\d+\)/.test(firstLine)) {
+    sectionHeading = firstLine;
+    sectionBody = lines.slice(1).join("\n");
+  }
+  
+  return `
+<div style="margin-bottom:16px;">
+  <div class="article-heading">${sectionHeading}</div>
+  ${formatTextContent(sectionBody)}
+</div>`;
+}
+
+// ── Parse termsText JSON and render structured sections ─────────────────────
+interface TemplateFields {
+  scopeOfWork?: string;
+  duration?: string;
+  paymentSchedule?: string;
+  party1Obligations?: string;
+  party2Obligations?: string;
+  notes?: string;
+  terms?: string;
+}
+
+function parseAndRenderTerms(termsText: string, contractAmount: number): string {
+  if (!termsText) return "";
+  
+  let fields: TemplateFields;
+  try {
+    fields = JSON.parse(termsText);
+  } catch {
+    // If not JSON, render as plain text (legacy format)
+    return `
+<div style="margin-bottom:16px;">
+  <div class="article-heading">المادة (1): نطاق الخدمات والشروط</div>
+  ${formatTextContent(termsText)}
+</div>`;
+  }
+  
+  let html = "";
+  
+  // المادة (1): نطاق الخدمات — from scopeOfWork
+  if (fields.scopeOfWork) {
+    html += renderSection("المادة (1): نطاق الخدمات", fields.scopeOfWork);
+  }
+  
+  // المادة (2): مراحل التصميم — from duration
+  if (fields.duration) {
+    html += renderSection("المادة (2): مراحل التصميم", fields.duration);
+  }
+  
+  // المادة (3): الأتعاب المالية — from paymentSchedule
+  if (fields.paymentSchedule) {
+    html += renderSection("المادة (3): الأتعاب المالية", fields.paymentSchedule);
+  }
+  
+  // المادة (4): التزامات المالك — from party1Obligations
+  if (fields.party1Obligations) {
+    html += renderSection("المادة (4): التزامات المالك", fields.party1Obligations);
+  }
+  
+  // المادة (5): الإشراف على التنفيذ / ملاحظات — from notes
+  if (fields.notes) {
+    html += renderSection("المادة (5): الإشراف على التنفيذ", fields.notes);
+  }
+  
+  // party2Obligations (if present)
+  if (fields.party2Obligations) {
+    html += renderSection("التزامات الاستشاري", fields.party2Obligations);
+  }
+  
+  // المادة (6): أحكام عامة — from terms
+  if (fields.terms) {
+    html += renderSection("المادة (6): أحكام عامة", fields.terms);
+  }
+  
   return html;
 }
 
 // ── Contract HTML body — formal legal format matching original DOCX ──────
 function contractBody(c: Contract): string {
   const amt = parseFloat(c.amount || "0");
+  const hasTermsJson = (() => {
+    try { JSON.parse(c.termsText || ""); return true; } catch { return false; }
+  })();
 
-  // Build scope of work from template content
-  const scopeContent = c.termsText || "";
-  
   return `
 ${officialHeader()}
 
@@ -165,8 +252,7 @@ ${officialHeader()}
   <div style="font-size:18px;font-weight:900;letter-spacing:2px;font-family:'Noto Kufi Arabic','Simplified Arabic',Arial,sans-serif;">
     إتفاقيــة خدمات هندسية
   </div>
-  ${c.templateType ? `<div style="font-size:14px;font-weight:700;margin-top:6px;color:#333;">${c.templateType}</div>` : ""}
-  ${c.template ? `<div style="font-size:13px;font-weight:600;margin-top:4px;color:#444;">${c.template}</div>` : ""}
+  ${c.template ? `<div style="font-size:14px;font-weight:700;margin-top:6px;color:#333;">${c.template}</div>` : ""}
 </div>
 
 <!-- Date & Contract Number -->
@@ -175,124 +261,64 @@ ${officialHeader()}
   <div><strong>التاريخ:</strong> ${c.signingDate || c.date}</div>
 </div>
 
-<!-- Intro text -->
+<!-- Intro text — matching original DOCX -->
 <div style="font-size:12px;line-height:2;margin-bottom:14px;">
-  أنه في يوم <strong>${c.signingDate || c.date || "___/___/______"}</strong> تم الإتفاق بين كلاً من:
+  إنــه فـي يـوم <strong>${c.signingDate || c.date || "___/___/______"}</strong> تم الإتفـــــــــاق بيـن كل من:
 </div>
 
-<!-- Section: Parties -->
+<!-- Parties — matching original DOCX format -->
+<div style="font-size:12px;line-height:2.2;margin-bottom:8px;">
+  <div><strong>الطرف الاول:</strong> السادة / مكتب دينامك ديزاين للاستشارات الهندسية &nbsp;&nbsp;&nbsp; ويشار اليه بـ <strong>(الاستشاري)</strong></div>
+  <div style="font-size:11px;color:#555;padding-right:10px;">العنوان: الكويت – قبلة - قطعة 11 – شارع الصالحية – بناية 18 – الدور الاول</div>
+</div>
+
+<div style="font-size:12px;line-height:2.2;margin-bottom:14px;">
+  <div><strong>الطرف الثانى:</strong> الســـيد/ <strong>${c.client || "_______________"}</strong> – بطاقة مدنية رقم/ <strong style="font-family:'Space Grotesk',sans-serif;">${c.civilId || "_______________"}</strong> &nbsp;&nbsp;&nbsp; ويشار اليه بـ <strong>(المالك)</strong></div>
+  <div style="font-size:11px;color:#555;padding-right:10px;">العنوان: منطقة: ${c.area || "_______________"} – قطعة (${c.block || "___"}) – قسيمة (${c.plot || "___"})</div>
+</div>
+
+<!-- تمهيد — matching original DOCX -->
 <div style="margin-bottom:16px;">
-  <div class="article-heading">أولاً: المتعاقدان</div>
-  
-  <div style="font-size:12px;line-height:2.2;margin-bottom:10px;padding:8px 12px;background:#fafafa;border:1px solid #eee;">
-    <div class="bold-line" style="font-size:13px;">الطرف الأول (الاستشاري):</div>
-    <div>مكتب ديناميك ديزاين للإستشارات الهندسية</div>
-    <div style="font-size:11px;color:#555;">مدينة الكويت – قبلة – شارع الصالحية – مبنى رقم (18) – الدور الأول – مكتب رقم (1)</div>
-  </div>
-  
-  <div style="font-size:12px;line-height:2.2;padding:8px 12px;background:#fafafa;border:1px solid #eee;">
-    <div class="bold-line" style="font-size:13px;">الطرف الثاني (المالك / العميل):</div>
-    <table style="width:100%;font-size:12px;margin-top:4px;">
-      <tr>
-        <td style="padding:3px 8px;color:#555;width:20%;">الاسم:</td>
-        <td style="padding:3px 8px;font-weight:600;">${c.client || "_______________"}</td>
-        <td style="padding:3px 8px;color:#555;width:20%;">الرقم المدني:</td>
-        <td style="padding:3px 8px;font-weight:600;font-family:'Space Grotesk',sans-serif;">${c.civilId || "_______________"}</td>
-      </tr>
-      <tr>
-        <td style="padding:3px 8px;color:#555;">المنطقة:</td>
-        <td style="padding:3px 8px;font-weight:600;">${c.area || "_______________"}</td>
-        <td style="padding:3px 8px;color:#555;">القطعة:</td>
-        <td style="padding:3px 8px;font-weight:600;">${c.block || "___"}</td>
-      </tr>
-      <tr>
-        <td style="padding:3px 8px;color:#555;">القسيمة:</td>
-        <td style="padding:3px 8px;font-weight:600;">${c.plot || "___"}</td>
-        <td style="padding:3px 8px;color:#555;">نوع العقار:</td>
-        <td style="padding:3px 8px;font-weight:600;">${c.type || "سكن خاص"}</td>
-      </tr>
-    </table>
-  </div>
-</div>
-
-<!-- Section: Introduction -->
-<div style="margin-bottom:14px;">
-  <div class="article-heading">تمهيد</div>
+  <div class="article-heading">تمهيد :-</div>
   <div class="article-content">
-    حيث أن الطرف الأول مكتب استشاري هندسي مرخص ومتخصص في أعمال التصميم والإشراف الهندسي،
-    وحيث أن الطرف الثاني يرغب في الاستعانة بخدمات الطرف الأول لتقديم خدمات
-    <strong>${c.service || c.templateType || "هندسية"}</strong>
-    لمشروع من نوع <strong>${c.type || "سكن خاص"}</strong>
-    ${c.area ? `في منطقة <strong>${c.area}</strong>` : ""}
-    ${c.block ? `– القطعة <strong>${c.block}</strong>` : ""}
-    ${c.plot ? `– القسيمة <strong>${c.plot}</strong>` : ""}،
-    ${c.package ? `الباقة المختارة: <strong>${c.package}</strong>،` : ""}
-    فقد اتفق الطرفان على ما يلي:
+    حيث أن المالك يرغب في الحصول على خدمات استشارية لـ${c.service || c.templateType || "تصميم وترخيص"} قسيمته الواقعة في منطقة: ${c.area || "___"} - قطعة: ${c.block || "___"} ، قسيمة: ${c.plot || "___"} .
+    <br/>فقد تم الاتفاق مع الاستشاري للقيام بالمهام الموضحة في هذه الاتفاقية، والتي تعتبر جزءًا لا يتجزأ منها.
   </div>
 </div>
 
-<!-- Section: Scope of Work / Template Content -->
-${scopeContent ? `
-<div style="margin-bottom:14px;">
-  <div class="article-heading">المادة (1): نطاق الخدمات والشروط</div>
-  <div class="article-content">${scopeContent.replace(/\n/g, "<br/>")}</div>
-</div>
-` : `
-<div style="margin-bottom:14px;">
+<!-- Template sections from termsText JSON -->
+${parseAndRenderTerms(c.termsText, amt)}
+
+${!hasTermsJson && !c.termsText ? `
+<!-- Fallback: basic sections when no template data -->
+<div style="margin-bottom:16px;">
   <div class="article-heading">المادة (1): نطاق الخدمات</div>
   <div class="article-content">
     يتعهد الطرف الأول بتقديم خدمات <strong>${c.service || c.templateType || "هندسية"}</strong> للطرف الثاني
     وفقاً لأعلى المعايير الهندسية المعتمدة في دولة الكويت.
   </div>
 </div>
-`}
 
-<!-- Section: Payment -->
-<div style="margin-bottom:14px;">
-  <div class="article-heading">المادة (${scopeContent ? "2" : "2"}): الأتعاب المالية</div>
+<div style="margin-bottom:16px;">
+  <div class="article-heading">المادة (2): الأتعاب المالية</div>
   <div class="article-content">
     <div class="bold-line">
       إجمالي الأتعاب: <span style="font-size:16px;font-family:'Space Grotesk',sans-serif;">${formatAmount(amt)}</span> دينار كويتي
     </div>
   </div>
-  <div class="article-heading" style="font-size:12px;border-bottom:1px solid #999;margin-top:10px;">آلية الدفع:</div>
-  <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;">
-    <thead>
-      <tr style="background:#f5f5f5;border-bottom:2px solid #000;">
-        <th style="padding:8px 10px;text-align:right;font-weight:700;">الدفعة</th>
-        <th style="padding:8px 10px;text-align:right;font-weight:700;">الوقت</th>
-        <th style="padding:8px 10px;text-align:center;font-weight:700;">النسبة</th>
-        <th style="padding:8px 10px;text-align:center;font-weight:700;">المبلغ (د.ك)</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr style="border-bottom:1px solid #ddd;">
-        <td style="padding:7px 10px;">الدفعة الأولى</td>
-        <td style="padding:7px 10px;">عند توقيع العقد</td>
-        <td style="padding:7px 10px;text-align:center;font-weight:700;">50%</td>
-        <td style="padding:7px 10px;text-align:center;font-weight:700;font-family:'Space Grotesk',sans-serif;">${formatAmount(amt * 0.5)}</td>
-      </tr>
-      <tr style="border-bottom:1px solid #ddd;">
-        <td style="padding:7px 10px;">الدفعة الثانية</td>
-        <td style="padding:7px 10px;">بعد صدور الرخصة / الإنجاز</td>
-        <td style="padding:7px 10px;text-align:center;font-weight:700;">50%</td>
-        <td style="padding:7px 10px;text-align:center;font-weight:700;font-family:'Space Grotesk',sans-serif;">${formatAmount(amt * 0.5)}</td>
-      </tr>
-    </tbody>
-  </table>
 </div>
 
-<!-- Section: General Terms -->
-<div style="margin-bottom:14px;">
-  <div class="article-heading">أحكام عامة</div>
+<div style="margin-bottom:16px;">
+  <div class="article-heading">المادة (3): أحكام عامة</div>
   <div class="article-content">
     في حال فسخ العقد من قبل المالك، لا يحق له استرداد أي مبالغ تم دفعها.
     <br/>في حال نشوء أي نزاع، يتم حله وديًا، فإن تعذر، يتم اللجوء إلى التحكيم أو المحاكم الكويتية المختصة.
     <br/>حُررت هذه الاتفاقية من نسختين، نسخة لكل طرف للعمل بموجبها.
   </div>
 </div>
+` : ""}
 
-<!-- Section: Signatures — matching original DOCX -->
+<!-- Signatures — matching original DOCX -->
 <div style="margin-top:30px;">
   <table style="width:100%;border-collapse:collapse;">
     <tr>
