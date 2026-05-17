@@ -1,157 +1,21 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useClients, useCreateClient, useProjects } from "@/lib/api";
 import {
   Users, Plus, Search, Phone, MapPin, FileText,
-  Building2, Home, Factory, TrendingUp, ChevronLeft,
-  Filter, MoreVertical, Eye, Edit2, Trash2, MessageSquare,
-  CheckCircle2, Clock, AlertCircle, Star
+  Building2, Home, MoreVertical, Eye, MessageSquare, Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
-// ==============================
-// بيانات العملاء التجريبية
-// ==============================
-export const clientsDB: Client[] = [
-  {
-    id: "C001",
-    name: "فهد عبدالله العتيبي",
-    phone: "99001122",
-    phone2: "55001122",
-    civilId: "281011234567",
-    email: "fahad@example.com",
-    type: "individual",
-    area: "خيطان",
-    block: "2",
-    plot: "212",
-    parcelArea: 400,
-    parcelShape: "زاوية",
-    parcelFacing: "شمال",
-    ownershipDoc: "12345",
-    ownershipDate: "2018-05-10",
-    spouseName: "نوف سالم العنزي",
-    spouseCivilId: "285021234567",
-    projects: ["S00048"],
-    status: "active",
-    rating: 5,
-    notes: "عميل مميز، سريع في التجاوب",
-    createdAt: "2025-01-15",
-    projectType: "سكن خاص",
-    serviceType: "بناء جديد",
-  },
-  {
-    id: "C002",
-    name: "محمد يوسف الرشيدي",
-    phone: "66112233",
-    phone2: "",
-    civilId: "275031234567",
-    email: "",
-    type: "individual",
-    area: "الفروانية",
-    block: "5",
-    plot: "88",
-    parcelArea: 325,
-    parcelShape: "مستطيل",
-    parcelFacing: "جنوب",
-    ownershipDoc: "67890",
-    ownershipDate: "2020-03-22",
-    spouseName: "",
-    spouseCivilId: "",
-    projects: ["S00045"],
-    status: "active",
-    rating: 4,
-    notes: "",
-    createdAt: "2025-02-20",
-    projectType: "سكن خاص",
-    serviceType: "تعديل وإضافة",
-  },
-  {
-    id: "C003",
-    name: "ورثة عبدالحميد خميس الخميس",
-    phone: "55443322",
-    phone2: "99443322",
-    civilId: "",
-    email: "",
-    type: "heirs",
-    area: "القادسية",
-    block: "2",
-    plot: "113",
-    parcelArea: 500,
-    parcelShape: "مستطيل",
-    parcelFacing: "شرق",
-    ownershipDoc: "11223",
-    ownershipDate: "2015-11-05",
-    spouseName: "",
-    spouseCivilId: "",
-    projects: ["S00040", "S00041"],
-    status: "active",
-    rating: 3,
-    notes: "ملف ورثة - يحتاج وكالة",
-    createdAt: "2024-11-10",
-    projectType: "سكن خاص",
-    serviceType: "تعديل وإضافة",
-  },
-  {
-    id: "C004",
-    name: "شركة الخليج للتطوير العقاري",
-    phone: "22334455",
-    phone2: "",
-    civilId: "",
-    email: "info@gulf-dev.com",
-    type: "company",
-    area: "الشويخ الصناعي",
-    block: "3",
-    plot: "44",
-    parcelArea: 2000,
-    parcelShape: "مستطيل",
-    parcelFacing: "شمال",
-    ownershipDoc: "55667",
-    ownershipDate: "2019-07-18",
-    spouseName: "",
-    spouseCivilId: "",
-    projects: ["S00035"],
-    status: "active",
-    rating: 4,
-    notes: "شركة - التواصل مع م. خالد المدير",
-    createdAt: "2024-09-05",
-    projectType: "صناعي",
-    serviceType: "بناء جديد",
-  },
-  {
-    id: "C005",
-    name: "عبدالله سرحان فلاح اليبسلي",
-    phone: "97887766",
-    phone2: "",
-    civilId: "268041234567",
-    email: "",
-    type: "individual",
-    area: "ضاحية صباح السالم",
-    block: "9",
-    plot: "225",
-    parcelArea: 450,
-    parcelShape: "مستطيل",
-    parcelFacing: "غرب",
-    ownershipDoc: "33445",
-    ownershipDate: "2022-01-30",
-    spouseName: "فاطمة علي الحربي",
-    spouseCivilId: "272051234567",
-    projects: ["S00030"],
-    status: "completed",
-    rating: 5,
-    notes: "تم إنهاء المشروع بنجاح",
-    createdAt: "2024-06-12",
-    projectType: "سكن خاص",
-    serviceType: "تعديل وإضافة",
-  },
-];
+export const clientsDB: Client[] = [];
 
 export interface Client {
   id: string;
@@ -161,6 +25,7 @@ export interface Client {
   civilId: string;
   email: string;
   type: "individual" | "company" | "heirs";
+  governorate: string;
   area: string;
   block: string;
   plot: string;
@@ -171,7 +36,6 @@ export interface Client {
   ownershipDate: string;
   spouseName: string;
   spouseCivilId: string;
-  projects: string[];
   status: "active" | "completed" | "pending";
   rating: number;
   notes: string;
@@ -180,101 +44,120 @@ export interface Client {
   serviceType: string;
 }
 
-const typeLabels: Record<string, { label: string; icon: any; color: string }> = {
-  individual: { label: "فرد", icon: Home, color: "bg-blue-100 text-blue-700" },
-  company: { label: "شركة", icon: Building2, color: "bg-purple-100 text-purple-700" },
-  heirs: { label: "ورثة", icon: Users, color: "bg-amber-100 text-amber-700" },
+export const kuwaitGovernorates: Record<string, string[]> = {
+  "محافظة العاصمة": [
+    "شرق", "مرقاب", "قبلة", "الميناء", "الديرة", "الوطية",
+    "الشامية", "الروضة", "الخالدية", "النزهة", "القيروان",
+    "كيفان", "الفيحاء", "اليرموك", "المنصورية", "الغرب",
+    "ضاحية عبدالله السالم", "بنيد القار", "الدعية", "العديلية",
+    "الدسمة", "الصليبيخات", "الشويخ الصناعي", "السرة",
+    "أم الجسم", "البنيان", "فيلكا",
+  ],
+  "محافظة حولي": [
+    "السالمية", "حولي", "الرميثية", "بيان", "مشرف",
+    "الجابرية", "الزهراء", "الشعب", "القادسية",
+    "سلوى", "الرقة", "العقيلة", "البدع", "ميدان حولي", "الشهداء",
+  ],
+  "محافظة الفروانية": [
+    "خيطان", "الفروانية", "الرقعي", "العارضية", "أبو فطيرة",
+    "ضاحية صباح السالم", "الأندلس", "الرابية", "إشبيلية",
+    "الضجيج", "جليب الشيوخ", "عبدالله المبارك", "الفردوس",
+    "الصليبية", "الحساوية",
+  ],
+  "محافظة مبارك الكبير": [
+    "العدان", "المنقف", "الري", "صباح السالم",
+    "أبو الحصانية", "القصور", "مبارك الكبير", "الفنيطيس", "الصباحية",
+  ],
+  "محافظة الأحمدي": [
+    "الفنطاس", "أبو حليفة", "الأحمدي", "العيون", "هدية",
+    "الظهر", "علي صباح السالم", "المقوع", "ضاحية جابر العلي",
+    "الرقة", "الوفرة", "الزور", "الخيران", "المنطقة الصناعية",
+  ],
+  "محافظة الجهراء": [
+    "الجهراء", "المطلاع", "تيماء", "النعيم",
+    "كاظمة", "السبية", "أم العيش", "الواحة", "الناعم",
+    "أمغرة", "القصر", "الوفرة الزراعية",
+  ],
 };
 
-const statusLabels: Record<string, { label: string; color: string; icon: any }> = {
-  active: { label: "نشط", color: "bg-green-100 text-green-700", icon: CheckCircle2 },
-  completed: { label: "منتهي", color: "bg-gray-100 text-gray-600", icon: CheckCircle2 },
-  pending: { label: "بانتظار", color: "bg-yellow-100 text-yellow-700", icon: Clock },
+export const serviceTypes: Record<string, string[]> = {
+  "سكن خاص": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "هدم", "إشراف"],
+  "صناعي": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "هدم"],
+  "استثماري": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "هدم"],
+  "تجاري": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "هدم"],
 };
 
-const projectTypeColors: Record<string, string> = {
+const typeLabels: Record<string, { label: string; color: string }> = {
+  individual: { label: "فرد", color: "bg-blue-100 text-blue-700" },
+  company: { label: "شركة", color: "bg-purple-100 text-purple-700" },
+};
+
+const statusLabels: Record<string, { label: string; color: string }> = {
+  active: { label: "نشط", color: "bg-green-100 text-green-700" },
+  completed: { label: "منتهي", color: "bg-gray-100 text-gray-600" },
+  pending: { label: "بانتظار", color: "bg-yellow-100 text-yellow-700" },
+};
+
+export const projectTypeColors: Record<string, string> = {
   "سكن خاص": "bg-blue-500",
   "صناعي": "bg-orange-500",
   "استثماري": "bg-green-500",
   "تجاري": "bg-yellow-500",
 };
 
-// ==============================
-// نموذج إضافة عميل جديد
-// ==============================
+function StarRating({ rating }: { rating: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((s) => (
+        <Star key={s} className={`w-3 h-3 ${s <= rating ? "fill-amber-400 text-amber-400" : "text-gray-200"}`} />
+      ))}
+    </div>
+  );
+}
+
+// ── نموذج إضافة عميل جديد ──────────────────────────────────────────────────
 function NewClientDialog({ open, onClose, onAdd }: {
   open: boolean;
   onClose: () => void;
-  onAdd: (client: Client) => void;
+  onAdd: (client: Omit<Client, "id">) => void;
 }) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     name: "", phone: "", phone2: "", civilId: "", email: "",
     type: "individual" as Client["type"],
     spouseName: "", spouseCivilId: "",
-    area: "", block: "", plot: "", parcelArea: "",
+    governorate: "", area: "", block: "", plot: "", parcelArea: "",
     parcelShape: "مستطيل", parcelFacing: "شمال",
     ownershipDoc: "", ownershipDate: "",
     projectType: "سكن خاص", serviceType: "بناء جديد",
     notes: "",
   });
 
-  const kuwaiti_areas = [
-    "خيطان", "الفروانية", "الرقعي", "العارضية", "أبو فطيرة",
-    "السالمية", "حولي", "الرميثية", "بيان", "مشرف",
-    "الجابرية", "النزهة", "الزهراء", "الشعب", "القادسية",
-    "العدان", "المنقف", "الفنطاس", "أبو حليفة", "الأحمدي",
-    "الصليبيخات", "الشامية", "الروضة", "الخالدية", "القيروان",
-    "ضاحية صباح السالم", "الشويخ الصناعي", "الري", "المطلاع",
-    "الجهراء", "تيماء", "العيون", "النعيم",
-  ];
-
-  const serviceTypes: Record<string, string[]> = {
-    "سكن خاص": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "هدم", "إشراف"],
-    "صناعي": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "هدم"],
-    "استثماري": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "هدم"],
-    "تجاري": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "هدم"],
-  };
+  const govAreas = form.governorate ? (kuwaitGovernorates[form.governorate] || []) : [];
 
   const handleSubmit = () => {
     if (!form.name || !form.phone) {
       toast.error("يرجى إدخال الاسم ورقم الهاتف");
       return;
     }
-    const newClient: Client = {
-      id: `C${String(clientsDB.length + 1).padStart(3, "0")}`,
-      name: form.name,
-      phone: form.phone,
-      phone2: form.phone2,
-      civilId: form.civilId,
-      email: form.email,
-      type: form.type,
-      area: form.area,
-      block: form.block,
-      plot: form.plot,
-      parcelArea: Number(form.parcelArea) || 0,
-      parcelShape: form.parcelShape,
-      parcelFacing: form.parcelFacing,
-      ownershipDoc: form.ownershipDoc,
-      ownershipDate: form.ownershipDate,
-      spouseName: form.spouseName,
-      spouseCivilId: form.spouseCivilId,
-      projects: [],
-      status: "pending",
-      rating: 0,
-      notes: form.notes,
-      createdAt: new Date().toISOString().split("T")[0],
-      projectType: form.projectType,
-      serviceType: form.serviceType,
-    };
-    onAdd(newClient);
+    onAdd({
+      name: form.name, phone: form.phone, phone2: form.phone2,
+      civilId: form.civilId, email: form.email, type: form.type,
+      governorate: form.governorate, area: form.area, block: form.block, plot: form.plot,
+      parcelArea: Number(form.parcelArea) || 0, parcelShape: form.parcelShape,
+      parcelFacing: form.parcelFacing, ownershipDoc: form.ownershipDoc,
+      ownershipDate: form.ownershipDate, spouseName: form.spouseName,
+      spouseCivilId: form.spouseCivilId, status: "pending", rating: 0,
+      notes: form.notes, createdAt: new Date().toISOString().split("T")[0],
+      projectType: form.projectType, serviceType: form.serviceType,
+    });
     toast.success(`تم إضافة العميل ${form.name} بنجاح`);
     onClose();
     setStep(1);
     setForm({
       name: "", phone: "", phone2: "", civilId: "", email: "",
       type: "individual", spouseName: "", spouseCivilId: "",
-      area: "", block: "", plot: "", parcelArea: "",
+      governorate: "", area: "", block: "", plot: "", parcelArea: "",
       parcelShape: "مستطيل", parcelFacing: "شمال",
       ownershipDoc: "", ownershipDate: "",
       projectType: "سكن خاص", serviceType: "بناء جديد", notes: "",
@@ -291,7 +174,6 @@ function NewClientDialog({ open, onClose, onAdd }: {
             </div>
             إضافة عميل جديد
           </DialogTitle>
-          {/* شريط الخطوات */}
           <div className="flex items-center gap-1 mt-3">
             {[1, 2, 3].map((s) => (
               <div key={s} className="flex items-center gap-1 flex-1">
@@ -314,12 +196,12 @@ function NewClientDialog({ open, onClose, onAdd }: {
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">نوع العميل</label>
                 <div className="flex gap-2">
-                  {(["individual", "company", "heirs"] as const).map((t) => (
+                  {(["individual", "company"] as const).map((t) => (
                     <button key={t} onClick={() => setForm({ ...form, type: t })}
                       className={`flex-1 py-2 px-3 rounded-lg border text-xs font-medium transition-colors ${
                         form.type === t ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600"
                       }`}>
-                      {typeLabels[t].label}
+                      {t === "individual" ? "🏠 فرد" : "🏢 شركة"}
                     </button>
                   ))}
                 </div>
@@ -327,7 +209,7 @@ function NewClientDialog({ open, onClose, onAdd }: {
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">الاسم الكامل *</label>
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder={form.type === "company" ? "اسم الشركة" : form.type === "heirs" ? "ورثة ..." : "الاسم الرباعي"} className="text-right text-sm" />
+                  placeholder={form.type === "company" ? "اسم الشركة" : "الاسم الرباعي"} className="text-right text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -380,13 +262,30 @@ function NewClientDialog({ open, onClose, onAdd }: {
           {/* الخطوة 2: بيانات القسيمة */}
           {step === 2 && (
             <div className="space-y-3">
-              <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">المنطقة</label>
-                <select value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })}
-                  className="w-full border rounded-lg px-3 py-2 text-sm text-right bg-white">
-                  <option value="">اختر المنطقة...</option>
-                  {kuwaiti_areas.map((a) => <option key={a} value={a}>{a}</option>)}
-                </select>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">المحافظة</label>
+                  <select
+                    value={form.governorate}
+                    onChange={(e) => setForm({ ...form, governorate: e.target.value, area: "" })}
+                    className="w-full border rounded-lg px-3 py-2 text-sm text-right bg-white">
+                    <option value="">اختر المحافظة...</option>
+                    {Object.keys(kuwaitGovernorates).map((g) => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">المنطقة</label>
+                  <select
+                    value={form.area}
+                    onChange={(e) => setForm({ ...form, area: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 text-sm text-right bg-white"
+                    disabled={!form.governorate}>
+                    <option value="">اختر المنطقة...</option>
+                    {govAreas.map((a) => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <div>
@@ -450,7 +349,7 @@ function NewClientDialog({ open, onClose, onAdd }: {
           {step === 3 && (
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-2 block">نوع المشروع</label>
+                <label className="text-xs font-medium text-gray-600 mb-2 block">نوع المعاملة</label>
                 <div className="grid grid-cols-2 gap-2">
                   {["سكن خاص", "صناعي", "استثماري", "تجاري"].map((t) => (
                     <button key={t} onClick={() => setForm({ ...form, projectType: t, serviceType: "بناء جديد" })}
@@ -477,13 +376,13 @@ function NewClientDialog({ open, onClose, onAdd }: {
                   ))}
                 </div>
               </div>
-              {/* ملخص */}
               <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-sm">
                 <div className="font-semibold text-gray-700 mb-2">ملخص بيانات العميل</div>
                 <div className="flex justify-between"><span className="text-gray-500">الاسم</span><span className="font-medium">{form.name || "—"}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">الهاتف</span><span>{form.phone || "—"}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">المحافظة</span><span>{form.governorate || "—"}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">المنطقة</span><span>{form.area || "—"}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">القسيمة</span><span>{form.plot ? `${form.area} ق${form.block}/ق${form.plot}` : "—"}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">القسيمة</span><span>{form.plot ? `ق${form.block}/ق${form.plot}` : "—"}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">نوع الخدمة</span><span className="font-medium text-blue-600">{form.projectType} — {form.serviceType}</span></div>
               </div>
             </div>
@@ -492,14 +391,10 @@ function NewClientDialog({ open, onClose, onAdd }: {
 
         <DialogFooter className="flex gap-2 mt-2">
           {step > 1 && (
-            <Button variant="outline" onClick={() => setStep(step - 1)} className="flex-1">
-              السابق
-            </Button>
+            <Button variant="outline" onClick={() => setStep(step - 1)} className="flex-1">السابق</Button>
           )}
           {step < 3 ? (
-            <Button onClick={() => setStep(step + 1)} className="flex-1 bg-blue-600 hover:bg-blue-700">
-              التالي
-            </Button>
+            <Button onClick={() => setStep(step + 1)} className="flex-1 bg-blue-600 hover:bg-blue-700">التالي</Button>
           ) : (
             <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700">
               <Plus className="w-4 h-4 ml-1" />
@@ -512,30 +407,41 @@ function NewClientDialog({ open, onClose, onAdd }: {
   );
 }
 
-// ==============================
-// الصفحة الرئيسية
-// ==============================
+// ── الصفحة الرئيسية ──────────────────────────────────────────────────────────
 export default function Clients() {
   const [, navigate] = useLocation();
-  const [clients, setClients] = useState<Client[]>(clientsDB);
+  const { data: clients = [], isLoading } = useClients();
+  const { data: allProjects = [] } = useProjects();
+  const createClient = useCreateClient();
   const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<string>("all");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterType, setFilterType] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterProjectType, setFilterProjectType] = useState("all");
+  const [filterServiceType, setFilterServiceType] = useState("all");
   const [showNewDialog, setShowNewDialog] = useState(false);
 
   const filtered = clients.filter((c) => {
-    const matchSearch = c.name.includes(search) || c.phone.includes(search) || c.area.includes(search);
+    const q = search.toLowerCase();
+    const matchSearch = !search ||
+      c.name.toLowerCase().includes(q) ||
+      c.phone.includes(search) ||
+      (c.area || "").includes(search) ||
+      (c.governorate || "").includes(search);
     const matchType = filterType === "all" || c.type === filterType;
     const matchStatus = filterStatus === "all" || c.status === filterStatus;
-    return matchSearch && matchType && matchStatus;
+    const matchPT = filterProjectType === "all" || c.projectType === filterProjectType;
+    const matchST = filterServiceType === "all" || c.serviceType === filterServiceType;
+    return matchSearch && matchType && matchStatus && matchPT && matchST;
   });
 
   const stats = {
     total: clients.length,
     active: clients.filter((c) => c.status === "active").length,
-    projects: clients.reduce((acc, c) => acc + c.projects.length, 0),
+    projects: allProjects.length,
     pending: clients.filter((c) => c.status === "pending").length,
   };
+
+  if (isLoading) return <div className="flex items-center justify-center min-h-96 text-muted-foreground">جاري التحميل...</div>;
 
   return (
     <div className="min-h-screen bg-gray-50" dir="rtl">
@@ -574,8 +480,8 @@ export default function Clients() {
       </div>
 
       {/* فلاتر وبحث */}
-      <div className="px-6 py-3 bg-white border-b flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="px-6 py-3 bg-white border-b flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search className="absolute right-3 top-2.5 w-4 h-4 text-gray-400" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="ابحث بالاسم أو الهاتف أو المنطقة..."
@@ -586,7 +492,6 @@ export default function Clients() {
           <option value="all">كل الأنواع</option>
           <option value="individual">أفراد</option>
           <option value="company">شركات</option>
-          <option value="heirs">ورثة</option>
         </select>
         <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
           className="border rounded-lg px-3 py-2 text-sm text-right bg-white">
@@ -594,6 +499,24 @@ export default function Clients() {
           <option value="active">نشط</option>
           <option value="completed">منتهي</option>
           <option value="pending">بانتظار</option>
+        </select>
+        <select value={filterProjectType} onChange={(e) => setFilterProjectType(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm text-right bg-white">
+          <option value="all">كل المعاملات</option>
+          <option value="سكن خاص">سكن خاص</option>
+          <option value="صناعي">صناعي</option>
+          <option value="استثماري">استثماري</option>
+          <option value="تجاري">تجاري</option>
+        </select>
+        <select value={filterServiceType} onChange={(e) => setFilterServiceType(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm text-right bg-white">
+          <option value="all">كل الخدمات</option>
+          <option value="بناء جديد">بناء جديد</option>
+          <option value="تعديل">تعديل</option>
+          <option value="إضافة">إضافة</option>
+          <option value="تعديل وإضافة">تعديل وإضافة</option>
+          <option value="هدم">هدم</option>
+          <option value="إشراف">إشراف</option>
         </select>
         <span className="text-sm text-gray-500">{filtered.length} نتيجة</span>
       </div>
@@ -609,32 +532,27 @@ export default function Clients() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((client) => {
-              const typeInfo = typeLabels[client.type];
+              const typeInfo = typeLabels[client.type] ?? typeLabels["individual"];
               const statusInfo = statusLabels[client.status];
-              const TypeIcon = typeInfo.icon;
-              const StatusIcon = statusInfo.icon;
+              const clientProjects = allProjects.filter((p) => p.clientId === client.id);
 
               return (
                 <div key={client.id}
                   className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer group"
                   onClick={() => navigate(`/clients/${client.id}`)}>
-                  {/* شريط اللون العلوي */}
                   <div className={`h-1.5 rounded-t-2xl ${projectTypeColors[client.projectType] || "bg-gray-400"}`} />
 
                   <div className="p-4">
-                    {/* الرأس */}
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
                         <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-lg font-bold ${
-                          client.type === "company" ? "bg-purple-100 text-purple-700" :
-                          client.type === "heirs" ? "bg-amber-100 text-amber-700" :
-                          "bg-blue-100 text-blue-700"
+                          client.type === "company" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
                         }`}>
                           {client.name.charAt(0)}
                         </div>
                         <div>
                           <h3 className="font-semibold text-gray-900 text-sm leading-tight">{client.name}</h3>
-                          <div className="flex items-center gap-1.5 mt-0.5">
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${typeInfo.color}`}>
                               {typeInfo.label}
                             </span>
@@ -642,6 +560,9 @@ export default function Clients() {
                               {statusInfo.label}
                             </span>
                           </div>
+                          {client.rating > 0 && (
+                            <div className="mt-1"><StarRating rating={client.rating} /></div>
+                          )}
                         </div>
                       </div>
                       <DropdownMenu>
@@ -664,37 +585,53 @@ export default function Clients() {
                       </DropdownMenu>
                     </div>
 
-                    {/* بيانات الاتصال */}
                     <div className="space-y-1.5 mb-3">
                       <div className="flex items-center gap-2 text-xs text-gray-600">
                         <Phone className="w-3.5 h-3.5 text-gray-400" />
                         <span dir="ltr">{client.phone}</span>
                         {client.phone2 && <span className="text-gray-400">/ {client.phone2}</span>}
                       </div>
-                      {client.area && (
+                      {(client.governorate || client.area) && (
                         <div className="flex items-center gap-2 text-xs text-gray-600">
                           <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                          <span>{client.area} — ق{client.block} / {client.plot}</span>
-                          {client.parcelArea > 0 && <span className="text-gray-400">({client.parcelArea}م²)</span>}
+                          <span>
+                            {client.governorate && (
+                              <span className="text-gray-400">{client.governorate.replace("محافظة ", "")} · </span>
+                            )}
+                            {client.area}
+                            {client.block && ` — ق${client.block}`}
+                            {client.plot && `/${client.plot}`}
+                            {client.parcelArea > 0 && (
+                              <span className="text-gray-400"> ({client.parcelArea}م²)</span>
+                            )}
+                          </span>
                         </div>
                       )}
                     </div>
 
-                    {/* الفاصل */}
                     <div className="border-t pt-3 flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <div className={`w-2 h-2 rounded-full ${projectTypeColors[client.projectType] || "bg-gray-400"}`} />
                         <span className="text-xs text-gray-500">{client.projectType}</span>
-                        <span className="text-gray-300">·</span>
-                        <span className="text-xs text-gray-500">{client.serviceType}</span>
+                        {client.serviceType && (
+                          <>
+                            <span className="text-gray-300">·</span>
+                            <span className="text-xs text-gray-500">{client.serviceType}</span>
+                          </>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>{client.projects.length} مشروع</span>
-                      </div>
+                      {clientProjects.length > 0 ? (
+                        <span className="text-xs text-purple-600 bg-purple-50 rounded-full px-2 py-0.5 font-medium">
+                          {clientProjects.length} مشروع
+                        </span>
+                      ) : (
+                        <div className="flex items-center gap-1 text-xs text-gray-400">
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>عرض الملف</span>
+                        </div>
+                      )}
                     </div>
 
-                    {/* ملاحظة */}
                     {client.notes && (
                       <div className="mt-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5">
                         {client.notes}
@@ -711,7 +648,7 @@ export default function Clients() {
       <NewClientDialog
         open={showNewDialog}
         onClose={() => setShowNewDialog(false)}
-        onAdd={(c) => setClients([...clients, c])}
+        onAdd={(c) => createClient.mutate(c as any)}
       />
     </div>
   );

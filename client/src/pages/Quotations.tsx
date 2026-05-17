@@ -4,15 +4,19 @@
  * Updated with full 23 packages from Odoo.sh + Location fields
  */
 import { useState } from "react";
+import { Link } from "wouter";
+import { useQuotations } from "@/lib/api";
+import { exportQuotationPdf } from "@/lib/pdf";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, FileText, Send, CheckCircle, Eye, Download, MessageCircle, Receipt, ChevronDown, ChevronUp, MapPin } from "lucide-react";
+import { Plus, FileText, Send, CheckCircle, Eye, Download, MessageCircle, Receipt, ChevronDown, ChevronUp, MapPin, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 /* ── Full 23 Engineering Packages from Odoo.sh ── */
-const allPackages: Record<string, { name: string; price: string; buildingType: string; serviceType: string; level: string; features: string[] }[]> = {
+export const allPackages: Record<string, { name: string; price: string; buildingType: string; serviceType: string; level: string; features: string[] }[]> = {
   "سكن خاص": [
     { name: "الباقة الأساسية - سكن خاص", price: "1,500", buildingType: "سكن خاص", serviceType: "بناء جديد", level: "Basic",
       features: ["التصميم المعماري", "التصميم الإنشائي", "فحص التربة", "إمكانية إيصال التيار", "إصدار رخصة البلدية", "مخطط صرف صحي", "واجهة 3D", "مخطط فرش", "إشراف 3 أشهر"] },
@@ -71,44 +75,59 @@ const allPackages: Record<string, { name: string; price: string; buildingType: s
 
 const flatPackages = Object.values(allPackages).flat();
 
-/* ── Quotations with Location Data ── */
-const quotations = [
-  { id: "S00047", client: "تهاني خالد محمد بورسلي", type: "سكن خاص", service: "تعديل وإضافة", package: "باقة تعديل وإضافة - سكن خاص",
-    amount: "500", status: "مقبول", date: "2026-04-15", civilId: "265110500317",
-    governorate: "محافظة حولي", area: "مشرف", landArea: "375", block: "6", suburb: "0", plot: "367", surveyPlan: "30930" },
-  { id: "S00046", client: "أحمد الكويتي", type: "سكن خاص", service: "هدم", package: "باقة الهدم - سكن خاص",
-    amount: "250", status: "عقد", date: "2026-04-10", civilId: "290080100412",
-    governorate: "محافظة حولي", area: "السالمية", landArea: "400", block: "8", suburb: "0", plot: "201", surveyPlan: "25100" },
-  { id: "S00048", client: "فهد العتيبي", type: "سكن خاص", service: "بناء جديد", package: "الباقة الذهبية - سكن خاص",
-    amount: "2,200", status: "مرسل", date: "2026-04-08", civilId: "281050300215",
-    governorate: "محافظة الجهراء", area: "الجهراء", landArea: "500", block: "3", suburb: "2", plot: "122", surveyPlan: "31500" },
-  { id: "S00049", client: "شركة الخليج", type: "تجاري", service: "بناء جديد", package: "الباقة الأساسية - تجاري",
-    amount: "2,000", status: "مسودة", date: "2026-04-05", civilId: "CR-12345",
-    governorate: "محافظة حولي", area: "حولي", landArea: "800", block: "1", suburb: "0", plot: "55", surveyPlan: "28000" },
-  { id: "S00050", client: "محمد العلي", type: "استثماري", service: "بناء جديد", package: "الباقة الأساسية - استثماري",
-    amount: "2,000", status: "مرسل", date: "2026-04-01", civilId: "275060200318",
-    governorate: "محافظة الأحمدي", area: "الفحيحيل", landArea: "600", block: "5", suburb: "1", plot: "88", surveyPlan: "29500" },
-  { id: "S00051", client: "سالم المطيري", type: "سكن خاص", service: "بناء جديد", package: "الباقة المميزة - سكن خاص",
-    amount: "1,600", status: "مرفوض", date: "2026-03-25", civilId: "268030400512",
-    governorate: "محافظة مبارك الكبير", area: "صباح الأحمد", landArea: "450", block: "12", suburb: "3", plot: "310", surveyPlan: "32000" },
-];
-
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
-  "مسودة": { label: "مسودة", color: "text-gray-600", bg: "bg-gray-100" },
-  "مرسل": { label: "مرسل", color: "text-blue-600", bg: "bg-blue-50" },
-  "مقبول": { label: "مقبول", color: "text-green-600", bg: "bg-green-50" },
-  "مرفوض": { label: "مرفوض", color: "text-red-600", bg: "bg-red-50" },
-  "عقد": { label: "تحول لعقد", color: "text-purple-600", bg: "bg-purple-50" },
+  "مسودة":      { label: "مسودة",      color: "text-gray-600",   bg: "bg-gray-100"  },
+  "مرسل":       { label: "مرسل",       color: "text-blue-600",   bg: "bg-blue-50"   },
+  "مقبول":      { label: "مقبول",      color: "text-green-600",  bg: "bg-green-50"  },
+  "مرفوض":      { label: "مرفوض",      color: "text-red-600",    bg: "bg-red-50"    },
+  "عقد":        { label: "تحول لعقد", color: "text-purple-600", bg: "bg-purple-50" },
+  "تم التعاقد": { label: "تم التعاقد", color: "text-emerald-700",bg: "bg-emerald-50"},
+  "منتهي":      { label: "منتهي",      color: "text-gray-500",   bg: "bg-gray-100"  },
 };
 
+const fallbackStatus = { label: "—", color: "text-gray-500", bg: "bg-gray-50" };
+
 export default function Quotations() {
+  const { data: quotations = [], isLoading } = useQuotations();
   const [view, setView] = useState<"list" | "packages">("list");
   const [selectedBuildingType, setSelectedBuildingType] = useState<string>("الكل");
   const [expandedQuotation, setExpandedQuotation] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("الكل");
+  const [exportingId, setExportingId] = useState<string | null>(null);
+
+  if (isLoading) return <div className="flex items-center justify-center min-h-96 text-muted-foreground">جاري التحميل...</div>;
+
+  const filtered = quotations.filter((q) => {
+    const matchSearch = !search || q.client.includes(search) || q.id.includes(search) || (q.civilId || "").includes(search);
+    const matchStatus = statusFilter === "الكل" || q.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
 
   const filteredPackages = selectedBuildingType === "الكل"
     ? flatPackages
     : allPackages[selectedBuildingType] || [];
+
+  async function handlePdf(e: React.MouseEvent, q: typeof quotations[0]) {
+    e.stopPropagation();
+    setExportingId(q.id);
+    const tid = toast.loading("جاري إنشاء PDF...");
+    try {
+      const pkg = flatPackages.find(p => p.name === q.package) ?? {
+        name: q.package, price: q.amount, features: [], level: "-",
+      };
+      await exportQuotationPdf(
+        { name: q.client, phone: "—", type: q.type, serviceType: q.service, governorate: q.governorate, area: q.area },
+        pkg,
+      );
+      toast.success("تم فتح نافذة الطباعة", { id: tid });
+    } catch (err: unknown) {
+      const blocked = err instanceof Error && err.message === "popup_blocked";
+      toast.error(blocked ? "السماح بالنوافذ المنبثقة مطلوب" : "فشل إنشاء PDF", { id: tid });
+    } finally {
+      setExportingId(null);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -140,34 +159,19 @@ export default function Quotations() {
         <>
           {/* Filters */}
           <div className="flex gap-3 flex-wrap">
-            <Input placeholder="بحث بالاسم أو الرقم..." className="max-w-xs" />
-            <Select>
-              <SelectTrigger className="w-36"><SelectValue placeholder="نوع العقار" /></SelectTrigger>
+            <Input
+              placeholder="بحث بالاسم أو الرقم المدني..."
+              className="max-w-xs"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-36"><SelectValue placeholder="الحالة" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="residential">سكن خاص</SelectItem>
-                <SelectItem value="investment">استثماري</SelectItem>
-                <SelectItem value="commercial">تجاري</SelectItem>
-                <SelectItem value="industrial">صناعي</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select>
-              <SelectTrigger className="w-36"><SelectValue placeholder="نوع الخدمة" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="new">بناء جديد</SelectItem>
-                <SelectItem value="demolition">هدم</SelectItem>
-                <SelectItem value="modification">تعديل</SelectItem>
-                <SelectItem value="addition">إضافة</SelectItem>
-                <SelectItem value="mod-add">تعديل وإضافة</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select>
-              <SelectTrigger className="w-32"><SelectValue placeholder="الحالة" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="draft">مسودة</SelectItem>
-                <SelectItem value="sent">مرسل</SelectItem>
-                <SelectItem value="accepted">مقبول</SelectItem>
-                <SelectItem value="rejected">مرفوض</SelectItem>
-                <SelectItem value="contract">عقد</SelectItem>
+                <SelectItem value="الكل">كل الحالات</SelectItem>
+                {Object.keys(statusConfig).map(s => (
+                  <SelectItem key={s} value={s}>{statusConfig[s].label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -191,8 +195,8 @@ export default function Quotations() {
                     </tr>
                   </thead>
                   <tbody>
-                    {quotations.map((q) => {
-                      const st = statusConfig[q.status];
+                    {filtered.map((q) => {
+                      const st = statusConfig[q.status] ?? fallbackStatus;
                       const isExpanded = expandedQuotation === q.id;
                       return (
                         <>
@@ -201,7 +205,14 @@ export default function Quotations() {
                             <td className="py-3 px-4">
                               {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                             </td>
-                            <td className="py-3 px-4 font-mono text-xs" style={{ fontFamily: "'Space Grotesk', monospace" }}>{q.id}</td>
+                            <td className="py-3 px-4 font-mono text-xs" style={{ fontFamily: "'Space Grotesk', monospace" }}>
+                              {q.id}
+                              {q.leadId && (
+                                <Link href="/crm">
+                                  <Badge variant="outline" className="text-[9px] px-1 py-0 ms-1 cursor-pointer hover:bg-blue-50 border-blue-200 text-blue-600">CRM</Badge>
+                                </Link>
+                              )}
+                            </td>
                             <td className="py-3 px-4 font-medium">{q.client}</td>
                             <td className="py-3 px-4"><Badge variant="outline" className="text-xs">{q.type}</Badge></td>
                             <td className="py-3 px-4"><Badge variant="secondary" className="text-xs">{q.service}</Badge></td>
@@ -211,11 +222,19 @@ export default function Quotations() {
                               <span className={`text-xs px-2 py-1 rounded-full ${st.bg} ${st.color}`}>{st.label}</span>
                             </td>
                             <td className="py-3 px-4">
-                              <div className="flex gap-1">
+                              <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" title="عرض"><Eye className="w-3.5 h-3.5" /></Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" title="إرسال"><Send className="w-3.5 h-3.5" /></Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" title="واتساب"><MessageCircle className="w-3.5 h-3.5" /></Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" title="تحميل"><Download className="w-3.5 h-3.5" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" title="واتساب"
+                                  onClick={() => window.open(`https://wa.me/965${q.civilId}`, "_blank")}>
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" title="تحميل PDF"
+                                  disabled={exportingId === q.id}
+                                  onClick={(e) => handlePdf(e, q)}>
+                                  {exportingId === q.id
+                                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    : <Download className="w-3.5 h-3.5" />}
+                                </Button>
                               </div>
                             </td>
                           </tr>
@@ -228,7 +247,9 @@ export default function Quotations() {
                                     <h4 className="text-xs font-bold mb-3 text-muted-foreground uppercase tracking-wider">بيانات المشروع</h4>
                                     <div className="space-y-2 text-sm">
                                       <div className="flex justify-between"><span className="text-muted-foreground">الرقم المدني:</span><span dir="ltr" style={{ fontFamily: "'Space Grotesk'" }}>{q.civilId}</span></div>
-                                      <div className="flex justify-between"><span className="text-muted-foreground">التاريخ:</span><span dir="ltr">{q.date}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">تاريخ الإصدار:</span><span dir="ltr">{q.date}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">صلاحية العرض:</span><span>{q.validityDays || 30} يوم</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">تاريخ الانتهاء:</span><span dir="ltr">{q.expiryDate || "—"}</span></div>
                                     </div>
                                   </div>
                                   {/* Location Details */}
@@ -242,25 +263,32 @@ export default function Quotations() {
                                       <div className="flex justify-between"><span className="text-muted-foreground">المنطقة:</span><span>{q.area}</span></div>
                                       <div className="flex justify-between"><span className="text-muted-foreground">مساحة الأرض:</span><span>{q.landArea} م²</span></div>
                                       <div className="flex justify-between"><span className="text-muted-foreground">القطعة:</span><span>{q.block}</span></div>
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <h4 className="text-xs font-bold mb-3 text-muted-foreground uppercase tracking-wider">بيانات إضافية</h4>
-                                    <div className="space-y-2 text-sm">
-                                      <div className="flex justify-between"><span className="text-muted-foreground">الضاحية:</span><span>{q.suburb}</span></div>
                                       <div className="flex justify-between"><span className="text-muted-foreground">رقم القسيمة:</span><span>{q.plot}</span></div>
-                                      <div className="flex justify-between"><span className="text-muted-foreground">رقم المخطط المساحي:</span><span dir="ltr" style={{ fontFamily: "'Space Grotesk'" }}>{q.surveyPlan}</span></div>
                                     </div>
                                   </div>
-                                </div>
-                                {/* Required Documents */}
-                                <div className="mt-4 pt-4 border-t">
-                                  <h4 className="text-xs font-bold mb-2 text-muted-foreground uppercase tracking-wider">المستندات المطلوبة</h4>
-                                  <div className="flex flex-wrap gap-2">
-                                    <Badge variant="outline" className="text-xs">البطاقة المدنية للمالك</Badge>
-                                    <Badge variant="outline" className="text-xs">رخصة البناء الأصلية</Badge>
-                                    <Badge variant="outline" className="text-xs">المخططات المرخصة</Badge>
-                                    <Badge variant="outline" className="text-xs">وثيقة البيت</Badge>
+                                  {/* Payment Schedule */}
+                                  <div>
+                                    <h4 className="text-xs font-bold mb-3 text-muted-foreground uppercase tracking-wider">جدول الدفعات</h4>
+                                    <div className="space-y-2 text-sm">
+                                      {(() => {
+                                        const amt = parseFloat(q.amount?.replace(",", "") || "0");
+                                        return [
+                                          { label: "الدفعة الأولى (30%)", val: amt * 0.30, note: "عند التوقيع" },
+                                          { label: "الدفعة الثانية (40%)", val: amt * 0.40, note: "عند اعتماد التصاميم" },
+                                          { label: "الدفعة الثالثة (30%)", val: amt * 0.30, note: "عند الإنجاز" },
+                                        ].map((d, i) => (
+                                          <div key={i} className="flex justify-between items-center">
+                                            <div>
+                                              <div className="text-muted-foreground text-xs">{d.label}</div>
+                                              <div className="text-[10px] text-muted-foreground">{d.note}</div>
+                                            </div>
+                                            <span className="font-bold" style={{ fontFamily: "'Space Grotesk'" }}>
+                                              {d.val.toLocaleString("ar-KW", { minimumFractionDigits: 3 })} د.ك
+                                            </span>
+                                          </div>
+                                        ));
+                                      })()}
+                                    </div>
                                   </div>
                                 </div>
                               </td>
@@ -269,6 +297,13 @@ export default function Quotations() {
                         </>
                       );
                     })}
+                    {filtered.length === 0 && (
+                      <tr>
+                        <td colSpan={9} className="py-12 text-center text-muted-foreground text-sm">
+                          لا توجد عروض أسعار مطابقة للبحث
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

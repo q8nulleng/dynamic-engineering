@@ -13,9 +13,20 @@ import {
   Building2, Wrench, PlusSquare, Layers, Trash2, Eye
 } from "lucide-react";
 import { Link } from "wouter";
-import { projectsDB } from "./ProjectDetail";
 import NewProjectDialog from "@/components/NewProjectDialog";
 import { toast } from "sonner";
+import { useProjects, useCreateProject } from "@/lib/api";
+
+const PROJECT_STATUSES = [
+  { key: "all",    label: "الكل",     color: "oklch(0.50 0.00 0)" },
+  { key: "جديد",   label: "جديد",    color: "oklch(0.55 0.15 250)" },
+  { key: "جارٍ",   label: "جارٍ",    color: "oklch(0.55 0.15 200)" },
+  { key: "بلدية",  label: "بلدية",   color: "oklch(0.55 0.15 60)"  },
+  { key: "إشراف",  label: "إشراف",   color: "oklch(0.55 0.15 150)" },
+  { key: "معلّق",  label: "معلّق",   color: "oklch(0.55 0.15 30)"  },
+  { key: "مكتمل",  label: "مكتمل",   color: "oklch(0.55 0.15 140)" },
+  { key: "مُقفل",  label: "مُقفل",   color: "oklch(0.45 0.00 0)"   },
+];
 
 const stageLabel = (progress: number) => {
   if (progress >= 90) return { text: "شبه مكتمل", color: "oklch(0.55 0.15 150)" };
@@ -44,12 +55,17 @@ const SUB_CATS = [
   { key: "إشراف",         label: "إشراف",          icon: Eye         },
 ];
 
-const allProjects = Object.values(projectsDB);
-
 export default function Projects() {
-  const [mainTab, setMainTab] = useState("all");
-  const [subTab,  setSubTab]  = useState("all");
+  const { data: allProjectsData = [], isLoading } = useProjects();
+  const createProject = useCreateProject();
+  const [mainTab,      setMainTab]      = useState("all");
+  const [subTab,       setSubTab]       = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [showNewProject, setShowNewProject] = useState(false);
+
+  const allProjects = allProjectsData;
+
+  if (isLoading) return <div className="flex items-center justify-center min-h-96 text-muted-foreground">جاري التحميل...</div>;
 
   /* تصفية حسب التصنيف الرئيسي */
   const byMain = mainTab === "all"
@@ -57,15 +73,24 @@ export default function Projects() {
     : allProjects.filter(p => p.type === mainTab);
 
   /* تصفية حسب التصنيف الفرعي */
-  const filtered = subTab === "all"
+  const bySub = subTab === "all"
     ? byMain
     : byMain.filter(p => p.serviceType === subTab);
+
+  /* تصفية حسب حالة المشروع */
+  const filtered = statusFilter === "all"
+    ? bySub
+    : bySub.filter(p => (p.status || "جديد") === statusFilter);
 
   const activeCat = MAIN_CATS.find(c => c.key === mainTab)!;
 
   /* عداد كل تصنيف فرعي ضمن التصنيف الرئيسي المحدد */
   const subCount = (key: string) =>
     key === "all" ? byMain.length : byMain.filter(p => p.serviceType === key).length;
+
+  /* عداد كل حالة */
+  const statusCount = (key: string) =>
+    key === "all" ? bySub.length : bySub.filter(p => (p.status || "جديد") === key).length;
 
   return (
     <div className="space-y-4">
@@ -165,6 +190,37 @@ export default function Projects() {
         </div>
       )}
 
+      {/* ─── فلتر الحالة ─── */}
+      <div className="flex gap-1.5 flex-wrap">
+        {PROJECT_STATUSES.map(st => {
+          const cnt = statusCount(st.key);
+          const isActive = statusFilter === st.key;
+          return (
+            <button
+              key={st.key}
+              onClick={() => setStatusFilter(st.key)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all"
+              style={{
+                backgroundColor: isActive ? `color-mix(in oklch, ${st.color} 12%, white)` : "transparent",
+                borderColor:     isActive ? `color-mix(in oklch, ${st.color} 40%, transparent)` : "hsl(var(--border))",
+                color:           isActive ? st.color : "hsl(var(--muted-foreground))",
+              }}
+            >
+              {st.label}
+              <span
+                className="text-[9px] font-bold px-1 py-0.5 rounded-full"
+                style={{
+                  backgroundColor: isActive ? `color-mix(in oklch, ${st.color} 20%, white)` : "hsl(var(--muted))",
+                  color:           isActive ? st.color : "hsl(var(--muted-foreground))",
+                }}
+              >
+                {cnt}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* ─── عدد النتائج ─── */}
       {(mainTab !== "all" || subTab !== "all") && (
         <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
@@ -188,11 +244,13 @@ export default function Projects() {
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((project) => {
             const stage = stageLabel(project.progress);
-            const totalTasks = project.phases.reduce((s, p) => s + p.tasks.length, 0);
-            const doneTasks  = project.phases.reduce((s, p) => s + p.tasks.filter(t => t.status === "done").length, 0);
-            const currentPhaseName = project.phases[project.currentPhase]?.title || "";
+            const projectPhases = project.phases || [];
+            const totalTasks = projectPhases.reduce((s, p) => s + (p.tasks?.length || 0), 0);
+            const doneTasks  = projectPhases.reduce((s, p) => s + (p.tasks?.filter(t => t.status === "done").length || 0), 0);
+            const currentPhaseName = projectPhases[project.currentPhase]?.title || "";
             const catInfo = MAIN_CATS.find(c => c.key === project.type) || MAIN_CATS[0];
             const CatIcon = catInfo.icon;
+            const statusInfo = PROJECT_STATUSES.find(s => s.key === (project.status || "جديد")) || PROJECT_STATUSES[1];
 
             return (
               <Link key={project.id} href={`/projects/${project.id}`}>
@@ -207,6 +265,15 @@ export default function Projects() {
                       </div>
                     </div>
                     <div className="flex gap-1 shrink-0 items-center">
+                      <span
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                        style={{
+                          backgroundColor: `color-mix(in oklch, ${statusInfo.color} 12%, white)`,
+                          color: statusInfo.color,
+                        }}
+                      >
+                        {statusInfo.label}
+                      </span>
                       <div
                         className="w-7 h-7 rounded-lg flex items-center justify-center"
                         style={{ backgroundColor: `color-mix(in oklch, ${catInfo.color} 12%, white)` }}
@@ -253,10 +320,10 @@ export default function Projects() {
                   {/* Footer */}
                   <div className="flex items-center justify-between mt-3 pt-3 border-t">
                     <div className="flex gap-1.5">
-                      {project.phases.map((_, pi) => {
-                        const p = project.phases[pi];
-                        const done = p.tasks.filter(t => t.status === "done").length;
-                        const pp = p.tasks.length > 0 ? (done / p.tasks.length) * 100 : 0;
+                      {projectPhases.map((_, pi) => {
+                        const p = projectPhases[pi];
+                        const done = (p.tasks || []).filter(t => t.status === "done").length;
+                        const pp = (p.tasks || []).length > 0 ? (done / (p.tasks || []).length) * 100 : 0;
                         return (
                           <div key={pi} className="w-5 h-1.5 rounded-full overflow-hidden bg-gray-100">
                             <div className="h-full rounded-full transition-all" style={{
@@ -279,10 +346,14 @@ export default function Projects() {
         open={showNewProject}
         onClose={() => setShowNewProject(false)}
         onAdd={(data) => {
-          toast.success(`تم إنشاء المشروع: ${data.name}`, {
-            description: `${data.type} · ${data.serviceType} · ${data.area}`,
+          createProject.mutate(data as Parameters<typeof createProject.mutate>[0], {
+            onSuccess: () => {
+              toast.success(`تم إنشاء المشروع: ${data.name}`, {
+                description: `${data.type} · ${data.serviceType} · ${data.area}`,
+              });
+              setShowNewProject(false);
+            },
           });
-          setShowNewProject(false);
         }}
       />
     </div>

@@ -13,7 +13,8 @@ import {
   Building2, Printer
 } from "lucide-react";
 import { toast } from "sonner";
-import { clientsDB, type Client } from "@/pages/Clients";
+import type { Client } from "@/pages/Clients";
+import { useClient } from "@/lib/api";
 
 /* ─── Types ─── */
 type FormStatus = "pending" | "filled" | "printed" | "signed";
@@ -190,8 +191,8 @@ interface Props {
 }
 
 export default function FormsTaskPanel({ open, onClose, projectName, serviceType, clientId }: Props) {
-  // إيجاد العميل من قاعدة البيانات
-  const client = clientId ? clientsDB.find(c => c.id === clientId) || null : null;
+  const { data: clientData } = useClient(clientId || "");
+  const client = (clientData as Client | undefined) || null;
   const filledData = fillFormData(client);
 
   // تصفية النماذج حسب نوع الخدمة

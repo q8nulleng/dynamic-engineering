@@ -1,4 +1,4 @@
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
@@ -14,7 +14,6 @@ import Payments from "./pages/Payments";
 import ClientPortal from "./pages/ClientPortal";
 import Reports from "./pages/Reports";
 import Contracts from "./pages/Contracts";
-import SignTemplates from "./pages/SignTemplates";
 import ProjectDetail from "./pages/ProjectDetail";
 import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
@@ -36,7 +35,6 @@ function Router() {
       <Route path="/client-portal" component={ClientPortal} />
       <Route path="/reports" component={Reports} />
       <Route path="/contracts" component={Contracts} />
-      <Route path="/sign" component={SignTemplates} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
@@ -46,9 +44,9 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="light">
+      <ThemeProvider defaultTheme="light" switchable={true}>
         <TooltipProvider>
-          <Toaster />
+          <Toaster position="bottom-center" richColors duration={4000} />
           <DashboardLayout>
             <Router />
           </DashboardLayout>

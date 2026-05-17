@@ -17,7 +17,8 @@ import {
   ChevronRight, ChevronLeft, User, MapPin, FileText, Check,
   Search, Users, Phone, UserPlus, UserCheck, Star
 } from "lucide-react";
-import { clientsDB, type Client } from "@/pages/Clients";
+import type { Client } from "@/pages/Clients";
+import { useClients } from "@/lib/api";
 
 /* ─── التصنيفات ─── */
 const MAIN_CATS = [
@@ -58,6 +59,7 @@ interface Props {
 }
 
 export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
+  const { data: allClients = [] } = useClients();
   const [step, setStep] = useState(1); // 1: رئيسي | 2: فرعي | 3: ربط عميل | 4: بيانات
   const [mainCat, setMainCat] = useState("");
   const [subCat,  setSubCat]  = useState("");
@@ -83,15 +85,15 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
   const handleClose = () => { reset(); onClose(); };
 
   // تصفية العملاء حسب البحث ونوع المشروع
-  const filteredClients = clientsDB.filter(c => {
+  const filteredClients = allClients.filter(c => {
     const matchSearch = !clientSearch ||
       c.name.includes(clientSearch) ||
       c.phone.includes(clientSearch) ||
-      c.area.includes(clientSearch);
+      (c.area || "").includes(clientSearch);
     return matchSearch;
   });
 
-  const selectedClient = clientsDB.find(c => c.id === selectedClientId);
+  const selectedClient = allClients.find(c => c.id === selectedClientId);
 
   // عند اختيار عميل موجود: تعبئة بيانات النموذج تلقائياً
   const handleSelectClient = (client: Client) => {
@@ -301,7 +303,7 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
                             <Badge className="text-[9px] px-1.5 py-0 bg-muted text-muted-foreground border-0">
                               {typeLabels[client.type]}
                             </Badge>
-                            <span className="text-[9px] text-muted-foreground">{client.projects.length} مشروع</span>
+                            <span className="text-[9px] text-muted-foreground">{client.projectType}</span>
                           </div>
                           {isSelected && (
                             <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: accentColor }}>

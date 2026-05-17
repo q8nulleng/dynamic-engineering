@@ -1,22 +1,20 @@
 /*
  * ProjectDetail - صفحة تفاصيل المشروع الداخلية
  * تعرض مراحل المشروع بنظام Kanban حسب نوع المشروع والخدمة
- * 4 أنواع مشاريع مدروسة من Odoo.sh:
- *   1. بناء جديد سكن خاص (S00048) - 5 مراحل - 39 مهمة
- *   2. بناء جديد صناعي (S00049) - 4 مراحل - 28 مهمة
- *   3. تعديل واضافة سكن خاص (S00047) - 4 مراحل - 42 مهمة
- *   4. تعديل سكن خاص (S00050) - 4 مراحل
  */
+import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   ArrowRight, Users, MapPin, Link2, CheckCircle2, Circle,
-  Clock, AlertCircle, User, FileText, Calendar, X, MessageSquare,
-  Paperclip, Star, ChevronRight, Flag
+  Clock, AlertCircle, User, FileText, X, MessageSquare,
+  Paperclip, ChevronRight, Flag, Lock, Loader2, Sparkles
 } from "lucide-react";
 import { useState } from "react";
 import { useRoute, Link } from "wouter";
+import { useProject, useAutoCreateTasks, useUpdateTask } from "@/lib/api";
+import { toast } from "sonner";
 import SketchTaskPanel from "@/components/SketchTaskPanel";
 import DocumentsTaskPanel from "@/components/DocumentsTaskPanel";
 import ContractPaymentPanel from "@/components/ContractPaymentPanel";
@@ -27,19 +25,24 @@ import SupervisionTaskPanel from "@/components/SupervisionTaskPanel";
 interface SubTask { name: string; done: boolean; assignee?: string; }
 interface Comment { author: string; text: string; time: string; }
 interface Task {
+  id: number;
   name: string;
-  status: "done" | "in_progress" | "blocked" | "pending";
+  status: "done" | "in_progress" | "blocked" | "pending" | "waiting_client" | "cancelled";
   subTasks?: SubTask[];
   assignee?: string;
   description?: string;
-  priority?: "high" | "normal";
+  priority?: number;
   deadline?: string;
   comments?: Comment[];
+  dependsOn?: number;
+  estimatedDays?: number;
+  autoCreated?: number;
 }
 interface Phase { title: string; subtitle?: string; tasks: Task[]; }
 interface ProjectData {
   id: string; name: string; client: string; type: string; serviceType: string;
-  area: string; quotation: string; progress: number; currentPhase: number; phases: Phase[];
+  area: string; quotation: string; progress: number; currentPhase: number;
+  status?: string; phases: Phase[];
 }
 
 /* ========================================================================
@@ -62,354 +65,6 @@ const structuralSubTasks = (done: boolean[]): SubTask[] => [
   { name: "مرحلة صب سقف السطح", done: done[11] ?? false },
 ];
 
-/* ========================================================================
-   بيانات المشاريع - 4 أنواع من Odoo.sh
-   ======================================================================== */
-const projectsDB: Record<string, ProjectData> = {
-
-  /* ═══════════════════════════════════════════════════════════════════════
-     النوع 1: بناء جديد سكن خاص (S00048 - نت - 39 مهمة - 5 مراحل)
-     ═══════════════════════════════════════════════════════════════════════ */
-  "S00048": {
-    id: "S00048", name: "بناء جديد سكن خاص - نت", client: "فهد العتيبي",
-    type: "سكن خاص", serviceType: "بناء جديد", area: "الجهراء", quotation: "S00048",
-    progress: 55, currentPhase: 3,
-    phases: [
-      {
-        title: "المرحلة الأولى", subtitle: "تجهيز الملف",
-        tasks: [
-          { name: "تصميم الكروكي", status: "done", assignee: "م. مارك", priority: "high",
-            description: "تصميم الكروكي المعماري الأولي للمشروع بناءً على متطلبات العميل ومساحة الأرض.",
-            comments: [{ author: "م. مارك", text: "تم إنجاز الكروكي وإرساله للعميل للمراجعة", time: "منذ 3 أيام" }] },
-          { name: "تجميع المستندات", status: "done", assignee: "محمد ثروت", priority: "high",
-            description: "جمع جميع المستندات المطلوبة من العميل لتجهيز الملف.",
-            subTasks: [
-              { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: true },
-            ]},
-          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد المحاسب", priority: "high",
-            description: "توقيع عقد الخدمة مع العميل وتحصيل الدفعة الأولى." },
-          { name: "تجهيز النماذج والتعهدات والتوقيع", status: "done", assignee: "محمد ثروت",
-            description: "تجهيز جميع النماذج الرسمية والتعهدات المطلوبة من البلدية." },
-          { name: "فحص التربة - كتاب الكهرباء", status: "done", assignee: "محمد ثروت", priority: "high",
-            description: "إرسال طلب فحص التربة وكتاب إيصال التيار الكهربائي للجهات المختصة.",
-            subTasks: [
-              { name: "فحص التربة تم الإرسال", done: true }, { name: "فحص التربة تم الاعتماد", done: true },
-              { name: "الكهرباء تم الإرسال", done: true }, { name: "الكهرباء تم الاعتماد", done: true },
-            ]},
-        ],
-      },
-      {
-        title: "المرحلة الثانية", subtitle: "التصميم",
-        tasks: [
-          { name: "سيستم الأعمدة", status: "done", assignee: "م. أمين", priority: "high",
-            description: "تصميم سيستم الأعمدة الإنشائية بناءً على نتائج فحص التربة والكروكي المعتمد." },
-          { name: "الواجهات", status: "done", assignee: "م. مصطفى",
-            description: "تصميم الواجهات المعمارية للمبنى." },
-          { name: "رسم مخطط البلدية", status: "done", assignee: "عرفان",
-            description: "رسم المخططات الرسمية المطلوبة لتقديمها لبلدية الكويت." },
-        ],
-      },
-      {
-        title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد",
-        tasks: [
-          { name: "إرسال للبلدية", status: "done", assignee: "محمد ثروت",
-            description: "تقديم ملف المشروع كاملاً لبلدية الكويت للحصول على رخصة البناء." },
-          { name: "اعتماد البلدية", status: "done", assignee: "محمد ثروت", priority: "high",
-            description: "متابعة اعتماد المخططات من قبل بلدية الكويت وإصدار رخصة البناء." },
-          { name: "تحصيل الدفعة الأخيرة من العقد", status: "done", assignee: "محمد ثروت",
-            description: "تحصيل الدفعة الأخيرة من العميل بعد اعتماد البلدية." },
-        ],
-      },
-      {
-        title: "المرحلة الرابعة", subtitle: "الكراسة والمخططات",
-        tasks: [
-          { name: "تصميم المخطط الإنشائي", status: "in_progress", assignee: "م. أمين", priority: "high",
-            description: "تصميم المخططات الإنشائية الكاملة للمشروع شاملة جميع الأدوار.",
-            subTasks: structuralSubTasks([true,true,true,true,true,true,false,false,false,false,false,false]) },
-          { name: "تصميم مخطط الصحي", status: "pending", assignee: "م. أمين",
-            description: "تصميم شبكة الصرف الصحي والمياه للمشروع." },
-          { name: "تصميم مخطط الكهرباء", status: "pending", assignee: "م. أمين",
-            description: "تصميم شبكة الكهرباء والإضاءة للمشروع." },
-          { name: "تصميم مخطط الفرش", status: "pending", assignee: "م. مصطفى",
-            description: "تصميم مخطط الفرش والتوزيع الداخلي للمشروع." },
-          { name: "تجهيز الكراسة النهائية", status: "pending", assignee: "م. مارك",
-            description: "تجميع جميع المخططات في كراسة هندسية نهائية متكاملة." },
-        ],
-      },
-      {
-        title: "المرحلة الخامسة", subtitle: "الإشراف",
-        tasks: [
-          { name: "إصدار تعهد الإشراف", status: "pending", assignee: "محمد ثروت",
-            description: "إصدار وثيقة تعهد الإشراف الهندسي على التنفيذ." },
-          { name: "الإشراف على التنفيذ", status: "pending", assignee: "م. فداء", priority: "high",
-            description: "الإشراف الميداني على تنفيذ المشروع بزيارات لا تقل عن 3 مرات أسبوعياً.",
-            subTasks: structuralSubTasks([false,false,false,false,false,false,false,false,false,false,false,false]) },
-          { name: "كتب البنك", status: "pending", assignee: "محمد ثروت",
-            description: "إصدار خطابات البنك المطلوبة لصرف دفعات القرض العقاري." },
-          { name: "إنهاء الإشراف", status: "pending", assignee: "م. فداء",
-            description: "إنهاء مرحلة الإشراف وتسليم شهادة الإتمام." },
-        ],
-      },
-    ],
-  },
-
-  /* ═══════════════════════════════════════════════════════════════════════
-     النوع 2: بناء جديد صناعي (S00049 - 28 مهمة - 4 مراحل)
-     ═══════════════════════════════════════════════════════════════════════ */
-  "S00049": {
-    id: "S00049", name: "بناء جديد صناعي", client: "شركة الخليج",
-    type: "صناعي", serviceType: "بناء جديد", area: "حولي", quotation: "S00049",
-    progress: 30, currentPhase: 1,
-    phases: [
-      {
-        title: "المرحلة الأولى", subtitle: "تجهيز الملف",
-        tasks: [
-          { name: "تصميم الكروكي", status: "done", assignee: "م. مارك", priority: "high" },
-          { name: "تجميع المستندات", status: "done", assignee: "محمد ثروت", subTasks: [
-            { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: true },
-          ]},
-          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد المحاسب" },
-          { name: "تجهيز النماذج والتعهدات والتوقيع", status: "done", assignee: "محمد ثروت" },
-          { name: "فحص التربة - كتاب الكهرباء", status: "done", assignee: "محمد ثروت", subTasks: [
-            { name: "فحص التربة تم الإرسال", done: true }, { name: "فحص التربة تم الاعتماد", done: true },
-            { name: "الكهرباء تم الإرسال", done: true }, { name: "الكهرباء تم الاعتماد", done: true },
-          ]},
-        ],
-      },
-      {
-        title: "المرحلة الثانية", subtitle: "التصميم",
-        tasks: [
-          { name: "سيستم الأعمدة", status: "in_progress", assignee: "م. أمين", priority: "high" },
-          { name: "الواجهات", status: "blocked", assignee: "م. مصطفى" },
-          { name: "رسم مخطط البلدية", status: "blocked", assignee: "عرفان" },
-        ],
-      },
-      {
-        title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد (مطافي + تنظيم + بلدية)",
-        tasks: [
-          { name: "إرسال للمطافي", status: "blocked", assignee: "محمد ثروت" },
-          { name: "اعتماد المطافي", status: "blocked", assignee: "محمد ثروت" },
-          { name: "إرسال للتنظيم", status: "blocked", assignee: "محمد ثروت" },
-          { name: "اعتماد التنظيم", status: "blocked", assignee: "محمد ثروت" },
-          { name: "إرسال للبلدية", status: "blocked", assignee: "محمد ثروت" },
-          { name: "اعتماد البلدية", status: "blocked", assignee: "محمد ثروت" },
-          { name: "تحصيل الدفعة الأخيرة من العقد", status: "blocked", assignee: "محمد ثروت" },
-        ],
-      },
-      {
-        title: "المرحلة الرابعة", subtitle: "الكراسة",
-        tasks: [
-          { name: "تصميم المخطط الإنشائي", status: "blocked", assignee: "م. أمين" },
-          { name: "تصميم مخطط الصحي", status: "blocked", assignee: "م. أمين" },
-          { name: "تجهيز الكراسة النهائية", status: "blocked", assignee: "م. مارك" },
-        ],
-      },
-    ],
-  },
-
-  /* ═══════════════════════════════════════════════════════════════════════
-     النوع 3: تعديل واضافة سكن خاص (S00047 - 42 مهمة - 4 مراحل)
-     ═══════════════════════════════════════════════════════════════════════ */
-  "S00047": {
-    id: "S00047", name: "تعديل وإضافة سكن خاص - مشرف", client: "تهاني خالد محمد بورسلي",
-    type: "سكن خاص", serviceType: "تعديل وإضافة", area: "مشرف - حولي", quotation: "S00047",
-    progress: 15, currentPhase: 0,
-    phases: [
-      {
-        title: "المرحلة الأولى", subtitle: "تجهيز الملف",
-        tasks: [
-          { name: "دراسة المخطط الإنشائي القديم", status: "in_progress", assignee: "م. أمين", priority: "high",
-            description: "دراسة وتحليل المخططات الإنشائية للمبنى القائم لتحديد إمكانية التعديل والإضافة.",
-            subTasks: structuralSubTasks([false,false,false,false,false,false,false,false,false,false,false,false]) },
-          { name: "كشف على العقار", status: "done", assignee: "م. فداء",
-            description: "زيارة ميدانية للعقار لتقييم الوضع الراهن وتحديد متطلبات التعديل." },
-          { name: "كروكي", status: "done", assignee: "م. مارك", priority: "high",
-            description: "رسم كروكي مبدئي للتعديلات والإضافات المطلوبة." },
-          { name: "جمع الوثائق والمستندات", status: "in_progress", assignee: "محمد ثروت", subTasks: [
-            { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: false },
-          ]},
-          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد المحاسب" },
-        ],
-      },
-      {
-        title: "المرحلة الثانية", subtitle: "التصميم",
-        tasks: [
-          { name: "سيستم الأعمدة", status: "blocked", assignee: "م. أمين" },
-          { name: "رسم البلدية", status: "blocked", assignee: "عرفان" },
-        ],
-      },
-      {
-        title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد",
-        tasks: [
-          { name: "إرسال للبلدية", status: "blocked", assignee: "محمد ثروت" },
-          { name: "اعتماد البلدية", status: "blocked", assignee: "محمد ثروت" },
-          { name: "تحصيل الدفعة الأخيرة من العقد", status: "blocked", assignee: "محمد ثروت" },
-        ],
-      },
-      {
-        title: "المرحلة الرابعة", subtitle: "الكراسة والإشراف",
-        tasks: [
-          { name: "مخطط إنشائي كامل", status: "blocked", assignee: "م. أمين",
-            subTasks: structuralSubTasks([false,false,false,false,false,false,false,false,false,false,false,false]) },
-          { name: "تجهيز الكراسة النهائية", status: "blocked", assignee: "م. مارك" },
-        ],
-      },
-    ],
-  },
-
-  /* ═══════════════════════════════════════════════════════════════════════
-     النوع 4: تعديل سكن خاص (S00050)
-     ═══════════════════════════════════════════════════════════════════════ */
-  "S00050": {
-    id: "S00050", name: "تعديل سكن خاص", client: "سالم المطيري",
-    type: "سكن خاص", serviceType: "تعديل", area: "السالمية - حولي", quotation: "S00050",
-    progress: 40, currentPhase: 1,
-    phases: [
-      {
-        title: "المرحلة الأولى", subtitle: "تجهيز الملف",
-        tasks: [
-          { name: "دراسة المخطط الإنشائي القديم", status: "done", assignee: "م. أمين",
-            subTasks: structuralSubTasks([true,true,true,true,true,true,true,true,true,true,true,true]) },
-          { name: "كشف على العقار", status: "done", assignee: "م. فداء" },
-          { name: "جمع الوثائق والمستندات", status: "done", assignee: "محمد ثروت", subTasks: [
-            { name: "الموقع العام", done: true }, { name: "المدنية", done: true }, { name: "الوثيقة", done: true },
-          ]},
-          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد المحاسب" },
-        ],
-      },
-      {
-        title: "المرحلة الثانية", subtitle: "التصميم",
-        tasks: [
-          { name: "سيستم الأعمدة", status: "in_progress", assignee: "م. أمين" },
-          { name: "رسم البلدية", status: "blocked", assignee: "عرفان" },
-        ],
-      },
-      {
-        title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد",
-        tasks: [
-          { name: "إرسال للبلدية", status: "blocked", assignee: "محمد ثروت" },
-          { name: "اعتماد البلدية", status: "blocked", assignee: "محمد ثروت" },
-          { name: "تحصيل الدفعة الأخيرة من العقد", status: "blocked", assignee: "محمد ثروت" },
-        ],
-      },
-      {
-        title: "المرحلة الرابعة", subtitle: "الكراسة",
-        tasks: [
-          { name: "مخطط إنشائي كامل", status: "blocked", assignee: "م. أمين",
-            subTasks: structuralSubTasks([false,false,false,false,false,false,false,false,false,false,false,false]) },
-          { name: "تجهيز الكراسة النهائية", status: "blocked", assignee: "م. مارك" },
-        ],
-      },
-    ],
-  },
-
-  /* ═══════════════════════════════════════════════════════════════════════
-     تعديل صناعي (S00051)
-     ═══════════════════════════════════════════════════════════════════════ */
-  "S00051": {
-    id: "S00051", name: "تعديل صناعي", client: "مؤسسة البناء",
-    type: "صناعي", serviceType: "تعديل", area: "الشويخ الصناعية", quotation: "S00051",
-    progress: 10, currentPhase: 0,
-    phases: [
-      {
-        title: "المرحلة الأولى", subtitle: "تجهيز الملف",
-        tasks: [
-          { name: "دراسة المخطط الإنشائي القديم", status: "in_progress", assignee: "م. أمين",
-            subTasks: structuralSubTasks([true,true,false,false,false,false,false,false,false,false,false,false]) },
-          { name: "كشف على العقار", status: "done", assignee: "م. فداء" },
-          { name: "جمع الوثائق والمستندات", status: "in_progress", assignee: "محمد ثروت", subTasks: [
-            { name: "الموقع العام", done: true }, { name: "المدنية", done: false }, { name: "الوثيقة", done: false },
-          ]},
-          { name: "العقد وتحصيل الدفعة الأولى", status: "pending", assignee: "محمد المحاسب" },
-        ],
-      },
-      {
-        title: "المرحلة الثانية", subtitle: "التصميم",
-        tasks: [
-          { name: "سيستم الأعمدة", status: "blocked", assignee: "م. أمين" },
-          { name: "رسم البلدية", status: "blocked", assignee: "عرفان" },
-        ],
-      },
-      {
-        title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد",
-        tasks: [
-          { name: "إرسال للمطافي", status: "blocked", assignee: "محمد ثروت" },
-          { name: "اعتماد المطافي", status: "blocked", assignee: "محمد ثروت" },
-          { name: "إرسال للتنظيم", status: "blocked", assignee: "محمد ثروت" },
-          { name: "اعتماد التنظيم", status: "blocked", assignee: "محمد ثروت" },
-          { name: "إرسال للبلدية", status: "blocked", assignee: "محمد ثروت" },
-          { name: "اعتماد البلدية", status: "blocked", assignee: "محمد ثروت" },
-          { name: "تحصيل الدفعة الأخيرة من العقد", status: "blocked", assignee: "محمد ثروت" },
-        ],
-      },
-      {
-        title: "المرحلة الرابعة", subtitle: "الكراسة",
-        tasks: [
-          { name: "مخطط إنشائي كامل", status: "blocked", assignee: "م. أمين" },
-          { name: "تصميم مخطط الصحي", status: "blocked", assignee: "م. أمين" },
-          { name: "تجهيز الكراسة النهائية", status: "blocked", assignee: "م. مارك" },
-        ],
-      },
-    ],
-  },
-
-  /* ═══════════════════════════════════════════════════════════════════════
-     فيلا - صباح الأحمد (S00045 - شبه مكتمل)
-     ═══════════════════════════════════════════════════════════════════════ */
-  "S00045": {
-    id: "S00045", name: "فيلا - صباح الأحمد", client: "خالد الرشيدي",
-    type: "سكن خاص", serviceType: "بناء جديد", area: "صباح الأحمد - مبارك الكبير", quotation: "S00045",
-    progress: 90, currentPhase: 4,
-    phases: [
-      {
-        title: "المرحلة الأولى", subtitle: "تجهيز الملف",
-        tasks: [
-          { name: "تصميم الكروكي", status: "done", assignee: "م. مارك" },
-          { name: "تجميع المستندات", status: "done", assignee: "محمد ثروت" },
-          { name: "العقد وتحصيل الدفعة الأولى", status: "done", assignee: "محمد المحاسب" },
-          { name: "تجهيز النماذج والتعهدات والتوقيع", status: "done", assignee: "محمد ثروت" },
-          { name: "فحص التربة - كتاب الكهرباء", status: "done", assignee: "محمد ثروت" },
-        ],
-      },
-      {
-        title: "المرحلة الثانية", subtitle: "التصميم",
-        tasks: [
-          { name: "سيستم الأعمدة", status: "done", assignee: "م. أمين" },
-          { name: "الواجهات", status: "done", assignee: "م. مصطفى" },
-          { name: "رسم مخطط البلدية", status: "done", assignee: "عرفان" },
-        ],
-      },
-      {
-        title: "المرحلة الثالثة", subtitle: "البلدية والاعتماد",
-        tasks: [
-          { name: "إرسال للبلدية", status: "done", assignee: "محمد ثروت" },
-          { name: "اعتماد البلدية", status: "done", assignee: "محمد ثروت" },
-          { name: "تحصيل الدفعة الأخيرة من العقد", status: "done", assignee: "محمد ثروت" },
-        ],
-      },
-      {
-        title: "المرحلة الرابعة", subtitle: "الكراسة والمخططات",
-        tasks: [
-          { name: "تصميم المخطط الإنشائي", status: "done", assignee: "م. أمين" },
-          { name: "تصميم مخطط الصحي", status: "done", assignee: "م. أمين" },
-          { name: "تصميم مخطط الكهرباء", status: "done", assignee: "م. أمين" },
-          { name: "تصميم مخطط الفرش", status: "done", assignee: "م. مصطفى" },
-          { name: "تجهيز الكراسة النهائية", status: "done", assignee: "م. مارك" },
-        ],
-      },
-      {
-        title: "المرحلة الخامسة", subtitle: "الإشراف",
-        tasks: [
-          { name: "إصدار تعهد الإشراف", status: "done", assignee: "محمد ثروت" },
-          { name: "الإشراف على التنفيذ", status: "in_progress", assignee: "م. فداء",
-            subTasks: structuralSubTasks([true,true,true,true,true,true,true,true,true,true,true,true]) },
-          { name: "كتب البنك", status: "done", assignee: "محمد ثروت" },
-          { name: "إنهاء الإشراف", status: "pending", assignee: "م. فداء" },
-        ],
-      },
-    ],
-  },
-};
 
 /* ===== Visual Config ===== */
 const phaseColors = [
@@ -417,21 +72,23 @@ const phaseColors = [
   "oklch(0.60 0.12 30)", "oklch(0.55 0.15 150)",
 ];
 
-const statusConfig = {
-  done: { label: "مكتمل", color: "oklch(0.55 0.15 150)", icon: CheckCircle2, bg: "bg-green-50 text-green-700", dot: "bg-green-500" },
-  in_progress: { label: "قيد العمل", color: "oklch(0.55 0.15 250)", icon: Clock, bg: "bg-blue-50 text-blue-700", dot: "bg-blue-500" },
-  blocked: { label: "معلّق", color: "oklch(0.60 0.12 30)", icon: AlertCircle, bg: "bg-orange-50 text-orange-700", dot: "bg-orange-400" },
-  pending: { label: "لم يبدأ", color: "oklch(0.70 0.00 0)", icon: Circle, bg: "bg-gray-50 text-gray-500", dot: "bg-gray-300" },
+const statusConfig: Record<string, { label: string; color: string; icon: React.FC<{ className?: string }>; bg: string; dot: string }> = {
+  done:           { label: "مكتملة",         color: "oklch(0.55 0.15 150)", icon: CheckCircle2, bg: "bg-green-50 text-green-700",   dot: "bg-green-500"  },
+  in_progress:    { label: "جارية",          color: "oklch(0.55 0.15 250)", icon: Clock,        bg: "bg-blue-50 text-blue-700",    dot: "bg-blue-500"   },
+  blocked:        { label: "بانتظار مراجعة",  color: "oklch(0.60 0.12 30)",  icon: AlertCircle,  bg: "bg-orange-50 text-orange-700", dot: "bg-orange-400" },
+  waiting_client: { label: "بانتظار العميل", color: "oklch(0.60 0.12 45)",  icon: AlertCircle,  bg: "bg-yellow-50 text-yellow-700", dot: "bg-yellow-400" },
+  pending:        { label: "لم تبدأ",        color: "oklch(0.70 0.00 0)",   icon: Circle,       bg: "bg-gray-50 text-gray-500",    dot: "bg-gray-300"   },
+  cancelled:      { label: "ملغاة",          color: "oklch(0.55 0.15 30)",  icon: X,            bg: "bg-red-50 text-red-700",      dot: "bg-red-400"    },
 };
 
 /* ===== Assignee Avatar Colors ===== */
 const assigneeColors: Record<string, string> = {
-  "م. مارك": "oklch(0.55 0.15 280)",
-  "م. أمين": "oklch(0.55 0.15 250)",
-  "م. مصطفى": "oklch(0.60 0.12 30)",
-  "م. فداء": "oklch(0.60 0.15 150)",
-  "محمد ثروت": "oklch(0.60 0.12 200)",
-  "عرفان": "oklch(0.65 0.10 60)",
+  "م. مارك":     "oklch(0.55 0.15 280)",
+  "م. أمين":     "oklch(0.55 0.15 250)",
+  "م. مصطفى":   "oklch(0.60 0.12 30)",
+  "م. فداء":     "oklch(0.60 0.15 150)",
+  "محمد ثروت":  "oklch(0.60 0.12 200)",
+  "عرفان":       "oklch(0.65 0.10 60)",
 };
 
 function getAssigneeColor(name?: string) {
@@ -440,12 +97,13 @@ function getAssigneeColor(name?: string) {
 }
 
 function getInitials(name?: string) {
-  if (!name) return "؟";
+  if (!name) return "ن";
   const cleaned = name.replace("م. ", "");
   return cleaned.charAt(0);
 }
 
-export { projectsDB };
+// backward-compat empty export
+export const projectsDB: Record<string, ProjectData> = {};
 
 /* ========================================================================
    Task Detail Panel - نافذة تفاصيل المهمة الكاملة (مثل Odoo)
@@ -454,14 +112,31 @@ interface TaskPanelProps {
   task: Task;
   phaseTitle: string;
   phaseColor: string;
+  projectId: string;
   onClose: () => void;
+  onStatusChange?: (taskId: number, newStatus: string) => void;
 }
 
-function TaskDetailPanel({ task, phaseTitle, phaseColor, onClose }: TaskPanelProps) {
-  const config = statusConfig[task.status];
+function TaskDetailPanel({ task, phaseTitle, phaseColor, projectId, onClose, onStatusChange }: TaskPanelProps) {
+  const config = statusConfig[task.status] ?? statusConfig["pending"];
+  const updateTask = useUpdateTask(projectId);
   const StatusIcon = config.icon;
   const subDone = task.subTasks?.filter(s => s.done).length || 0;
   const subTotal = task.subTasks?.length || 0;
+
+  const handleStatusChange = (newStatus: Task["status"]) => {
+    updateTask.mutate(
+      { id: task.id, status: newStatus },
+      {
+        onSuccess: () => {
+          toast.success(`تم تحديث حالة المهمة`);
+          onStatusChange?.(task.id, newStatus);
+          onClose();
+        },
+        onError: () => toast.error("حدث خطأ أثناء التحديث"),
+      }
+    );
+  };
 
   return (
     /* Overlay */
@@ -504,7 +179,7 @@ function TaskDetailPanel({ task, phaseTitle, phaseColor, onClose }: TaskPanelPro
               <StatusIcon className="w-3.5 h-3.5" />
               {config.label}
             </div>
-            {task.priority === "high" && (
+            {(task.priority ?? 0) >= 2 && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-600">
                 <Flag className="w-3.5 h-3.5" />
                 أولوية عالية
@@ -629,17 +304,48 @@ function TaskDetailPanel({ task, phaseTitle, phaseColor, onClose }: TaskPanelPro
         </div>
 
         {/* Panel Footer */}
-        <div className="p-4 border-t bg-muted/10 flex gap-2">
-          <Button
-            className="flex-1 text-white"
-            size="sm"
-            style={{ backgroundColor: phaseColor }}
-            onClick={onClose}
-          >
+        <div className="p-4 border-t bg-muted/10 space-y-2">
+          {/* Quick status change */}
+          <div className="flex gap-2">
+            {task.status !== "done" && (
+              <Button
+                className="flex-1 text-white text-xs"
+                size="sm"
+                style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
+                onClick={() => handleStatusChange("done")}
+                disabled={updateTask.isPending}
+              >
+                {updateTask.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 ml-1" />}
+                تم إكمال المهمة
+              </Button>
+            )}
+            {task.status !== "in_progress" && task.status !== "done" && (
+              <Button
+                variant="outline"
+                className="flex-1 text-xs"
+                size="sm"
+                onClick={() => handleStatusChange("in_progress")}
+                disabled={updateTask.isPending}
+              >
+                <Clock className="w-3.5 h-3.5 ml-1" />
+                جارية
+              </Button>
+            )}
+            {task.status !== "blocked" && task.status !== "done" && (
+              <Button
+                variant="outline"
+                className="flex-1 text-xs text-orange-700 border-orange-200"
+                size="sm"
+                onClick={() => handleStatusChange("blocked")}
+                disabled={updateTask.isPending}
+              >
+                <AlertCircle className="w-3.5 h-3.5 ml-1" />
+                انتظار مراجعة
+              </Button>
+            )}
+          </div>
+          <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground" onClick={onClose}>
             إغلاق
-          </Button>
-          <Button variant="outline" size="sm" className="flex-1">
-            تعديل المهمة
           </Button>
         </div>
       </div>
@@ -653,7 +359,9 @@ function TaskDetailPanel({ task, phaseTitle, phaseColor, onClose }: TaskPanelPro
 export default function ProjectDetail() {
   const [, params] = useRoute("/projects/:id");
   const projectId = params?.id || "";
-  const project = projectsDB[projectId];
+  const { data: projectData, isLoading } = useProject(projectId);
+  const project = projectData as ProjectData | undefined;
+  const autoCreateTasks = useAutoCreateTasks(projectId);
   const [selectedTask, setSelectedTask] = useState<{ task: Task; phaseTitle: string; phaseColor: string } | null>(null);
   const [showSketchPanel, setShowSketchPanel] = useState(false);
   const [sketchPanelColor, setSketchPanelColor] = useState("");
@@ -661,6 +369,8 @@ export default function ProjectDetail() {
   const [showContractPanel, setShowContractPanel] = useState(false);
   const [showFormsPanel, setShowFormsPanel] = useState(false);
   const [showSupervisionPanel, setShowSupervisionPanel] = useState(false);
+
+  if (isLoading) return <div className="flex items-center justify-center min-h-96 text-muted-foreground">جاري التحميل...</div>;
 
   if (!project) {
     return (
@@ -680,6 +390,25 @@ export default function ProjectDetail() {
   const totalTasks = project.phases.reduce((s, p) => s + p.tasks.length, 0);
   const doneTasks = project.phases.reduce((s, p) => s + p.tasks.filter(t => t.status === "done").length, 0);
 
+  /* خريطة id → status لكشف المهام المحجوبة */
+  const allTasks = project.phases.flatMap(p => p.tasks);
+  const taskStatusById = new Map(allTasks.map(t => [t.id, t.status]));
+  const isTaskLocked = (task: Task) => {
+    if (!task.dependsOn || task.dependsOn === 0) return false;
+    return taskStatusById.get(task.dependsOn) !== "done";
+  };
+
+  /* هل يمكن إنشاء المهام التلقائية؟ */
+  const hasAutoTasks = allTasks.some(t => t.autoCreated === 1);
+  const canAutoCreate = (project.type === "سكن خاص") && !hasAutoTasks;
+
+  const handleAutoCreate = () => {
+    autoCreateTasks.mutate(undefined, {
+      onSuccess: (data) => toast.success(`تم إنشاء ${data.created} مهمة تلقائياً`),
+      onError: (err) => toast.error(err instanceof Error ? err.message : "فشل الإنشاء التلقائي"),
+    });
+  };
+
   return (
     <div className="space-y-5">
       {/* Task Detail Panel (Odoo-style) */}
@@ -688,6 +417,7 @@ export default function ProjectDetail() {
           task={selectedTask.task}
           phaseTitle={selectedTask.phaseTitle}
           phaseColor={selectedTask.phaseColor}
+          projectId={projectId}
           onClose={() => setSelectedTask(null)}
         />
       )}
@@ -745,9 +475,25 @@ export default function ProjectDetail() {
             </span>
           </div>
         </div>
-        <div className="text-left shrink-0">
-          <Badge variant="outline" className="text-xs">{project.type}</Badge>
-          <Badge variant="secondary" className="text-xs mr-1">{project.serviceType}</Badge>
+        <div className="flex items-center gap-2 shrink-0">
+          {canAutoCreate && (
+            <Button
+              size="sm"
+              className="text-white text-xs"
+              style={{ backgroundColor: "oklch(0.55 0.15 250)" }}
+              onClick={handleAutoCreate}
+              disabled={autoCreateTasks.isPending}
+            >
+              {autoCreateTasks.isPending
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin ml-1" />
+                : <Sparkles className="w-3.5 h-3.5 ml-1" />}
+              إنشاء مهام تلقائية
+            </Button>
+          )}
+          <div className="text-left">
+            <Badge variant="outline" className="text-xs">{project.type}</Badge>
+            <Badge variant="secondary" className="text-xs mr-1">{project.serviceType}</Badge>
+          </div>
         </div>
       </div>
 
@@ -824,16 +570,17 @@ export default function ProjectDetail() {
               {/* Task Cards */}
               <div className="space-y-2">
                 {phase.tasks.map((task, ti) => {
-                  const config = statusConfig[task.status];
+                  const config = statusConfig[task.status] ?? statusConfig["pending"];
                   const StatusIcon = config.icon;
                   const hasSubTasks = task.subTasks && task.subTasks.length > 0;
                   const subDone = task.subTasks?.filter(st => st.done).length || 0;
                   const subTotal = task.subTasks?.length || 0;
+                  const locked = isTaskLocked(task);
 
                   return (
                     <div
                       key={ti}
-                      className="p-3 rounded-xl border bg-background transition-all cursor-pointer hover:shadow-md hover:border-opacity-80 group"
+                      className={`p-3 rounded-xl border bg-background transition-all cursor-pointer hover:shadow-md group ${locked ? "opacity-60" : ""}`}
                       style={{ borderColor: "transparent", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
                       onClick={() => {
                         if (task.name === "تصميم الكروكي") {
@@ -851,14 +598,19 @@ export default function ProjectDetail() {
                           setSelectedTask({ task, phaseTitle: phase.title, phaseColor: color });
                         }
                       }}
-                      onMouseEnter={e => (e.currentTarget.style.borderColor = color)}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = locked ? "#e5e7eb" : color)}
                       onMouseLeave={e => (e.currentTarget.style.borderColor = "transparent")}
                     >
                       {/* Card Top: Status dot + Name */}
                       <div className="flex items-start gap-2">
-                        <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${config.dot}`} />
+                        {locked
+                          ? <Lock className="w-3 h-3 mt-1 shrink-0 text-muted-foreground" />
+                          : <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${config.dot}`} />}
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold leading-snug group-hover:text-foreground">{task.name}</p>
+                          {task.estimatedDays ? (
+                            <p className="text-[10px] text-muted-foreground">{task.estimatedDays} يوم</p>
+                          ) : null}
 
                           {/* Sub-tasks progress bar */}
                           {hasSubTasks && (
@@ -875,7 +627,7 @@ export default function ProjectDetail() {
                       {/* Card Bottom: Status badge + Assignee */}
                       <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
                         <Badge className={`text-[9px] px-1.5 h-4 ${config.bg}`} variant="secondary">
-                          {config.label}
+                          {locked ? "محجوبة" : config.label}
                         </Badge>
                         {task.assignee && (
                           <div className="flex items-center gap-1">
