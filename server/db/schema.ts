@@ -123,6 +123,7 @@ export const contracts = sqliteTable("contracts", {
   templateType: text("template_type").default(""),
   termsText: text("terms_text").default(""),
   signingDate: text("signing_date").default(""),
+  signedFileUrl: text("signed_file_url").default(""),
 });
 
 export const phases = sqliteTable("phases", {

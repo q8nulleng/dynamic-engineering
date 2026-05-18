@@ -20,7 +20,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // File upload config
 const upload = multer({
   dest: path.join(__dirname, "..", "uploads"),
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
 });
 
 // Init DB on startup

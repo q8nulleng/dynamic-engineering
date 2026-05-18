@@ -134,6 +134,7 @@ export interface Contract {
   templateType: string;
   termsText: string;
   signingDate: string;
+  signedFileUrl: string;
 }
 
 export interface InvoiceLine {

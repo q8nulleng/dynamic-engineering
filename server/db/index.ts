@@ -263,7 +263,8 @@ function createTables() {
       lead_id TEXT DEFAULT '',
       template_type TEXT DEFAULT '',
       terms_text TEXT DEFAULT '',
-      signing_date TEXT DEFAULT ''
+      signing_date TEXT DEFAULT '',
+      signed_file_url TEXT DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS invoices (

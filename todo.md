@@ -15,3 +15,13 @@
 - [x] Fix: deployed site shows only 5 contract templates instead of 19
 - [x] Improve PDF output formatting to match original contract documents
 - [x] Fix PDF formatting: termsText shows as raw JSON/field names instead of formatted sections
+- [x] Change client from "ورثة الجسار" to "شركة مايكوا لتركيب أنظمة التبريد" (company type)
+- [x] Create 9 project tasks with correct statuses (completed/in-progress/pending)
+- [x] Upload and organize documents (أوراق الجسار PDF) in documents section
+- [x] Add signed contract copy to contracts section
+- [x] Increase multer file size limit from 20MB to 50MB for large document uploads
+- [x] Add signedFileUrl field to contracts table and API
+- [x] Add "العقد الموقع (PDF)" download button in contracts detail view
+- [x] Upload signed contract PDF (extracted pages 1-3 from أوراق الجسار)
+- [x] Upload electricity request document (page 4 from أوراق الجسار)
+- [x] Update client type to "company" for شركة مايكوا

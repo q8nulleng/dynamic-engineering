@@ -601,6 +601,13 @@ export default function Contracts() {
                                           </Button>
                                         </Link>
                                       )}
+                                      {c.signedFileUrl && (
+                                        <a href={c.signedFileUrl} target="_blank" rel="noopener noreferrer">
+                                          <Button variant="outline" size="sm" className="w-full text-xs justify-start gap-2 h-8 border-green-300 text-green-700 hover:bg-green-50">
+                                            <Download className="w-3 h-3" />العقد الموقع (PDF)
+                                          </Button>
+                                        </a>
+                                      )}
                                       {c.status === "مسودة" && (
                                         <Button size="sm" className="w-full text-xs h-8 text-white"
                                           style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
