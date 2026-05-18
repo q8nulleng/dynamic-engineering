@@ -4,26 +4,7 @@ import { eq } from "drizzle-orm";
 import * as schema from "./schema.js";
 
 export function seedDatabase(db: BetterSQLite3Database<typeof schema>) {
-  const existingClients = db.select().from(clients).limit(1).all();
-  if (existingClients.length === 0) {
-    seedClientsAndProjects(db);
-  }
-
-  const existingContracts = db.select().from(contracts).limit(1).all();
-  if (existingContracts.length === 0) {
-    seedContractsAndInvoices(db);
-  }
-
-  const existingLeads = db.select().from(crmLeads).limit(1).all();
-  if (existingLeads.length === 0) {
-    seedCrmLeads(db);
-  }
-
-  const existingDocuments = db.select().from(documents).limit(1).all();
-  if (existingDocuments.length === 0) {
-    seedDocuments(db);
-  }
-
+  // Only seed contract templates - no demo/test data
   const existingTemplates = db.select().from(contractTemplates).limit(1).all();
   if (existingTemplates.length === 0) {
     seedContractTemplates(db);
