@@ -32,6 +32,7 @@ export function initDb() {
   addCol("ALTER TABLE clients ADD COLUMN total_contracts_value REAL DEFAULT 0");
   addCol("ALTER TABLE clients ADD COLUMN total_paid REAL DEFAULT 0");
   addCol("ALTER TABLE clients ADD COLUMN total_remaining REAL DEFAULT 0");
+  addCol("ALTER TABLE clients ADD COLUMN project_summary TEXT DEFAULT ''");
 
   // crm_leads — create + Issue #9 new fields
   try {

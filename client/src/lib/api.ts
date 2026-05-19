@@ -45,6 +45,7 @@ export interface Client {
   totalContractsValue: number;
   totalPaid: number;
   totalRemaining: number;
+  projectSummary?: string;
 }
 
 export interface TaskData {

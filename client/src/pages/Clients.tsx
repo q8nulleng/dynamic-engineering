@@ -42,49 +42,50 @@ export interface Client {
   createdAt: string;
   projectType: string;
   serviceType: string;
+  projectSummary?: string;
 }
 
 export const kuwaitGovernorates: Record<string, string[]> = {
   "محافظة العاصمة": [
     "شرق", "مرقاب", "قبلة", "الميناء", "الديرة", "الوطية",
-    "الشامية", "الروضة", "الخالدية", "النزهة", "القيروان",
+    "الشامية", "الروضة", "الخالدية", "النزهة",
     "كيفان", "الفيحاء", "اليرموك", "المنصورية", "الغرب",
     "ضاحية عبدالله السالم", "بنيد القار", "الدعية", "العديلية",
     "الدسمة", "الصليبيخات", "الشويخ الصناعي", "السرة",
-    "أم الجسم", "البنيان", "فيلكا",
+    "أم الجسم", "البنيان", "فيلكا", "أخرى",
   ],
   "محافظة حولي": [
     "السالمية", "حولي", "الرميثية", "بيان", "مشرف",
     "الجابرية", "الزهراء", "الشعب", "القادسية",
-    "سلوى", "الرقة", "العقيلة", "البدع", "ميدان حولي", "الشهداء",
+    "سلوى", "الرقة", "العقيلة", "البدع", "ميدان حولي", "الشهداء", "أخرى",
   ],
   "محافظة الفروانية": [
     "خيطان", "الفروانية", "الرقعي", "العارضية", "أبو فطيرة",
     "ضاحية صباح السالم", "الأندلس", "الرابية", "إشبيلية",
     "الضجيج", "جليب الشيوخ", "عبدالله المبارك", "الفردوس",
-    "الصليبية", "الحساوية",
+    "الصليبية", "الحساوية", "أخرى",
   ],
   "محافظة مبارك الكبير": [
     "العدان", "المنقف", "الري", "صباح السالم",
-    "أبو الحصانية", "القصور", "مبارك الكبير", "الفنيطيس", "الصباحية",
+    "أبو الحصانية", "القصور", "مبارك الكبير", "الفنيطيس", "الصباحية", "أخرى",
   ],
   "محافظة الأحمدي": [
     "الفنطاس", "أبو حليفة", "الأحمدي", "العيون", "هدية",
     "الظهر", "علي صباح السالم", "المقوع", "ضاحية جابر العلي",
-    "الرقة", "الوفرة", "الزور", "الخيران", "المنطقة الصناعية",
+    "الرقة", "الوفرة", "الزور", "الخيران", "المنطقة الصناعية", "أخرى",
   ],
   "محافظة الجهراء": [
-    "الجهراء", "المطلاع", "تيماء", "النعيم",
+    "الجهراء", "المطلاع", "تيماء", "النعيم", "القيروان",
     "كاظمة", "السبية", "أم العيش", "الواحة", "الناعم",
-    "أمغرة", "القصر", "الوفرة الزراعية",
+    "أمغرة", "القصر", "الوفرة الزراعية", "أخرى",
   ],
 };
 
 export const serviceTypes: Record<string, string[]> = {
-  "سكن خاص": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "هدم", "إشراف"],
-  "صناعي": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "هدم"],
-  "استثماري": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "هدم"],
-  "تجاري": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "هدم"],
+  "سكن خاص": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "إضافة مبنى قائم", "هدم", "إشراف"],
+  "صناعي": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "إضافة مبنى قائم", "هدم"],
+  "استثماري": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "إضافة مبنى قائم", "هدم"],
+  "تجاري": ["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "إضافة مبنى قائم", "هدم"],
 };
 
 const typeLabels: Record<string, { label: string; color: string }> = {
@@ -126,7 +127,7 @@ function NewClientDialog({ open, onClose, onAdd }: {
     name: "", phone: "", phone2: "", civilId: "", email: "",
     type: "individual" as Client["type"],
     spouseName: "", spouseCivilId: "",
-    governorate: "", area: "", block: "", plot: "", parcelArea: "",
+    governorate: "", area: "", customArea: "", block: "", plot: "", parcelArea: "",
     parcelShape: "مستطيل", parcelFacing: "شمال",
     ownershipDoc: "", ownershipDate: "",
     projectType: "سكن خاص", serviceType: "بناء جديد",
@@ -143,7 +144,9 @@ function NewClientDialog({ open, onClose, onAdd }: {
     onAdd({
       name: form.name, phone: form.phone, phone2: form.phone2,
       civilId: form.civilId, email: form.email, type: form.type,
-      governorate: form.governorate, area: form.area, block: form.block, plot: form.plot,
+      governorate: form.governorate,
+      area: form.area === "أخرى" && form.customArea ? form.customArea : form.area,
+      block: form.block, plot: form.plot,
       parcelArea: Number(form.parcelArea) || 0, parcelShape: form.parcelShape,
       parcelFacing: form.parcelFacing, ownershipDoc: form.ownershipDoc,
       ownershipDate: form.ownershipDate, spouseName: form.spouseName,
@@ -157,10 +160,10 @@ function NewClientDialog({ open, onClose, onAdd }: {
     setForm({
       name: "", phone: "", phone2: "", civilId: "", email: "",
       type: "individual", spouseName: "", spouseCivilId: "",
-      governorate: "", area: "", block: "", plot: "", parcelArea: "",
-      parcelShape: "مستطيل", parcelFacing: "شمال",
-      ownershipDoc: "", ownershipDate: "",
-      projectType: "سكن خاص", serviceType: "بناء جديد", notes: "",
+      governorate: "", area: "", customArea: "", block: "", plot: "", parcelArea: "",
+    parcelShape: "مستطيل", parcelFacing: "شمال",
+    ownershipDoc: "", ownershipDate: "",
+    projectType: "سكن خاص", serviceType: "بناء جديد", notes: "",
     });
   };
 
@@ -279,12 +282,20 @@ function NewClientDialog({ open, onClose, onAdd }: {
                   <label className="text-xs font-medium text-gray-600 mb-1 block">المنطقة</label>
                   <select
                     value={form.area}
-                    onChange={(e) => setForm({ ...form, area: e.target.value })}
+                    onChange={(e) => setForm({ ...form, area: e.target.value, customArea: "" })}
                     className="w-full border rounded-lg px-3 py-2 text-sm text-right bg-white"
                     disabled={!form.governorate}>
                     <option value="">اختر المنطقة...</option>
                     {govAreas.map((a) => <option key={a} value={a}>{a}</option>)}
                   </select>
+                  {form.area === "أخرى" && (
+                    <Input
+                      value={form.customArea}
+                      onChange={(e) => setForm({ ...form, customArea: e.target.value })}
+                      placeholder="اكتب اسم المنطقة..."
+                      className="text-right text-sm mt-1"
+                    />
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2">
@@ -515,6 +526,7 @@ export default function Clients() {
           <option value="تعديل">تعديل</option>
           <option value="إضافة">إضافة</option>
           <option value="تعديل وإضافة">تعديل وإضافة</option>
+          <option value="إضافة مبنى قائم">إضافة مبنى قائم</option>
           <option value="هدم">هدم</option>
           <option value="إشراف">إشراف</option>
         </select>

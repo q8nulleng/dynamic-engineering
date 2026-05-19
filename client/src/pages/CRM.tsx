@@ -85,9 +85,9 @@ const priorityStars = (p: number) => (
 
 const emptyForm = {
   name: "", phone: "", type: "", serviceType: "",
-  source: "", expectedRevenue: "", probability: "",
+  source: "", referralName: "", expectedRevenue: "", probability: "",
   expectedClosing: "", priority: "", governorate: "", area: "",
-  likelyContract: "", notes: "", plotNumber: "", landArea: "",
+  notes: "", plotNumber: "", landArea: "",
 };
 
 type PkgType = { name: string; price: string; buildingType: string; serviceType: string; level: string; features: string[] };
@@ -100,6 +100,7 @@ function QuotationDialog({ lead, onClose, onSaved }: {
   const createQuotation = useCreateQuotation();
   const [selectedPkg, setSelectedPkg] = useState<PkgType | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [agreedPrice, setAgreedPrice] = useState("");
 
   const allFlat = Object.values(allPackages).flat();
   const byType = lead.type ? (allPackages[lead.type] || allFlat) : allFlat;
@@ -112,12 +113,13 @@ function QuotationDialog({ lead, onClose, onSaved }: {
   const buildQuotationPayload = () => {
     const now = new Date().toISOString().split("T")[0];
     const expiryDate = new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
+    const finalAmount = agreedPrice.trim() ? agreedPrice.trim() : selectedPkg!.price;
     return {
       client: lead.name,
       type: lead.type,
       service: lead.serviceType || "",
       package: selectedPkg!.name,
-      amount: selectedPkg!.price,
+      amount: finalAmount,
       date: now,
       governorate: lead.governorate || "",
       area: lead.area || "",
@@ -181,6 +183,27 @@ function QuotationDialog({ lead, onClose, onSaved }: {
           {lead.serviceType && <div><span className="text-muted-foreground">الخدمة: </span><span className="font-medium">{lead.serviceType}</span></div>}
           {lead.governorate && <div><span className="text-muted-foreground">المحافظة: </span><span className="font-medium">{lead.governorate}</span></div>}
           {lead.area && <div><span className="text-muted-foreground">المنطقة: </span><span className="font-medium">{lead.area}</span></div>}
+        </div>
+
+        {/* السعر المتفق عليه */}
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <label className="text-sm font-semibold text-amber-800 block mb-1.5">
+            السعر المتفق عليه (اختياري)
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={agreedPrice}
+              onChange={(e) => setAgreedPrice(e.target.value)}
+              placeholder="اتركه فارغًا لاستخدام سعر الباقة..."
+              className="flex-1 border border-amber-300 rounded-lg px-3 py-1.5 text-sm text-right bg-white focus:outline-none focus:ring-2 focus:ring-amber-300"
+              dir="ltr"
+            />
+            <span className="text-sm font-medium text-amber-700">د.ك</span>
+          </div>
+          {agreedPrice && (
+            <p className="text-xs text-amber-600 mt-1">✓ سيتم استخدام هذا السعر بدلاً من سعر الباقة</p>
+          )}
         </div>
 
         {/* Package selection */}
@@ -747,7 +770,7 @@ export default function CRM() {
       serviceType: form.serviceType,
       governorate: form.governorate,
       area: form.area,
-      likelyContract: form.likelyContract,
+
       expectedRevenue: form.expectedRevenue || "0",
       probability: Number(form.probability) || 10,
       priority: Number(form.priority) || 0,
@@ -1039,12 +1062,12 @@ export default function CRM() {
                                   setEditForm({
                                     name: lead.name || "", phone: lead.phone || "",
                                     type: lead.type || "", serviceType: lead.serviceType || "",
-                                    source: lead.source || "", expectedRevenue: lead.expectedRevenue || "",
+                                    source: lead.source || "", referralName: "", expectedRevenue: lead.expectedRevenue || "",
                                     probability: String(lead.probability || ""),
                                     expectedClosing: lead.expectedClosing || "",
                                     priority: String(lead.priority || ""),
                                     governorate: lead.governorate || "", area: lead.area || "",
-                                    likelyContract: lead.likelyContract || "", notes: lead.notes || "",
+                                    notes: lead.notes || "",
                                     plotNumber: lead.plotNumber || "", landArea: String(lead.landArea || ""),
                                   });
                                   setEditActiveTab("basic");
@@ -1167,18 +1190,22 @@ export default function CRM() {
                     <Activity className="w-3.5 h-3.5 text-muted-foreground" />
                     مصدر العميل
                   </label>
-                  <Select value={editForm.source} onValueChange={(v) => setEditForm(p => ({ ...p, source: v }))}>
+                  <Select value={editForm.source} onValueChange={(v) => setEditForm(p => ({ ...p, source: v, referralName: v !== "إحالة" ? "" : p.referralName }))}>
                     <SelectTrigger><SelectValue placeholder="كيف وصل العميل؟" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="اتصال">اتصال هاتفي</SelectItem>
-                      <SelectItem value="واتساب">واتساب</SelectItem>
-                      <SelectItem value="زيارة">زيارة المكتب</SelectItem>
-                      <SelectItem value="بريد">بريد إلكتروني</SelectItem>
                       <SelectItem value="انستغرام">انستغرام</SelectItem>
-                      <SelectItem value="إحالة">إحالة من عميل</SelectItem>
-                      <SelectItem value="موقع">الموقع الإلكتروني</SelectItem>
+                      <SelectItem value="جوجل">جوجل</SelectItem>
+                      <SelectItem value="إحالة">إحالة من...</SelectItem>
                     </SelectContent>
                   </Select>
+                  {editForm.source === "إحالة" && (
+                    <Input
+                      placeholder="اسم الشخص المحيل..."
+                      value={editForm.referralName || ""}
+                      onChange={(e) => setEditForm(p => ({ ...p, referralName: e.target.value }))}
+                      className="mt-1"
+                    />
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium flex items-center gap-1.5">
@@ -1301,13 +1328,7 @@ export default function CRM() {
                     </label>
                     <Input type="date" dir="ltr" className="text-right" value={editForm.expectedClosing} onChange={(e) => setEditForm(p => ({ ...p, expectedClosing: e.target.value }))} />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium flex items-center gap-1.5">
-                      <Tag className="w-3.5 h-3.5 text-muted-foreground" />
-                      التعاقد المرجح
-                    </label>
-                    <Input placeholder="مثال: مرجح جداً، تحت المفاوضة..." value={editForm.likelyContract} onChange={(e) => setEditForm(p => ({ ...p, likelyContract: e.target.value }))} />
-                  </div>
+
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5">
                       <Hash className="w-3.5 h-3.5 text-muted-foreground" />
@@ -1358,7 +1379,7 @@ export default function CRM() {
                       serviceType: editForm.serviceType,
                       governorate: editForm.governorate,
                       area: editForm.area,
-                      likelyContract: editForm.likelyContract,
+
                       expectedRevenue: editForm.expectedRevenue || "0",
                       probability: Number(editForm.probability) || 10,
                       priority: Number(editForm.priority) || 0,
@@ -1442,15 +1463,19 @@ export default function CRM() {
                   <Select value={form.source} onValueChange={(v) => handleFormChange("source", v)}>
                     <SelectTrigger><SelectValue placeholder="كيف وصل العميل؟" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="اتصال">اتصال هاتفي</SelectItem>
-                      <SelectItem value="واتساب">واتساب</SelectItem>
-                      <SelectItem value="زيارة">زيارة المكتب</SelectItem>
-                      <SelectItem value="بريد">بريد إلكتروني</SelectItem>
                       <SelectItem value="انستغرام">انستغرام</SelectItem>
-                      <SelectItem value="إحالة">إحالة من عميل</SelectItem>
-                      <SelectItem value="موقع">الموقع الإلكتروني</SelectItem>
+                      <SelectItem value="جوجل">جوجل</SelectItem>
+                      <SelectItem value="إحالة">إحالة من...</SelectItem>
                     </SelectContent>
                   </Select>
+                  {form.source === "إحالة" && (
+                    <Input
+                      placeholder="اسم الشخص المحيل..."
+                      value={form.referralName || ""}
+                      onChange={(e) => handleFormChange("referralName", e.target.value)}
+                      className="mt-1"
+                    />
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium flex items-center gap-1.5">
@@ -1576,13 +1601,7 @@ export default function CRM() {
                     </label>
                     <Input type="date" dir="ltr" className="text-right" value={form.expectedClosing} onChange={(e) => handleFormChange("expectedClosing", e.target.value)} />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium flex items-center gap-1.5">
-                      <Tag className="w-3.5 h-3.5 text-muted-foreground" />
-                      التعاقد المرجح
-                    </label>
-                    <Input placeholder="مثال: مرجح جداً، تحت المفاوضة..." value={form.likelyContract} onChange={(e) => handleFormChange("likelyContract", e.target.value)} />
-                  </div>
+
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5">
                       <Hash className="w-3.5 h-3.5 text-muted-foreground" />

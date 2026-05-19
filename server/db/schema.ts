@@ -25,6 +25,7 @@ export const clients = sqliteTable("clients", {
   createdAt: text("created_at").notNull(),
   projectType: text("project_type").default(""),
   serviceType: text("service_type").default(""),
+  projectSummary: text("project_summary").default(""),
   // Issue #9 — cross-module linking
   leadId: text("lead_id").default(""),         // FK → crm_leads.id (no .references() — circular)
   totalContractsValue: real("total_contracts_value").default(0),

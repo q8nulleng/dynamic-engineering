@@ -273,6 +273,62 @@ function EditParcelDialog({ client, open, onClose }: {
   );
 }
 
+// ── كرت نبذة عن المشروع ──────────────────────────────────────────────────
+function ProjectSummaryCard({ client }: { client: Client }) {
+  const updateClient = useUpdateClient();
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(client.projectSummary || "");
+
+  const handleSave = () => {
+    updateClient.mutate(
+      { id: client.id, projectSummary: text },
+      {
+        onSuccess: () => { toast.success("تم حفظ نبذة المشروع"); setEditing(false); },
+        onError: () => toast.error("حدث خطأ أثناء الحفظ"),
+      }
+    );
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border p-5">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-blue-500" />
+          نبذة عن المشروع
+        </h3>
+        {!editing && (
+          <button onClick={() => { setText(client.projectSummary || ""); setEditing(true); }}
+            className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+            <Edit2 className="w-3 h-3" /> تعديل
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <div className="space-y-2">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={4}
+            placeholder="اكتب نبذة عن المشروع، متطلبات العميل، ملاحظات خاصة..."
+            className="w-full border rounded-lg px-3 py-2 text-sm text-right resize-none focus:outline-none focus:ring-2 focus:ring-blue-200"
+            dir="rtl"
+          />
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => setEditing(false)}
+              className="text-xs px-3 py-1.5 rounded-lg border text-gray-600 hover:bg-gray-50">إلغاء</button>
+            <button onClick={handleSave}
+              className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700">حفظ</button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
+          {client.projectSummary || <span className="text-gray-400 italic">لا توجد نبذة بعد. اضغط تعديل لإضافة وصف للمشروع.</span>}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── الصفحة الرئيسية ────────────────────────────────────────────────────────
 export default function ClientDetail() {
   const params = useParams<{ id: string }>();
@@ -485,6 +541,9 @@ export default function ClientDetail() {
                 </div>
               )}
             </div>
+
+            {/* نبذة عن المشروع */}
+            <ProjectSummaryCard client={client} />
 
             {/* حذف العميل */}
             <div className="bg-white rounded-2xl border border-red-100 p-5">
