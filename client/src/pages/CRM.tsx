@@ -156,7 +156,10 @@ function QuotationDialog({ lead, onClose, onSaved }: {
     setGenerating(true);
     const tid = toast.loading("جاري إنشاء PDF...");
     try {
-      await exportQuotationPdf(lead, selectedPkg);
+      const pkgForPdf = agreedPrice.trim()
+        ? { ...selectedPkg, price: agreedPrice.trim() }
+        : selectedPkg;
+      await exportQuotationPdf(lead, pkgForPdf);
       toast.success("تم فتح نافذة الطباعة", { id: tid });
     } catch (err: unknown) {
       const isBlocked = err instanceof Error && err.message === "popup_blocked";
@@ -290,7 +293,7 @@ function QuotationDialog({ lead, onClose, onSaved }: {
               <div style={{ border: "2px solid #000", padding: "12px 14px", marginBottom: "10px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                   <div style={{ fontSize: "22px", fontWeight: 900, color: "#000", fontFamily: "'Space Grotesk',sans-serif" }}>
-                    {selectedPkg.price} <span style={{ fontSize: "11px", fontWeight: 600 }}>د.ك</span>
+                    {agreedPrice.trim() ? agreedPrice.trim() : selectedPkg.price} <span style={{ fontSize: "11px", fontWeight: 600 }}>د.ك</span>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: "13px", fontWeight: 700, color: "#000" }}>{selectedPkg.name}</div>
