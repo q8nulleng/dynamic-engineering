@@ -4,11 +4,190 @@ import { eq } from "drizzle-orm";
 import * as schema from "./schema.js";
 
 export function seedDatabase(db: BetterSQLite3Database<typeof schema>) {
-  // Only seed contract templates - no demo/test data
+  // Seed contract templates
   const existingTemplates = db.select().from(contractTemplates).limit(1).all();
   if (existingTemplates.length === 0) {
     seedContractTemplates(db);
   }
+  // Seed real project data (Maikwa / Jassar)
+  const existingClients = db.select().from(clients).where(eq(clients.id, 'CDSO6EL')).all();
+  if (existingClients.length === 0) {
+    seedMaikwaProject(db);
+  }
+}
+
+function seedMaikwaProject(db: BetterSQLite3Database<typeof schema>) {
+  // ── Client ────────────────────────────────────────────────────────────
+  db.insert(clients).values({
+    id: 'CDSO6EL',
+    name: 'شركة مايكوا لتركيب أنظمة التبريد والتكييف',
+    phone: '99994562',
+    phone2: '',
+    civilId: '285070600118',
+    email: '',
+    type: 'company',
+    governorate: '',
+    area: 'الشويخالصناعية 3',
+    block: '3',
+    plot: '37',
+    parcelArea: 0,
+    parcelShape: '',
+    parcelFacing: '',
+    ownershipDoc: '',
+    ownershipDate: '',
+    spouseName: '',
+    spouseCivilId: '',
+    status: 'active',
+    rating: 5,
+    notes: 'المالك: ورثة حمود عبداللطيف الجسار (فتوح وألطاف وإيمان)\nالوكيل: خالد عبداللطيف علي الجسار - رقم مدني 285070600118\nالتوكيلات: 3 توكيلات رسمية من وزارة العدل\nالمستأجر: ماهر حمزة صالح - بطاقة مدنية 270091100487\nالممثل في العقد: ماهر حمزة صالح (بصفته مستأجر)',
+    createdAt: '2026-05-18',
+    projectType: 'صناعي',
+    serviceType: 'تعديل وإضافة',
+    leadId: '',
+    totalContractsValue: 1300,
+    totalPaid: 650,
+    totalRemaining: 650,
+  }).run();
+
+  // ── Project ───────────────────────────────────────────────────────────
+  db.insert(projects).values({
+    id: 'SGSJZ-',
+    name: 'رخصة تعديلية - الشويخالصناعية 3 - قسيمة 37',
+    clientId: 'CDSO6EL',
+    client: 'شركة مايكوا',
+    type: 'تعديل وإضافة',
+    serviceType: 'تعديل وإضافة',
+    area: 'الشويخالصناعية 3',
+    quotation: '',
+    progress: 0,
+    currentPhase: 0,
+    createdAt: '2026-05-18',
+    contractId: 'CON-2026-9H_',
+    leadId: '',
+    status: 'active',
+  }).run();
+
+  // ── Phases ────────────────────────────────────────────────────────────
+  const phase1 = db.insert(phases).values({ projectId: 'SGSJZ-', order: 0, title: 'التعاقد والتجهيز', subtitle: 'توقيع العقد وتجميع الأوراق' }).returning().get();
+  const phase2 = db.insert(phases).values({ projectId: 'SGSJZ-', order: 1, title: 'الخدمات الحكومية', subtitle: 'تقوية التيار والكهرباء' }).returning().get();
+  const phase3 = db.insert(phases).values({ projectId: 'SGSJZ-', order: 2, title: 'التصميم', subtitle: 'الكشف والمخططات المعمارية' }).returning().get();
+  const phase4 = db.insert(phases).values({ projectId: 'SGSJZ-', order: 3, title: 'التقديم', subtitle: 'إدخال المعاملات للجهات الرسمية' }).returning().get();
+
+  // ── Tasks ─────────────────────────────────────────────────────────────
+  db.insert(tasks).values([
+    { phaseId: phase1.id, name: 'توقيع العقد', status: 'done', assignee: 'الإدارة', order: 0, estimatedDays: 1 },
+    { phaseId: phase1.id, name: 'توقيع وثائق البلدية', status: 'done', assignee: 'الإدارة', order: 1, estimatedDays: 1 },
+    { phaseId: phase1.id, name: 'تجميع الأوراق المطلوبة (عقد إيجار، وصل ساري، مخططات سابقة، رخصة سابقة بلدية وإطفاء)', status: 'done', assignee: 'سكرتير', order: 2, estimatedDays: 5 },
+    { phaseId: phase2.id, name: 'طلب تقوية تيار من الهيئة العامة للصناعة (من المالك)', status: 'done', assignee: 'المالك', order: 0, estimatedDays: 7 },
+    { phaseId: phase2.id, name: 'تقديم كتاب تقوية إلى وزارة الكهرباء', status: 'in_progress', assignee: 'سكرتير', description: 'تم التقديم - بانتظار الموافقة', order: 1, estimatedDays: 14 },
+    { phaseId: phase3.id, name: 'الكشف على الموقع', status: 'done', assignee: 'م. مصطفى', order: 0, estimatedDays: 1 },
+    { phaseId: phase3.id, name: 'رسم المخططات المعمارية واعتمادها مع العميل', status: 'pending', assignee: 'م. مصطفى', order: 1, estimatedDays: 10 },
+    { phaseId: phase4.id, name: 'إدخال مخطط الإطفاء', status: 'pending', assignee: 'سكرتير', order: 0, estimatedDays: 7 },
+    { phaseId: phase4.id, name: 'إدخال المعاملة إلى البلدية', status: 'pending', assignee: 'سكرتير', order: 1, estimatedDays: 7 },
+  ]).run();
+
+  // ── Contract ──────────────────────────────────────────────────────────
+  db.insert(contracts).values({
+    id: 'CON-2026-9H_',
+    projectId: 'SGSJZ-',
+    clientId: 'CDSO6EL',
+    client: 'شركة مايكوا لتركيب أنظمة التبريد والتكييف',
+    template: 'عقد إضافة وتعديل صناعي',
+    type: 'صناعي',
+    service: 'تعديل وإضافة',
+    package: 'باقة صناعية',
+    status: 'active',
+    date: '2026-05-04',
+    amount: '1300',
+    civilId: '285070600118',
+    area: 'الشويخالصناعية 3',
+    block: '3',
+    plot: '37',
+    leadId: '',
+    templateType: 'عقد إضافة وتعديل صناعي',
+    termsText: '',
+    signingDate: '2026-05-04',
+    signedFileUrl: '/manus-storage/dc2a5c2b1b8c2e9a61781d236b70a868_8f9134c5',
+  }).run();
+
+  // ── Invoices ──────────────────────────────────────────────────────────
+  db.insert(invoices).values([
+    {
+      id: 'INV/2026/001',
+      projectId: 'SGSJZ-',
+      clientId: 'CDSO6EL',
+      client: 'شركة مايكوا لتركيب أنظمة التبريد والتكييف',
+      project: 'رخصة تعديلية - الشويخالصناعية 3 - قسيمة 37',
+      status: 'مدفوعة',
+      date: '2026-05-04',
+      dueDate: '2026-05-04',
+      subtotal: 650,
+      taxRate: 0,
+      taxAmount: 0,
+      total: 650,
+      notes: 'الدفعة الأولى 50% عند توقيع العقد',
+      contractId: 'CON-2026-9H_',
+      paymentType: 'دفعة أولى',
+      paymentMethod: 'تحويل بنكي',
+      invoiceNumber: 'DYN-INV-2026-001',
+    },
+    {
+      id: 'INV/2026/002',
+      projectId: 'SGSJZ-',
+      clientId: 'CDSO6EL',
+      client: 'شركة مايكوا لتركيب أنظمة التبريد والتكييف',
+      project: 'رخصة تعديلية - الشويخالصناعية 3 - قسيمة 37',
+      status: 'معلقة',
+      date: '2026-05-04',
+      dueDate: '2026-06-08',
+      subtotal: 650,
+      taxRate: 0,
+      taxAmount: 0,
+      total: 650,
+      notes: 'الدفعة الثانية 50% عند استخراج ترخيص بلدية الكويت',
+      contractId: 'CON-2026-9H_',
+      paymentType: 'دفعة ثانية',
+      paymentMethod: '',
+      invoiceNumber: 'DYN-INV-2026-002',
+    },
+  ]).run();
+
+  // ── Documents ─────────────────────────────────────────────────────────
+  db.insert(documents).values([
+    {
+      clientId: 'CDSO6EL',
+      projectId: 'SGSJZ-',
+      name: 'أوراق المالك - ورثة حمود الجسار (بطاقات مدنية، توكيلات، عقد إيجار، تعهدات)',
+      category: 'مستندات العميل',
+      status: 'received',
+      fileName: '2a031c4805e3ef25b5611fd8366d6702_47f8ba32',
+      fileSize: '32973 KB',
+      uploadedAt: '2026-05-18T17:50:51.221Z',
+      url: '/manus-storage/2a031c4805e3ef25b5611fd8366d6702_47f8ba32',
+    },
+    {
+      clientId: 'CDSO6EL',
+      projectId: 'SGSJZ-',
+      name: 'العقد الموقع - عقد إضافة وتعديل صناعي - شركة مايكوا',
+      category: 'عقود موقعة',
+      status: 'received',
+      fileName: 'dc2a5c2b1b8c2e9a61781d236b70a868_8f9134c5',
+      fileSize: '2479 KB',
+      uploadedAt: '2026-05-18T17:53:50.468Z',
+      url: '/manus-storage/dc2a5c2b1b8c2e9a61781d236b70a868_8f9134c5',
+    },
+    {
+      clientId: 'CDSO6EL',
+      projectId: 'SGSJZ-',
+      name: 'طلب تقوية التيار الكهربائي - هيئة الصناعة - رقم 930025',
+      category: 'مستندات حكومية',
+      status: 'received',
+      fileName: 'a2be8b76c719a269a515587244a8cbb4_d57d0bc0',
+      fileSize: '1283 KB',
+      uploadedAt: '2026-05-18T17:53:58.467Z',
+      url: '/manus-storage/a2be8b76c719a269a515587244a8cbb4_d57d0bc0',
+    },
+  ]).run();
 }
 
 function seedClientsAndProjects(db: BetterSQLite3Database<typeof schema>) {
