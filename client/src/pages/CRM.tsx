@@ -360,7 +360,23 @@ function QuotationDialog({ lead, onClose, onSaved }: {
 // ── View Quote Dialog ────────────────────────────────────────────────────
 function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   const { data: quotes, isLoading } = useQuotationsByLead(lead.id);
+  const updateQuotation = useUpdateQuotation();
   const quote = quotes?.[0];
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ amount: "", service: "", package: "", status: "", type: "" });
+
+  const startEdit = () => {
+    if (!quote) return;
+    setEditForm({ amount: quote.amount, service: quote.service, package: quote.package, status: quote.status, type: quote.type });
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!quote) return;
+    await updateQuotation.mutateAsync({ id: quote.id, ...editForm });
+    toast.success("تم تحديث عرض السعر بنجاح");
+    setEditing(false);
+  };
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -372,6 +388,54 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
           <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
         ) : !quote ? (
           <div className="text-center py-8 text-muted-foreground text-sm">لا يوجد عرض سعر مربوط بهذه الفرصة</div>
+        ) : editing ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">المبلغ (د.ك)</label>
+                <Input value={editForm.amount} onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))} dir="ltr" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">الحالة</label>
+                <select value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                  {["مسودة", "مرسل", "مقبول", "مرفوض", "عقد", "تم التعاقد", "منتهي"].map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">نوع المشروع</label>
+                <select value={editForm.type} onChange={e => setEditForm(f => ({ ...f, type: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                  {["سكن خاص", "استثماري", "تجاري", "صناعي"].map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">نوع الخدمة</label>
+                <select value={editForm.service} onChange={e => setEditForm(f => ({ ...f, service: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                  {["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "إضافة مبنى قائم", "هدم", "إشراف"].map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">اسم الباقة</label>
+              <Input value={editForm.package} onChange={e => setEditForm(f => ({ ...f, package: e.target.value }))} />
+            </div>
+            <div className="flex gap-2 justify-end pt-1">
+              <Button variant="outline" size="sm" onClick={() => setEditing(false)}>إلغاء</Button>
+              <Button size="sm" disabled={updateQuotation.isPending} onClick={saveEdit}
+                style={{ backgroundColor: "oklch(0.55 0.15 150)" }}>
+                {updateQuotation.isPending ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Save className="w-3 h-3 ml-1" />}
+                حفظ التعديل
+              </Button>
+            </div>
+          </div>
         ) : (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm border rounded-lg p-4 bg-muted/30">
@@ -386,6 +450,10 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" size="sm" onClick={onClose}>إغلاق</Button>
+              <Button variant="outline" size="sm" onClick={startEdit}>
+                <Pencil className="w-3.5 h-3.5 ml-1" />
+                تعديل العرض
+              </Button>
               <Link href="/quotations">
                 <Button size="sm" style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>
                   <FileText className="w-3.5 h-3.5 ml-1" />

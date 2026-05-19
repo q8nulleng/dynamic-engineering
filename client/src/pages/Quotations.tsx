@@ -5,14 +5,15 @@
  */
 import { useState } from "react";
 import { Link } from "wouter";
-import { useQuotations } from "@/lib/api";
+import { useQuotations, useUpdateQuotation } from "@/lib/api";
 import { exportQuotationPdf } from "@/lib/pdf";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, FileText, Send, CheckCircle, Eye, Download, MessageCircle, Receipt, ChevronDown, ChevronUp, MapPin, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus, FileText, Send, CheckCircle, Eye, Download, MessageCircle, Receipt, ChevronDown, ChevronUp, MapPin, Loader2, Pencil, Save } from "lucide-react";
 import { toast } from "sonner";
 
 /* ── Full 23 Engineering Packages from Odoo.sh ── */
@@ -95,6 +96,21 @@ export default function Quotations() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("الكل");
   const [exportingId, setExportingId] = useState<string | null>(null);
+  const [editingQuote, setEditingQuote] = useState<typeof quotations[0] | null>(null);
+  const [editForm, setEditForm] = useState({ amount: "", service: "", package: "", status: "", type: "" });
+  const updateQuotation = useUpdateQuotation();
+
+  const startEditQuote = (q: typeof quotations[0]) => {
+    setEditForm({ amount: q.amount, service: q.service, package: q.package, status: q.status, type: q.type });
+    setEditingQuote(q);
+  };
+
+  const saveEditQuote = async () => {
+    if (!editingQuote) return;
+    await updateQuotation.mutateAsync({ id: editingQuote.id, ...editForm });
+    toast.success("تم تحديث عرض السعر بنجاح");
+    setEditingQuote(null);
+  };
 
   if (isLoading) return <div className="flex items-center justify-center min-h-96 text-muted-foreground">جاري التحميل...</div>;
 
@@ -130,6 +146,7 @@ export default function Quotations() {
   }
 
   return (
+    <>
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -224,6 +241,10 @@ export default function Quotations() {
                             <td className="py-3 px-4">
                               <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" title="عرض"><Eye className="w-3.5 h-3.5" /></Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" title="تعديل"
+                  onClick={() => startEditQuote(q)}>
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" title="واتساب"
                                   onClick={() => window.open(`https://wa.me/965${q.civilId}`, "_blank")}>
                                   <MessageCircle className="w-3.5 h-3.5" />
@@ -366,6 +387,65 @@ export default function Quotations() {
           </div>
         </>
       )}
+
+      {/* Edit Quotation Dialog */}
+      {editingQuote && (
+        <Dialog open onOpenChange={() => setEditingQuote(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="text-base font-bold">تعديل عرض السعر — {editingQuote.client}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">المبلغ (د.ك)</label>
+                  <Input value={editForm.amount} onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))} dir="ltr" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">الحالة</label>
+                  <select value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                    {["مسودة", "مرسل", "مقبول", "مرفوض", "عقد", "تم التعاقد", "منتهي"].map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">نوع المشروع</label>
+                  <select value={editForm.type} onChange={e => setEditForm(f => ({ ...f, type: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                    {["سكن خاص", "استثماري", "تجاري", "صناعي"].map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">نوع الخدمة</label>
+                  <select value={editForm.service} onChange={e => setEditForm(f => ({ ...f, service: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                    {["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "إضافة مبنى قائم", "هدم", "إشراف"].map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">اسم الباقة</label>
+                <Input value={editForm.package} onChange={e => setEditForm(f => ({ ...f, package: e.target.value }))} />
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <Button variant="outline" size="sm" onClick={() => setEditingQuote(null)}>إلغاء</Button>
+                <Button size="sm" disabled={updateQuotation.isPending} onClick={saveEditQuote}
+                  style={{ backgroundColor: "oklch(0.55 0.15 150)" }}>
+                  {updateQuotation.isPending ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Save className="w-3 h-3 ml-1" />}
+                  حفظ التعديل
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
+    </>  
   );
 }
