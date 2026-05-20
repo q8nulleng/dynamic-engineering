@@ -686,75 +686,77 @@ export default function Contracts() {
             </Select>
           </div>
 
-          {/* Templates Table */}
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-0">
-              {templatesLoading ? (
-                <div className="py-12 text-center text-muted-foreground text-sm">جاري التحميل...</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/30">
-                        <th className="text-right py-3 px-4 font-medium">اسم القالب</th>
-                        <th className="text-right py-3 px-4 font-medium">نوع العقار</th>
-                        <th className="text-right py-3 px-4 font-medium">نوع الخدمة</th>
-                        <th className="text-right py-3 px-4 font-medium">البنود</th>
-                        <th className="text-right py-3 px-4 font-medium">إجراءات</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredTemplates.map((t) => (
-                        <tr key={t.id} className="border-b last:border-0 hover:bg-muted/20">
-                          <td className="py-3 px-4 font-medium">
-                            {t.name}
-                            {t.isDefault === 1 && (
-                              <Badge variant="outline" className="text-[9px] px-1 py-0 ms-2 border-gold text-amber-600">افتراضي</Badge>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-xs text-muted-foreground">{t.buildingType}</td>
-                          <td className="py-3 px-4 text-xs text-muted-foreground">{t.serviceType}</td>
-                          <td className="py-3 px-4 text-xs">
-                            <span className="px-1.5 py-0.5 bg-muted rounded text-muted-foreground font-mono">
-                              {countSections(t)}/7
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex gap-1">
-                              <Button variant="ghost" size="icon" className="h-7 w-7" title="عرض"
-                                onClick={() => setViewTemplate(t)}>
-                                <Eye className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" title="تعديل"
-                                onClick={() => openEditTemplate(t)}>
-                                <Pencil className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" title="نسخ"
-                                onClick={() => openCopyTemplate(t)}>
-                                <Copy className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                title="حذف"
-                                onClick={() => handleDeleteTemplate(t)}>
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
+          {/* Templates Cards Grid */}
+          {templatesLoading ? (
+            <div className="py-12 text-center text-muted-foreground text-sm">جاري التحميل...</div>
+          ) : filteredTemplates.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground text-sm">لا توجد قوالب مطابقة</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredTemplates.map((t) => (
+                <Card key={t.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4 space-y-3">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1 flex-1 min-w-0">
+                        <p className="font-semibold text-sm leading-tight line-clamp-2">{t.name}</p>
+                        <div className="flex gap-1.5 flex-wrap">
+                          <Badge variant="outline" className="text-[10px]">{t.buildingType}</Badge>
+                          <Badge variant="secondary" className="text-[10px]">{t.serviceType}</Badge>
+                          {t.isDefault === 1 && (
+                            <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-600">افتراضي</Badge>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-xs font-mono px-1.5 py-0.5 bg-muted rounded text-muted-foreground shrink-0">{countSections(t)}/7</span>
+                    </div>
+
+                    {/* Sections preview */}
+                    <div className="space-y-1">
+                      {[
+                        { key: "preamble", label: "الديباجة" },
+                        { key: "scope", label: "نطاق العمل" },
+                        { key: "fees", label: "الأتعاب" },
+                        { key: "payment", label: "الدفع" },
+                        { key: "duration", label: "المدة" },
+                        { key: "obligations", label: "الالتزامات" },
+                        { key: "termination", label: "الإنهاء" },
+                      ].map((sec) => (
+                        <div key={sec.key} className="flex items-center gap-1.5 text-xs">
+                          {(t as unknown as Record<string, unknown>)[sec.key] ? (
+                            <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0" />
+                          ) : (
+                            <div className="w-3 h-3 rounded-full border border-muted-foreground/30 shrink-0" />
+                          )}
+                          <span className={(t as unknown as Record<string, unknown>)[sec.key] ? "text-foreground" : "text-muted-foreground"}>{sec.label}</span>
+                        </div>
                       ))}
-                      {filteredTemplates.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="py-12 text-center text-muted-foreground text-sm">
-                            لا توجد قوالب مطابقة
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-1.5 pt-1">
+                      <Button variant="outline" size="sm" className="flex-1 text-xs h-8"
+                        onClick={() => openEditTemplate(t)}>
+                        <Pencil className="w-3 h-3 ml-1" />تعديل
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" title="عرض"
+                        onClick={() => setViewTemplate(t)}>
+                        <Eye className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" title="نسخ"
+                        onClick={() => openCopyTemplate(t)}>
+                        <Copy className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        title="حذف" onClick={() => handleDeleteTemplate(t)}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </>
       )}
 

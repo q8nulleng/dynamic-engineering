@@ -88,6 +88,18 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
 
 const fallbackStatus = { label: "—", color: "text-gray-500", bg: "bg-gray-50" };
 
+type Package = { name: string; price: string; buildingType: string; serviceType: string; level: string; features: string[] };
+
+const STORAGE_KEY = "dynamic_packages_v1";
+
+function loadPackages(): Record<string, Package[]> {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return allPackages;
+}
+
 export default function Quotations() {
   const { data: quotations = [], isLoading } = useQuotations();
   const [view, setView] = useState<"list" | "packages">("list");
@@ -99,6 +111,35 @@ export default function Quotations() {
   const [editingQuote, setEditingQuote] = useState<typeof quotations[0] | null>(null);
   const [editForm, setEditForm] = useState({ amount: "", service: "", package: "", status: "", type: "" });
   const updateQuotation = useUpdateQuotation();
+
+  // Package editing state
+  const [packages, setPackages] = useState<Record<string, Package[]>>(loadPackages);
+  const [editingPkg, setEditingPkg] = useState<Package | null>(null);
+  const [pkgForm, setPkgForm] = useState<Package>({ name: "", price: "", buildingType: "", serviceType: "", level: "", features: [] });
+  const [pkgFeaturesText, setPkgFeaturesText] = useState("");
+
+  const flatPkgs = Object.values(packages).flat();
+
+  const openEditPkg = (pkg: Package) => {
+    setEditingPkg(pkg);
+    setPkgForm({ ...pkg });
+    setPkgFeaturesText(pkg.features.join("\n"));
+  };
+
+  const saveEditPkg = () => {
+    if (!editingPkg) return;
+    const updated = { ...pkgForm, features: pkgFeaturesText.split("\n").map(f => f.trim()).filter(Boolean) };
+    const newPackages = { ...packages };
+    for (const bt of Object.keys(newPackages)) {
+      newPackages[bt] = newPackages[bt].map(p =>
+        p.name === editingPkg.name && p.buildingType === editingPkg.buildingType ? updated : p
+      );
+    }
+    setPackages(newPackages);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newPackages));
+    setEditingPkg(null);
+    toast.success("تم حفظ تعديلات الباقة");
+  };
 
   const startEditQuote = (q: typeof quotations[0]) => {
     setEditForm({ amount: q.amount, service: q.service, package: q.package, status: q.status, type: q.type });
@@ -121,8 +162,8 @@ export default function Quotations() {
   });
 
   const filteredPackages = selectedBuildingType === "الكل"
-    ? flatPackages
-    : allPackages[selectedBuildingType] || [];
+    ? flatPkgs
+    : packages[selectedBuildingType] || [];
 
   async function handlePdf(e: React.MouseEvent, q: typeof quotations[0]) {
     e.stopPropagation();
@@ -146,7 +187,6 @@ export default function Quotations() {
   }
 
   return (
-    <>
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -347,7 +387,7 @@ export default function Quotations() {
               >
                 {bt}
                 <Badge variant="secondary" className="mr-1.5 text-[10px] px-1.5">
-                  {bt === "الكل" ? flatPackages.length : (allPackages[bt]?.length || 0)}
+                  {bt === "الكل" ? flatPkgs.length : (packages[bt]?.length || 0)}
                 </Badge>
               </Button>
             ))}
@@ -380,7 +420,9 @@ export default function Quotations() {
                       </li>
                     ))}
                   </ul>
-                  <Button className="w-full mt-4" variant="outline" size="sm">تعديل الباقة</Button>
+                  <Button className="w-full mt-4" variant="outline" size="sm" onClick={() => openEditPkg(pkg)}>
+                    <Pencil className="w-3.5 h-3.5 ml-1" />تعديل الباقة
+                  </Button>
                 </CardContent>
               </Card>
             ))}
@@ -445,7 +487,66 @@ export default function Quotations() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Edit Package Dialog */}
+      {editingPkg && (
+        <Dialog open onOpenChange={() => setEditingPkg(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="text-base font-bold">تعديل الباقة — {editingPkg.name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">اسم الباقة</label>
+                  <Input value={pkgForm.name} onChange={e => setPkgForm(f => ({ ...f, name: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">السعر (د.ك)</label>
+                  <Input value={pkgForm.price} onChange={e => setPkgForm(f => ({ ...f, price: e.target.value }))} dir="ltr" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">نوع المبنى</label>
+                  <select value={pkgForm.buildingType} onChange={e => setPkgForm(f => ({ ...f, buildingType: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                    {["سكن خاص", "استثماري", "تجاري", "صناعي"].map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">نوع الخدمة</label>
+                  <select value={pkgForm.serviceType} onChange={e => setPkgForm(f => ({ ...f, serviceType: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                    {["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "إضافة مبنى قائم", "إضافة مبنى قائم بدون ترخيص", "هدم", "إشراف"].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">المستوى (Level)</label>
+                  <select value={pkgForm.level} onChange={e => setPkgForm(f => ({ ...f, level: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                    {["-", "Basic", "Premium", "Gold", "Supervision"].map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">الخدمات (كل خدمة في سطر)</label>
+                <textarea
+                  value={pkgFeaturesText}
+                  onChange={e => setPkgFeaturesText(e.target.value)}
+                  rows={6}
+                  className="w-full border rounded-lg px-3 py-2 text-sm bg-white resize-none"
+                  placeholder="اكتب كل خدمة في سطر منفصل..."
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <Button variant="outline" size="sm" onClick={() => setEditingPkg(null)}>إلغاء</Button>
+                <Button size="sm" onClick={saveEditPkg} style={{ backgroundColor: "oklch(0.55 0.15 150)" }}>
+                  <Save className="w-3 h-3 ml-1" />حفظ التعديل
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
-    </>  
   );
 }
