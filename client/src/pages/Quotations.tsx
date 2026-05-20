@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, FileText, Send, CheckCircle, Eye, Download, MessageCircle, Receipt, ChevronDown, ChevronUp, MapPin, Loader2, Pencil, Save } from "lucide-react";
+import { Plus, FileText, Send, CheckCircle, Eye, Download, MessageCircle, Receipt, ChevronDown, ChevronUp, MapPin, Loader2, Pencil, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 /* ── Full 23 Engineering Packages from Odoo.sh ── */
@@ -119,6 +119,33 @@ export default function Quotations() {
   const [pkgFeaturesText, setPkgFeaturesText] = useState("");
 
   const flatPkgs = Object.values(packages).flat();
+
+  const [addingPkg, setAddingPkg] = useState(false);
+  const [newPkgForm, setNewPkgForm] = useState<Package>({ name: "", price: "", buildingType: "سكن خاص", serviceType: "بناء جديد", level: "-", features: [] });
+  const [newPkgFeaturesText, setNewPkgFeaturesText] = useState("");
+
+  const saveNewPkg = () => {
+    const newPkg: Package = { ...newPkgForm, features: newPkgFeaturesText.split("\n").map(f => f.trim()).filter(Boolean) };
+    const bt = newPkg.buildingType;
+    const newPackages = { ...packages, [bt]: [...(packages[bt] || []), newPkg] };
+    setPackages(newPackages);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newPackages));
+    setAddingPkg(false);
+    setNewPkgForm({ name: "", price: "", buildingType: "سكن خاص", serviceType: "بناء جديد", level: "-", features: [] });
+    setNewPkgFeaturesText("");
+    toast.success("تم إضافة الباقة بنجاح");
+  };
+
+  const deletePkg = (pkg: Package) => {
+    if (!confirm(`هل تريد حذف باقة "${pkg.name}"?`)) return;
+    const newPackages = { ...packages };
+    for (const bt of Object.keys(newPackages)) {
+      newPackages[bt] = newPackages[bt].filter(p => !(p.name === pkg.name && p.buildingType === pkg.buildingType));
+    }
+    setPackages(newPackages);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newPackages));
+    toast.success("تم حذف الباقة");
+  };
 
   const openEditPkg = (pkg: Package) => {
     setEditingPkg(pkg);
@@ -393,15 +420,27 @@ export default function Quotations() {
             ))}
           </div>
 
+          {/* Add New Package Button */}
+          <div className="flex justify-end mb-2">
+            <Button size="sm" onClick={() => setAddingPkg(true)} style={{ backgroundColor: "oklch(0.55 0.15 150)" }}>
+              <Plus className="w-4 h-4 ml-1" />باقة جديدة
+            </Button>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredPackages.map((pkg, i) => (
               <Card key={i} className="border-0 shadow-sm hover:shadow-md transition-shadow">
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-sm leading-tight">{pkg.name}</CardTitle>
-                    {pkg.level !== "-" && (
-                      <Badge className="text-[10px] shrink-0 text-white" style={{ backgroundColor: "oklch(0.55 0.15 150)" }}>{pkg.level}</Badge>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {pkg.level !== "-" && (
+                        <Badge className="text-[10px] shrink-0 text-white" style={{ backgroundColor: "oklch(0.55 0.15 150)" }}>{pkg.level}</Badge>
+                      )}
+                      <button onClick={() => deletePkg(pkg)} className="text-red-400 hover:text-red-600 p-0.5 rounded" title="حذف الباقة">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                   <div className="flex gap-1.5 mt-1">
                     <Badge variant="outline" className="text-[10px]">{pkg.buildingType}</Badge>
@@ -422,6 +461,10 @@ export default function Quotations() {
                   </ul>
                   <Button className="w-full mt-4" variant="outline" size="sm" onClick={() => openEditPkg(pkg)}>
                     <Pencil className="w-3.5 h-3.5 ml-1" />تعديل الباقة
+                  </Button>
+                  <Button className="w-full mt-1" variant="ghost" size="sm" onClick={() => deletePkg(pkg)}
+                    style={{ color: "oklch(0.55 0.15 20)" }}>
+                    <Trash2 className="w-3.5 h-3.5 ml-1" />حذف الباقة
                   </Button>
                 </CardContent>
               </Card>
@@ -541,6 +584,67 @@ export default function Quotations() {
                 <Button variant="outline" size="sm" onClick={() => setEditingPkg(null)}>إلغاء</Button>
                 <Button size="sm" onClick={saveEditPkg} style={{ backgroundColor: "oklch(0.55 0.15 150)" }}>
                   <Save className="w-3 h-3 ml-1" />حفظ التعديل
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Add New Package Dialog */}
+      {addingPkg && (
+        <Dialog open onOpenChange={() => setAddingPkg(false)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="text-base font-bold">إضافة باقة جديدة</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">اسم الباقة</label>
+                  <Input value={newPkgForm.name} onChange={e => setNewPkgForm(f => ({ ...f, name: e.target.value }))} placeholder="مثال: الباقة الأساسية - سكن خاص" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">السعر (د.ك)</label>
+                  <Input value={newPkgForm.price} onChange={e => setNewPkgForm(f => ({ ...f, price: e.target.value }))} dir="ltr" placeholder="1,500" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">نوع المبنى</label>
+                  <select value={newPkgForm.buildingType} onChange={e => setNewPkgForm(f => ({ ...f, buildingType: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                    {["سكن خاص", "استثماري", "تجاري", "صناعي"].map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">نوع الخدمة</label>
+                  <select value={newPkgForm.serviceType} onChange={e => setNewPkgForm(f => ({ ...f, serviceType: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                    {["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "إضافة مبنى قائم", "إضافة مبنى قائم بدون ترخيص", "هدم", "إشراف"].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">المستوى (Level)</label>
+                  <select value={newPkgForm.level} onChange={e => setNewPkgForm(f => ({ ...f, level: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                    {["-", "Basic", "Premium", "Gold", "Supervision"].map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">الخدمات (كل خدمة في سطر)</label>
+                <textarea
+                  value={newPkgFeaturesText}
+                  onChange={e => setNewPkgFeaturesText(e.target.value)}
+                  rows={5}
+                  className="w-full border rounded-lg px-3 py-2 text-sm bg-white resize-none"
+                  placeholder="اكتب كل خدمة في سطر منفصل..."
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <Button variant="outline" size="sm" onClick={() => setAddingPkg(false)}>إلغاء</Button>
+                <Button size="sm" onClick={saveNewPkg} disabled={!newPkgForm.name || !newPkgForm.price}
+                  style={{ backgroundColor: "oklch(0.55 0.15 150)" }}>
+                  <Plus className="w-3 h-3 ml-1" />إضافة الباقة
                 </Button>
               </div>
             </div>
