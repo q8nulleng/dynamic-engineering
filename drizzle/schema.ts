@@ -1,17 +1,13 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import {
+  int, mysqlEnum, mysqlTable, text, timestamp, varchar,
+  float, tinyint, bigint
+} from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
  */
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
@@ -25,4 +21,209 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+// ── Dynamic Engineering System Tables ─────────────────────────────────────────
+
+export const clients = mysqlTable("clients", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  name: text("name").notNull(),
+  phone: varchar("phone", { length: 32 }).notNull().default(""),
+  phone2: varchar("phone2", { length: 32 }).default(""),
+  civilId: varchar("civil_id", { length: 32 }).default(""),
+  email: varchar("email", { length: 320 }).default(""),
+  type: varchar("type", { length: 32 }).notNull().default("individual"),
+  governorate: varchar("governorate", { length: 64 }).default(""),
+  area: varchar("area", { length: 128 }).default(""),
+  block: varchar("block", { length: 32 }).default(""),
+  plot: varchar("plot", { length: 32 }).default(""),
+  parcelArea: float("parcel_area").default(0),
+  parcelShape: varchar("parcel_shape", { length: 64 }).default(""),
+  parcelFacing: varchar("parcel_facing", { length: 64 }).default(""),
+  ownershipDoc: varchar("ownership_doc", { length: 128 }).default(""),
+  ownershipDate: varchar("ownership_date", { length: 32 }).default(""),
+  spouseName: varchar("spouse_name", { length: 128 }).default(""),
+  spouseCivilId: varchar("spouse_civil_id", { length: 32 }).default(""),
+  status: varchar("status", { length: 32 }).notNull().default("active"),
+  rating: int("rating").default(5),
+  notes: text("notes").default(""),
+  createdAt: varchar("created_at", { length: 32 }).notNull(),
+  projectType: varchar("project_type", { length: 64 }).default(""),
+  serviceType: varchar("service_type", { length: 64 }).default(""),
+  projectSummary: text("project_summary").default(""),
+  leadId: varchar("lead_id", { length: 64 }).default(""),
+  totalContractsValue: float("total_contracts_value").default(0),
+  totalPaid: float("total_paid").default(0),
+  totalRemaining: float("total_remaining").default(0),
+});
+
+export const crmLeads = mysqlTable("crm_leads", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  name: text("name").notNull(),
+  phone: varchar("phone", { length: 32 }).default(""),
+  type: varchar("type", { length: 64 }).default(""),
+  source: varchar("source", { length: 64 }).default(""),
+  serviceType: varchar("service_type", { length: 64 }).default(""),
+  governorate: varchar("governorate", { length: 64 }).default(""),
+  area: varchar("area", { length: 128 }).default(""),
+  likelyContract: varchar("likely_contract", { length: 64 }).default(""),
+  expectedRevenue: varchar("expected_revenue", { length: 32 }).default("0"),
+  probability: int("probability").default(10),
+  priority: int("priority").default(0),
+  expectedClosing: varchar("expected_closing", { length: 32 }).default(""),
+  notes: text("notes").default(""),
+  stage: varchar("stage", { length: 64 }).default("استفسار جديد"),
+  tags: text("tags").default("[]"),
+  quotations: int("quotations").default(0),
+  date: varchar("date", { length: 32 }).notNull(),
+  civilId: varchar("civil_id", { length: 32 }).default(""),
+  plotNumber: varchar("plot_number", { length: 32 }).default(""),
+  landArea: float("land_area").default(0),
+  assignedTo: varchar("assigned_to", { length: 64 }).default(""),
+});
+
+export const projects = mysqlTable("projects", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  name: text("name").notNull(),
+  clientId: varchar("client_id", { length: 64 }),
+  client: text("client").notNull().default(""),
+  type: varchar("type", { length: 64 }).notNull().default("سكن خاص"),
+  serviceType: varchar("service_type", { length: 64 }).notNull().default("بناء جديد"),
+  area: varchar("area", { length: 128 }).default(""),
+  quotation: varchar("quotation", { length: 64 }).default(""),
+  progress: int("progress").notNull().default(0),
+  currentPhase: int("current_phase").notNull().default(0),
+  createdAt: varchar("created_at", { length: 32 }).notNull(),
+  contractId: varchar("contract_id", { length: 64 }).default(""),
+  leadId: varchar("lead_id", { length: 64 }).default(""),
+  status: varchar("status", { length: 32 }).default("جديد"),
+});
+
+export const contracts = mysqlTable("contracts", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  quotationId: varchar("quotation_id", { length: 64 }),
+  projectId: varchar("project_id", { length: 64 }),
+  clientId: varchar("client_id", { length: 64 }),
+  client: text("client").notNull().default(""),
+  template: varchar("template", { length: 128 }).default(""),
+  type: varchar("type", { length: 64 }).default(""),
+  service: varchar("service", { length: 64 }).default(""),
+  package: varchar("package", { length: 128 }).default(""),
+  status: varchar("status", { length: 32 }).notNull().default("مسودة"),
+  date: varchar("date", { length: 32 }).notNull(),
+  amount: varchar("amount", { length: 32 }).default("0"),
+  civilId: varchar("civil_id", { length: 32 }).default(""),
+  area: varchar("area", { length: 128 }).default(""),
+  block: varchar("block", { length: 32 }).default(""),
+  plot: varchar("plot", { length: 32 }).default(""),
+  leadId: varchar("lead_id", { length: 64 }).default(""),
+  templateType: varchar("template_type", { length: 64 }).default(""),
+  termsText: text("terms_text").default(""),
+  signingDate: varchar("signing_date", { length: 32 }).default(""),
+  signedFileUrl: text("signed_file_url").default(""),
+});
+
+export const quotations = mysqlTable("quotations", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  clientId: varchar("client_id", { length: 64 }),
+  client: text("client").notNull().default(""),
+  type: varchar("type", { length: 64 }).notNull().default("سكن خاص"),
+  service: varchar("service", { length: 64 }).notNull().default("بناء جديد"),
+  package: varchar("package", { length: 128 }).default(""),
+  amount: varchar("amount", { length: 32 }).default("0"),
+  status: varchar("status", { length: 32 }).notNull().default("مسودة"),
+  date: varchar("date", { length: 32 }).notNull(),
+  civilId: varchar("civil_id", { length: 32 }).default(""),
+  governorate: varchar("governorate", { length: 64 }).default(""),
+  area: varchar("area", { length: 128 }).default(""),
+  landArea: varchar("land_area", { length: 32 }).default(""),
+  block: varchar("block", { length: 32 }).default(""),
+  suburb: varchar("suburb", { length: 64 }).default(""),
+  plot: varchar("plot", { length: 32 }).default(""),
+  surveyPlan: varchar("survey_plan", { length: 128 }).default(""),
+  projectId: varchar("project_id", { length: 64 }),
+  leadId: varchar("lead_id", { length: 64 }).default(""),
+  validityDays: int("validity_days").default(30),
+  expiryDate: varchar("expiry_date", { length: 32 }).default(""),
+});
+
+export const phases = mysqlTable("phases", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: varchar("project_id", { length: 64 }).notNull(),
+  order: int("order").notNull().default(0),
+  title: text("title").notNull(),
+  subtitle: text("subtitle").default(""),
+});
+
+export const tasks = mysqlTable("tasks", {
+  id: int("id").autoincrement().primaryKey(),
+  phaseId: int("phase_id").notNull(),
+  name: text("name").notNull(),
+  status: varchar("status", { length: 32 }).notNull().default("pending"),
+  assignee: varchar("assignee", { length: 128 }).default(""),
+  description: text("description").default(""),
+  priority: int("priority").default(0),
+  deadline: varchar("deadline", { length: 32 }).default(""),
+  order: int("order").notNull().default(0),
+  dependsOn: int("depends_on").default(0),
+  autoCreated: tinyint("auto_created").default(0),
+  estimatedDays: int("estimated_days").default(0),
+});
+
+export const invoices = mysqlTable("invoices", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  projectId: varchar("project_id", { length: 64 }),
+  clientId: varchar("client_id", { length: 64 }),
+  client: text("client").notNull().default(""),
+  project: text("project").default(""),
+  status: varchar("status", { length: 32 }).notNull().default("مسودة"),
+  date: varchar("date", { length: 32 }).notNull(),
+  dueDate: varchar("due_date", { length: 32 }).default(""),
+  subtotal: float("subtotal").default(0),
+  taxRate: float("tax_rate").default(15),
+  taxAmount: float("tax_amount").default(0),
+  total: float("total").default(0),
+  notes: text("notes").default(""),
+  contractId: varchar("contract_id", { length: 64 }),
+  paymentType: varchar("payment_type", { length: 32 }).default("other"),
+  paymentMethod: varchar("payment_method", { length: 32 }).default(""),
+  invoiceNumber: varchar("invoice_number", { length: 64 }).default(""),
+});
+
+export const invoiceLines = mysqlTable("invoice_lines", {
+  id: int("id").autoincrement().primaryKey(),
+  invoiceId: varchar("invoice_id", { length: 64 }).notNull(),
+  product: text("product").notNull().default(""),
+  description: text("description").default(""),
+  quantity: float("quantity").default(1),
+  price: float("price").default(0),
+  taxPercent: float("tax_percent").default(15),
+  total: float("total").default(0),
+});
+
+export const documents = mysqlTable("documents", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: varchar("client_id", { length: 64 }),
+  projectId: varchar("project_id", { length: 64 }),
+  name: text("name").notNull(),
+  category: varchar("category", { length: 64 }).default(""),
+  status: varchar("status", { length: 32 }).notNull().default("pending"),
+  fileName: varchar("file_name", { length: 256 }).default(""),
+  fileSize: varchar("file_size", { length: 32 }).default(""),
+  uploadedAt: varchar("uploaded_at", { length: 32 }).default(""),
+  url: text("url").default(""),
+});
+
+export const contractTemplates = mysqlTable("contract_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: text("name").notNull(),
+  buildingType: varchar("building_type", { length: 64 }).notNull().default(""),
+  serviceType: varchar("service_type", { length: 64 }).notNull().default(""),
+  scopeOfWork: text("scope_of_work").default(""),
+  terms: text("terms").default(""),
+  party1Obligations: text("party1_obligations").default(""),
+  party2Obligations: text("party2_obligations").default(""),
+  paymentSchedule: text("payment_schedule").default(""),
+  duration: varchar("duration", { length: 64 }).default(""),
+  notes: text("notes").default(""),
+  createdAt: varchar("created_at", { length: 32 }).notNull(),
+  isDefault: tinyint("is_default").default(0),
+});

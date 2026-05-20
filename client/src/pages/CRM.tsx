@@ -88,7 +88,7 @@ const emptyForm = {
   name: "", phone: "", type: "", serviceType: "",
   source: "", referralName: "", expectedRevenue: "", probability: "",
   expectedClosing: "", priority: "", governorate: "", area: "",
-  notes: "", plotNumber: "", landArea: "",
+  notes: "", plotNumber: "", landArea: "", customArea: "",
 };
 
 type PkgType = { name: string; price: string; buildingType: string; serviceType: string; level: string; features: string[] };
@@ -952,7 +952,7 @@ export default function CRM() {
       type: form.type,
       serviceType: form.serviceType,
       governorate: form.governorate,
-      area: form.area,
+      area: form.area === "أخرى" && form.customArea.trim() ? form.customArea.trim() : form.area,
 
       expectedRevenue: form.expectedRevenue || "0",
       probability: Number(form.probability) || 10,
@@ -1265,6 +1265,7 @@ export default function CRM() {
                                     governorate: lead.governorate || "", area: lead.area || "",
                                     notes: lead.notes || "",
                                     plotNumber: lead.plotNumber || "", landArea: String(lead.landArea || ""),
+                                    customArea: "",
                                   });
                                   setEditActiveTab("basic");
                                   setEditTarget(lead);
@@ -1493,7 +1494,7 @@ export default function CRM() {
                       <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
                       المنطقة
                     </label>
-                    <Select value={editForm.area} onValueChange={(v) => setEditForm(p => ({ ...p, area: v }))} disabled={!editForm.governorate}>
+                    <Select value={editForm.area} onValueChange={(v) => setEditForm(p => ({ ...p, area: v, customArea: v !== "أخرى" ? "" : (p.customArea || "") }))} disabled={!editForm.governorate}>
                       <SelectTrigger><SelectValue placeholder={editForm.governorate ? "اختر المنطقة" : "اختر المحافظة أولاً"} /></SelectTrigger>
                       <SelectContent>
                         {(kuwaitGovernorates[editForm.governorate] || []).map((a) => (
@@ -1501,6 +1502,15 @@ export default function CRM() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {editForm.area === "أخرى" && (
+                      <Input
+                        value={(editForm as any).customArea || ""}
+                        onChange={(e) => setEditForm(p => ({ ...p, customArea: e.target.value } as any))}
+                        placeholder="اكتب اسم المنطقة..."
+                        className="mt-1 text-right text-sm"
+                        autoFocus
+                      />
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1768,7 +1778,7 @@ export default function CRM() {
                     </label>
                     <Select
                       value={form.area}
-                      onValueChange={(v) => handleFormChange("area", v)}
+                      onValueChange={(v) => { handleFormChange("area", v); if (v !== "أخرى") handleFormChange("customArea", ""); }}
                       disabled={!form.governorate}>
                       <SelectTrigger><SelectValue placeholder={form.governorate ? "اختر المنطقة" : "اختر المحافظة أولاً"} /></SelectTrigger>
                       <SelectContent>
@@ -1777,6 +1787,15 @@ export default function CRM() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {form.area === "أخرى" && (
+                      <Input
+                        value={form.customArea}
+                        onChange={(e) => handleFormChange("customArea", e.target.value)}
+                        placeholder="اكتب اسم المنطقة..."
+                        className="mt-1 text-right text-sm"
+                        autoFocus
+                      />
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
