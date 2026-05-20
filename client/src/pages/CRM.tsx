@@ -37,7 +37,7 @@ import {
   useCreateClient, useCreateProject, useCreateContract, useUpdateContract,
   useCreateInvoice, useContracts, useContractsByLead, useProjects, useContractTemplates,
 } from "@/lib/api";
-import { exportQuotationPdf } from "@/lib/pdf";
+import { exportQuotationPdf, exportContractPdf } from "@/lib/pdf";
 import { toast } from "sonner";
 
 interface Lead {
@@ -688,6 +688,25 @@ function LeadContractSection({
 }) {
   const { data: contracts = [] } = useContractsByLead(lead.id);
   const contract = contracts[0];
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  const handleContractPdf = async () => {
+    if (!contract) return;
+    setPdfBusy(true);
+    const tid = toast.loading("جاري إنشاء PDF العقد...");
+    try {
+      await exportContractPdf(contract);
+      toast.success("تم فتح نافذة الطباعة", { id: tid });
+    } catch (err: unknown) {
+      const blocked = err instanceof Error && err.message === "popup_blocked";
+      toast.error(
+        blocked ? "السماح بالنوافذ المنبثقة مطلوب — اضغط على الأيقونة في شريط العنوان" : "فشل إنشاء PDF",
+        { id: tid }
+      );
+    } finally {
+      setPdfBusy(false);
+    }
+  };
 
   return (
     <div className="space-y-2 w-full">
@@ -713,9 +732,20 @@ function LeadContractSection({
             onClick={onCreateContract}
           ><FileText className="w-3 h-3 ml-1" />إنشاء عقد</Button>
         ) : (
-          <Button size="sm" variant="outline" className="text-xs h-7 text-blue-700 border-blue-300"
-            onClick={onCreateContract}
-          ><Pencil className="w-3 h-3 ml-1" />تعديل العقد</Button>
+          <>
+            <Button size="sm" variant="outline" className="text-xs h-7 text-blue-700 border-blue-300"
+              onClick={onCreateContract}
+            ><Pencil className="w-3 h-3 ml-1" />تعديل العقد</Button>
+            <Button size="sm" variant="outline" className="text-xs h-7 text-red-700 border-red-300"
+              disabled={pdfBusy}
+              onClick={handleContractPdf}
+            >
+              {pdfBusy
+                ? <Loader2 className="w-3 h-3 ml-1 animate-spin" />
+                : <FileText className="w-3 h-3 ml-1" />}
+              عرض العقد PDF
+            </Button>
+          </>
         )}
         <Button size="sm" variant="outline" className="text-xs h-7 text-blue-700 border-blue-300"
           onClick={onViewQuote}
