@@ -26,7 +26,7 @@ import {
   Calendar, FileText, Trophy, X, ChevronDown, ChevronUp,
   Building, Percent, Tag, Save,
   ClipboardList, MessageCircle, Activity, Users, MapPin, Loader2,
-  Pencil, Trash2, Eye, CheckCircle, Hash, Ruler,
+  Pencil, Trash2, Eye, CheckCircle, Hash, Ruler, ArrowRightLeft,
 } from "lucide-react";
 import { Link } from "wouter";
 import { kuwaitGovernorates } from "./Clients";
@@ -64,6 +64,7 @@ interface Lead {
   plotNumber?: string;
   landArea?: number;
   assignedTo?: string;
+  stage?: string;
 }
 
 const stageTemplates = [
@@ -1140,6 +1141,33 @@ export default function CRM() {
                             {lead.quotations > 0 && (
                               <Badge className="text-[10px] text-white bg-blue-500">{lead.quotations} عرض سعر</Badge>
                             )}
+                          </div>
+
+                          {/* Stage Mover — always visible */}
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1"><ArrowRightLeft className="w-3 h-3" />نقل إلى:</span>
+                            <Select
+                              value={lead.stage || stage.title}
+                              onValueChange={async (newStage) => {
+                                if (newStage === (lead.stage || stage.title)) return;
+                                await updateLead.mutateAsync({ id: lead.id, stage: newStage });
+                                const idx = stageTemplates.findIndex(s => s.title === newStage);
+                                if (idx >= 0) setOpenStage(idx);
+                                setSelectedLead(null);
+                                toast.success(`"‏${lead.name}‏" → ${newStage}`);
+                              }}
+                            >
+                              <SelectTrigger className="h-6 text-[11px] w-auto min-w-[130px] border-dashed">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {stageTemplates.map((s) => (
+                                  <SelectItem key={s.title} value={s.title} className="text-xs">
+                                    {s.title}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
 
                           {/* Actions — stage-specific */}
