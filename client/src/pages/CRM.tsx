@@ -35,7 +35,7 @@ import {
   useCreateQuotation, useUpdateQuotation, useQuotationsByLead, useQuotations,
   useCrmLeads, useCreateCrmLead, useUpdateCrmLead, useDeleteCrmLead,
   useCreateClient, useCreateProject, useCreateContract, useUpdateContract,
-  useCreateInvoice, useContracts, useProjects, useContractTemplates,
+  useCreateInvoice, useContracts, useContractsByLead, useProjects, useContractTemplates,
 } from "@/lib/api";
 import { exportQuotationPdf } from "@/lib/pdf";
 import { toast } from "sonner";
@@ -672,6 +672,66 @@ function ContractDialog({ lead, onClose, onSaved }: {
   );
 }
 
+// ── Lead Contract Section (shows contract inline after creation) ────────────
+function LeadContractSection({
+  lead,
+  onCreateContract,
+  onViewQuote,
+  signingBusy,
+  onSigned,
+}: {
+  lead: Lead;
+  onCreateContract: () => void;
+  onViewQuote: () => void;
+  signingBusy: boolean;
+  onSigned: () => void;
+}) {
+  const { data: contracts = [] } = useContractsByLead(lead.id);
+  const contract = contracts[0];
+
+  return (
+    <div className="space-y-2 w-full">
+      {contract && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-blue-800 flex items-center gap-1">
+              <FileText className="w-3.5 h-3.5" />العقد المنشأ
+            </span>
+            <Badge variant="outline" className="text-[10px] border-blue-300 text-blue-700">{contract.status}</Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-1 text-muted-foreground">
+            <div><span className="font-medium text-foreground">النوع: </span>{contract.type}</div>
+            <div><span className="font-medium text-foreground">المبلغ: </span><span dir="ltr" style={{ fontFamily: "'Space Grotesk'" }}>{contract.amount} د.ك</span></div>
+            <div><span className="font-medium text-foreground">الباقة: </span>{contract.package}</div>
+            <div><span className="font-medium text-foreground">التاريخ: </span>{contract.date}</div>
+          </div>
+        </div>
+      )}
+      <div className="flex gap-2 flex-wrap">
+        {!contract ? (
+          <Button size="sm" className="text-xs h-7" style={{ backgroundColor: "oklch(0.30 0.05 250)" }}
+            onClick={onCreateContract}
+          ><FileText className="w-3 h-3 ml-1" />إنشاء عقد</Button>
+        ) : (
+          <Button size="sm" variant="outline" className="text-xs h-7 text-blue-700 border-blue-300"
+            onClick={onCreateContract}
+          ><Pencil className="w-3 h-3 ml-1" />تعديل العقد</Button>
+        )}
+        <Button size="sm" variant="outline" className="text-xs h-7 text-blue-700 border-blue-300"
+          onClick={onViewQuote}
+        ><Eye className="w-3 h-3 ml-1" />عرض السعر</Button>
+        <Button size="sm" className="text-xs h-7 text-white" style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
+          disabled={signingBusy}
+          onClick={onSigned}
+        >
+          {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <CheckCircle className="w-3 h-3 ml-1" />}
+          تم التعاقد
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function CRM() {
   const { data: leadsData } = useCrmLeads();
   const { data: contractsData } = useContracts();
@@ -1107,21 +1167,7 @@ export default function CRM() {
                             </>)}
 
                             {/* ── Stage 3: بانتظار التعاقد ── */}
-                            {si === 3 && (<>
-                              <Button size="sm" className="text-xs h-7" style={{ backgroundColor: "oklch(0.30 0.05 250)" }}
-                                onClick={() => setContractTarget(lead)}
-                              ><FileText className="w-3 h-3 ml-1" />إنشاء عقد</Button>
-                              <Button size="sm" variant="outline" className="text-xs h-7 text-blue-700 border-blue-300"
-                                onClick={() => setViewQuoteTarget(lead)}
-                              ><Eye className="w-3 h-3 ml-1" />عرض عرض السعر</Button>
-                              <Button size="sm" className="text-xs h-7 text-white" style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
-                                disabled={signingBusy}
-                                onClick={() => handleContractSigned(lead)}
-                              >
-                                {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <CheckCircle className="w-3 h-3 ml-1" />}
-                                تم التعاقد
-                              </Button>
-                            </>)}
+                            {si === 3 && (<LeadContractSection lead={lead} onCreateContract={() => setContractTarget(lead)} onViewQuote={() => setViewQuoteTarget(lead)} signingBusy={signingBusy} onSigned={() => handleContractSigned(lead)} />)}
 
                             {/* ── Stage 4: تم التعاقد (archived) ── */}
                             {si === 4 && (

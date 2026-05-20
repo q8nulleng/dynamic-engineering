@@ -327,6 +327,14 @@ export function useQuotationsByLead(leadId: string | undefined) {
 
 // ── Contracts ─────────────────────────────────────────────────────────────
 
+export function useContractsByLead(leadId: string | undefined) {
+  return useQuery<Contract[]>({
+    queryKey: ["contracts", { leadId }],
+    queryFn: () => request(`/api/contracts?leadId=${leadId}`),
+    enabled: !!leadId,
+  });
+}
+
 export function useContracts() {
   return useQuery<Contract[]>({
     queryKey: ["contracts"],
