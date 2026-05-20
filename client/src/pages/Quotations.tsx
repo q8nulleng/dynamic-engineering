@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { Link } from "wouter";
-import { useQuotations, useUpdateQuotation } from "@/lib/api";
+import { useQuotations, useUpdateQuotation, useCreateQuotation, useClients } from "@/lib/api";
 import { exportQuotationPdf } from "@/lib/pdf";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -124,6 +124,62 @@ export default function Quotations() {
   const [newPkgForm, setNewPkgForm] = useState<Package>({ name: "", price: "", buildingType: "سكن خاص", serviceType: "بناء جديد", level: "-", features: [] });
   const [newPkgFeaturesText, setNewPkgFeaturesText] = useState("");
 
+  // New quotation creation state
+  const [creatingQuote, setCreatingQuote] = useState(false);
+  const [newQuoteClientId, setNewQuoteClientId] = useState("");
+  const [newQuoteBuildingType, setNewQuoteBuildingType] = useState("سكن خاص");
+  const [newQuoteServiceType, setNewQuoteServiceType] = useState("بناء جديد");
+  const [newQuoteSelectedPkg, setNewQuoteSelectedPkg] = useState<Package | null>(null);
+  const [newQuoteAgreedPrice, setNewQuoteAgreedPrice] = useState("");
+  const [newQuoteNotes, setNewQuoteNotes] = useState("");
+  const createQuotation = useCreateQuotation();
+  const { data: clients = [] } = useClients();
+
+  const newQuotePackages = packages[newQuoteBuildingType]
+    ? (newQuoteServiceType
+        ? (packages[newQuoteBuildingType].filter(p => p.serviceType === newQuoteServiceType).length > 0
+            ? packages[newQuoteBuildingType].filter(p => p.serviceType === newQuoteServiceType)
+            : packages[newQuoteBuildingType])
+        : packages[newQuoteBuildingType])
+    : flatPkgs;
+
+  const handleCreateQuotation = async (status: string) => {
+    const selectedClient = clients.find(c => c.id === newQuoteClientId);
+    const now = new Date().toISOString().split("T")[0];
+    const expiryDate = new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
+    const finalAmount = newQuoteAgreedPrice.trim() ? newQuoteAgreedPrice.trim() : newQuoteSelectedPkg!.price;
+    await createQuotation.mutateAsync({
+      client: selectedClient?.name || "",
+      type: newQuoteBuildingType,
+      service: newQuoteServiceType,
+      package: newQuoteSelectedPkg!.name,
+      amount: finalAmount,
+      date: now,
+      governorate: selectedClient?.governorate || "",
+      area: selectedClient?.area || "",
+      clientId: selectedClient?.id || null,
+      projectId: null,
+      civilId: selectedClient?.civilId || "",
+      landArea: selectedClient?.parcelArea ? String(selectedClient.parcelArea) : "",
+      block: selectedClient?.block || "",
+      suburb: "",
+      plot: selectedClient?.plot || "",
+      surveyPlan: "",
+      leadId: undefined,
+      validityDays: 30,
+      expiryDate,
+      status,
+    });
+    toast.success(status === "مسودة" ? "تم حفظ المسودة" : status === "مرسل" ? "تم إنشاء عرض السعر" : "تم اعتماد عرض السعر");
+    setCreatingQuote(false);
+    setNewQuoteClientId("");
+    setNewQuoteBuildingType("سكن خاص");
+    setNewQuoteServiceType("بناء جديد");
+    setNewQuoteSelectedPkg(null);
+    setNewQuoteAgreedPrice("");
+    setNewQuoteNotes("");
+  };
+
   const saveNewPkg = () => {
     const newPkg: Package = { ...newPkgForm, features: newPkgFeaturesText.split("\n").map(f => f.trim()).filter(Boolean) };
     const bt = newPkg.buildingType;
@@ -232,7 +288,7 @@ export default function Quotations() {
             <Receipt className="w-4 h-4 ml-1" />
             فاتورة فتح ملف 50 د.ك
           </Button>
-          <Button style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>
+          <Button style={{ backgroundColor: "oklch(0.30 0.05 250)" }} onClick={() => setCreatingQuote(true)}>
             <Plus className="w-4 h-4 ml-2" />
             عرض سعر جديد
           </Button>
@@ -584,6 +640,148 @@ export default function Quotations() {
                 <Button variant="outline" size="sm" onClick={() => setEditingPkg(null)}>إلغاء</Button>
                 <Button size="sm" onClick={saveEditPkg} style={{ backgroundColor: "oklch(0.55 0.15 150)" }}>
                   <Save className="w-3 h-3 ml-1" />حفظ التعديل
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Create New Quotation Dialog */}
+      {creatingQuote && (
+        <Dialog open onOpenChange={() => setCreatingQuote(false)}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold">إنشاء عرض سعر جديد</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {/* Client selector */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground block mb-1">العميل</label>
+                <select
+                  value={newQuoteClientId}
+                  onChange={e => {
+                    setNewQuoteClientId(e.target.value);
+                    const c = clients.find(cl => cl.id === e.target.value);
+                    if (c) {
+                      if (c.projectType) setNewQuoteBuildingType(c.projectType);
+                      if (c.serviceType) setNewQuoteServiceType(c.serviceType);
+                    }
+                  }}
+                  className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
+                >
+                  <option value="">-- اختر العميل --</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ""}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Building type & service type */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground block mb-1">نوع المبنى</label>
+                  <select
+                    value={newQuoteBuildingType}
+                    onChange={e => { setNewQuoteBuildingType(e.target.value); setNewQuoteSelectedPkg(null); }}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
+                  >
+                    {["سكن خاص", "استثماري", "تجاري", "صناعي"].map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground block mb-1">نوع الخدمة</label>
+                  <select
+                    value={newQuoteServiceType}
+                    onChange={e => { setNewQuoteServiceType(e.target.value); setNewQuoteSelectedPkg(null); }}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
+                  >
+                    {["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "إضافة مبنى قائم", "إضافة مبنى قائم بدون ترخيص", "هدم", "إشراف"].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Agreed price */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <label className="text-sm font-semibold text-amber-800 block mb-1.5">السعر المتفق عليه (اختياري)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={newQuoteAgreedPrice}
+                    onChange={e => setNewQuoteAgreedPrice(e.target.value)}
+                    placeholder="اتركه فارغًا لاستخدام سعر الباقة..."
+                    className="flex-1 border border-amber-300 rounded-lg px-3 py-1.5 text-sm text-right bg-white focus:outline-none focus:ring-2 focus:ring-amber-300"
+                    dir="ltr"
+                  />
+                  <span className="text-sm font-medium text-amber-700">د.ك</span>
+                </div>
+                {newQuoteAgreedPrice && <p className="text-xs text-amber-600 mt-1">✓ سيتم استخدام هذا السعر بدلاً من سعر الباقة</p>}
+              </div>
+
+              {/* Package selection */}
+              <div>
+                <h4 className="font-bold text-sm mb-2">اختر الباقة ({newQuotePackages.length} باقة متاحة)</h4>
+                {newQuotePackages.length === 0 ? (
+                  <p className="text-sm text-muted-foreground p-3 border rounded-lg">لا توجد باقات لهذا النوع/الخدمة</p>
+                ) : (
+                  <div className="space-y-2 max-h-56 overflow-y-auto">
+                    {newQuotePackages.map((pkg, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setNewQuoteSelectedPkg(pkg === newQuoteSelectedPkg ? null : pkg)}
+                        className={`w-full p-3 rounded-lg border text-right transition-all ${
+                          newQuoteSelectedPkg === pkg
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-border hover:border-blue-300"
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-base" style={{ fontFamily: "'Space Grotesk'" }}>
+                            {newQuoteAgreedPrice && newQuoteSelectedPkg === pkg ? newQuoteAgreedPrice : pkg.price} د.ك
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm">{pkg.name}</span>
+                            {pkg.level !== "-" && <Badge variant="outline" className="text-[10px]">{pkg.level}</Badge>}
+                          </div>
+                        </div>
+                        {newQuoteSelectedPkg === pkg && (
+                          <ul className="mt-2 text-xs text-muted-foreground space-y-1 text-right">
+                            {pkg.features.map((f, fi) => <li key={fi}>• {f}</li>)}
+                          </ul>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-2 justify-start pt-2 flex-wrap">
+                <Button variant="outline" onClick={() => setCreatingQuote(false)}>إلغاء</Button>
+                <Button
+                  variant="outline"
+                  disabled={!newQuoteSelectedPkg || !newQuoteClientId || createQuotation.isPending}
+                  onClick={() => handleCreateQuotation("مسودة")}
+                >
+                  {createQuotation.isPending ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Save className="w-3 h-3 ml-1" />}
+                  حفظ مسودة
+                </Button>
+                <Button
+                  disabled={!newQuoteSelectedPkg || !newQuoteClientId || createQuotation.isPending}
+                  onClick={() => handleCreateQuotation("مرسل")}
+                  style={{ backgroundColor: "oklch(0.30 0.05 250)" }}
+                >
+                  {createQuotation.isPending ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Send className="w-3 h-3 ml-1" />}
+                  إنشاء وإرسال
+                </Button>
+                <Button
+                  disabled={!newQuoteSelectedPkg || !newQuoteClientId || createQuotation.isPending}
+                  onClick={() => handleCreateQuotation("مقبول")}
+                  style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
+                >
+                  {createQuotation.isPending ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <CheckCircle className="w-3 h-3 ml-1" />}
+                  اعتماد العرض
                 </Button>
               </div>
             </div>
