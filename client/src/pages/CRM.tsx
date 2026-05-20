@@ -337,11 +337,32 @@ function QuotationDialog({ lead, onClose, onSaved }: {
           </Button>
           <Button
             disabled={!selectedPkg || createQuotation.isPending}
-            onClick={handleSend}
+            onClick={async () => {
+              if (!selectedPkg) return;
+              const q = await createQuotation.mutateAsync({ ...buildQuotationPayload(), status: "مرسل" });
+              toast.success("تم حفظ العرض كمرسل");
+              onSaved(q.id);
+              const phone = lead.phone?.replace(/[^0-9]/g, "");
+              const msg = encodeURIComponent(`مرحباً ${lead.name}،\nيسعدنا إرسال عرض السعر الخاص بمشروعكم.\nالباقة: ${selectedPkg.name}\nالمبلغ: ${agreedPrice.trim() || selectedPkg.price} د.ك\nنرجو مراجعة العرض والتواصل معنا لأي استفسار.\nشكراً لثقتكم بديناميك للاستشارات الهندسية`);
+              window.open(`https://wa.me/965${phone}?text=${msg}`, "_blank");
+            }}
+            style={{ backgroundColor: "#25D366" }}
+          >
+            {createQuotation.isPending ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <MessageCircle className="w-3 h-3 ml-1" />}
+            إرسال واتساب
+          </Button>
+          <Button
+            disabled={!selectedPkg || createQuotation.isPending}
+            onClick={async () => {
+              if (!selectedPkg) return;
+              const q = await createQuotation.mutateAsync({ ...buildQuotationPayload(), status: "مقبول" });
+              toast.success("تم اعتماد عرض السعر بنجاح ✓");
+              onSaved(q.id);
+            }}
             style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
           >
-            {createQuotation.isPending ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Mail className="w-3 h-3 ml-1" />}
-            إرسال العرض
+            {createQuotation.isPending ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <CheckCircle className="w-3 h-3 ml-1" />}
+            اعتماد العرض
           </Button>
           <Button
             disabled={!selectedPkg || generating}
@@ -1341,6 +1362,9 @@ export default function CRM() {
                         <SelectItem value="تعديل">تعديل</SelectItem>
                         <SelectItem value="إضافة">إضافة</SelectItem>
                         <SelectItem value="تعديل وإضافة">تعديل وإضافة</SelectItem>
+                        <SelectItem value="إضافة مبنى قائم">إضافة مبنى قائم</SelectItem>
+                        <SelectItem value="إضافة مبنى قائم بدون ترخيص">إضافة مبنى قائم بدون ترخيص</SelectItem>
+                        <SelectItem value="إشراف">إشراف</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1611,6 +1635,9 @@ export default function CRM() {
                         <SelectItem value="تعديل">تعديل</SelectItem>
                         <SelectItem value="إضافة">إضافة</SelectItem>
                         <SelectItem value="تعديل وإضافة">تعديل وإضافة</SelectItem>
+                        <SelectItem value="إضافة مبنى قائم">إضافة مبنى قائم</SelectItem>
+                        <SelectItem value="إضافة مبنى قائم بدون ترخيص">إضافة مبنى قائم بدون ترخيص</SelectItem>
+                        <SelectItem value="إشراف">إشراف</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
