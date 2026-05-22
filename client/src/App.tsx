@@ -18,6 +18,7 @@ import ProjectDetail from "./pages/ProjectDetail";
 import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
 import Appointments from "./pages/Appointments";
+import WorkPlans from "./pages/WorkPlans";
 import DashboardLayout from "./components/DashboardLayout";
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -37,6 +38,7 @@ function Router() {
       <Route path="/reports" component={Reports} />
       <Route path="/contracts" component={Contracts} />
       <Route path="/appointments" component={Appointments} />
+      <Route path="/work-plans" component={WorkPlans} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

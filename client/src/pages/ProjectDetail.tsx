@@ -9,11 +9,13 @@ import { Progress } from "@/components/ui/progress";
 import {
   ArrowRight, Users, MapPin, Link2, CheckCircle2, Circle,
   Clock, AlertCircle, User, FileText, X, MessageSquare,
-  Paperclip, ChevronRight, Flag, Lock, Loader2, Sparkles
+  Paperclip, ChevronRight, Flag, Lock, Loader2, Sparkles,
+  Plus, ClipboardList, ChevronDown
 } from "lucide-react";
 import { useState } from "react";
 import { useRoute, Link } from "wouter";
-import { useProject, useAutoCreateTasks, useUpdateTask } from "@/lib/api";
+import { useProject, useAutoCreateTasks, useUpdateTask, useWorkPlans, useApplyWorkPlan, useCreatePhaseTask } from "@/lib/api";
+import type { WorkPlan } from "@/lib/api";
 import { toast } from "sonner";
 import SketchTaskPanel from "@/components/SketchTaskPanel";
 import DocumentsTaskPanel from "@/components/DocumentsTaskPanel";
@@ -349,6 +351,7 @@ function TaskDetailPanel({ task, phaseTitle, phaseColor, projectId, onClose, onS
           </Button>
         </div>
       </div>
+
     </div>
   );
 }
@@ -369,6 +372,43 @@ export default function ProjectDetail() {
   const [showContractPanel, setShowContractPanel] = useState(false);
   const [showFormsPanel, setShowFormsPanel] = useState(false);
   const [showSupervisionPanel, setShowSupervisionPanel] = useState(false);
+
+  // Work Plans state
+  const [showImportPlan, setShowImportPlan] = useState(false);
+  const [showAddTask, setShowAddTask] = useState<{ phaseId: number; phaseTitle: string } | null>(null);
+  const [newTaskName, setNewTaskName] = useState("");
+  const [newTaskDays, setNewTaskDays] = useState("");
+  const [newTaskAssignee, setNewTaskAssignee] = useState("");
+  const { data: workPlans = [] } = useWorkPlans();
+  const applyWorkPlan = useApplyWorkPlan(projectId);
+  const createPhaseTask = useCreatePhaseTask(projectId);
+
+  const handleApplyPlan = (plan: WorkPlan) => {
+    applyWorkPlan.mutate(plan.id, {
+      onSuccess: (data) => {
+        toast.success(`تم استيراد خطة "${plan.name}" - ${data.created} مرحلة/مهمة`);
+        setShowImportPlan(false);
+      },
+      onError: () => toast.error("فشل استيراد الخطة"),
+    });
+  };
+
+  const handleAddTask = () => {
+    if (!showAddTask || !newTaskName.trim()) return;
+    createPhaseTask.mutate(
+      { phaseId: showAddTask.phaseId, name: newTaskName.trim(), estimatedDays: newTaskDays ? parseInt(newTaskDays) : undefined, assignee: newTaskAssignee || undefined },
+      {
+        onSuccess: () => {
+          toast.success("تمت إضافة المهمة");
+          setShowAddTask(null);
+          setNewTaskName("");
+          setNewTaskDays("");
+          setNewTaskAssignee("");
+        },
+        onError: () => toast.error("فشل إضافة المهمة"),
+      }
+    );
+  };
 
   if (isLoading) return <div className="flex items-center justify-center min-h-96 text-muted-foreground">جاري التحميل...</div>;
 
@@ -481,6 +521,15 @@ export default function ProjectDetail() {
               <span className="hidden sm:inline mr-1">إنشاء مهام</span>
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs h-8 shrink-0"
+            onClick={() => setShowImportPlan(true)}
+          >
+            <ClipboardList className="w-3 h-3" />
+            <span className="hidden sm:inline mr-1">خطة عمل</span>
+          </Button>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <span className="flex items-center gap-1 text-xs text-muted-foreground"><Users className="w-3 h-3" />{project.client}</span>
@@ -586,6 +635,15 @@ export default function ProjectDetail() {
                 </div>
               </div>
 
+              {/* Add Task Button */}
+              <button
+                className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors mb-2"
+                onClick={() => setShowAddTask({ phaseId: (phase as any).id, phaseTitle: phase.title })}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                إضافة مهمة
+              </button>
+
               {/* Task Cards */}
               <div className="space-y-2">
                 {phase.tasks.map((task, ti) => {
@@ -668,6 +726,113 @@ export default function ProjectDetail() {
           );
         })}
       </div>
+
+      {/* Import Work Plan Modal */}
+      {showImportPlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl" onClick={() => setShowImportPlan(false)}>
+          <div className="bg-background rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="w-5 h-5" style={{ color: "oklch(0.55 0.15 250)" }} />
+                <h3 className="text-base font-bold">استيراد خطة عمل</h3>
+              </div>
+              <button onClick={() => setShowImportPlan(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
+              {workPlans.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <ClipboardList className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">لا توجد خطط عمل محفوظة</p>
+                  <p className="text-xs mt-1">أضف خطط عمل من قسم "خطط العمل" في القائمة الجانبية</p>
+                </div>
+              ) : (
+                workPlans.map(plan => (
+                  <div key={plan.id} className="border rounded-xl p-3 hover:border-blue-300 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold">{plan.name}</p>
+                        {plan.description && <p className="text-xs text-muted-foreground mt-0.5">{plan.description}</p>}
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <Badge variant="outline" className="text-[10px] h-5">{plan.projectType}</Badge>
+                          {plan.serviceType && <Badge variant="secondary" className="text-[10px] h-5">{plan.serviceType}</Badge>}
+                          <span className="text-[10px] text-muted-foreground">{plan.phases?.length || 0} مرحلة</span>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="text-white text-xs h-7 shrink-0"
+                        style={{ backgroundColor: "oklch(0.55 0.15 250)" }}
+                        onClick={() => handleApplyPlan(plan)}
+                        disabled={applyWorkPlan.isPending}
+                      >
+                        {applyWorkPlan.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "استيراد"}
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Task Modal */}
+      {showAddTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl" onClick={() => setShowAddTask(null)}>
+          <div className="bg-background rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-sm font-bold">إضافة مهمة — {showAddTask.phaseTitle}</h3>
+              <button onClick={() => setShowAddTask(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">اسم المهمة *</label>
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  placeholder="مثال: مراجعة المخططات"
+                  value={newTaskName}
+                  onChange={e => setNewTaskName(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">المدة (أيام)</label>
+                  <input
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    placeholder="3"
+                    type="number"
+                    min="1"
+                    value={newTaskDays}
+                    onChange={e => setNewTaskDays(e.target.value)}
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">المسؤول</label>
+                  <input
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    placeholder="م. أمين"
+                    value={newTaskAssignee}
+                    onChange={e => setNewTaskAssignee(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button
+                  className="flex-1 text-white text-sm"
+                  style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
+                  onClick={handleAddTask}
+                  disabled={!newTaskName.trim() || createPhaseTask.isPending}
+                >
+                  {createPhaseTask.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 ml-1" />}
+                  إضافة المهمة
+                </Button>
+                <Button variant="outline" className="flex-1 text-sm" onClick={() => setShowAddTask(null)}>إلغاء</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

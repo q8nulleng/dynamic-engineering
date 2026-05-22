@@ -27,6 +27,7 @@ import {
   FileSignature,
   Target,
   CalendarDays,
+  ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +45,7 @@ const navItems = [
   { path: "/quotations", label: "عروض الأسعار", icon: FileText, badge: 2 },
   { path: "/contracts", label: "العقود الهندسية", icon: FileSignature, badge: 1 },
   { path: "/client-portal", label: "بوابة العميل", icon: Globe },
+  { path: "/work-plans", label: "خطط العمل", icon: ClipboardList },
   { path: "/reports", label: "التقارير", icon: BarChart3 },
 ];
 

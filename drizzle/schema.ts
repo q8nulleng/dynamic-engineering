@@ -227,6 +227,35 @@ export const appointments = mysqlTable("appointments", {
   createdAt: varchar("created_at", { length: 32 }).notNull(),
 });
 
+// ── Work Plans (خطط العمل المركزية) ──────────────────────────────────────────
+export const workPlans = mysqlTable("work_plans", {
+  id: int("id").autoincrement().primaryKey(),
+  name: text("name").notNull(),
+  projectType: varchar("project_type", { length: 64 }).notNull().default(""),
+  serviceType: varchar("service_type", { length: 64 }).default(""),
+  description: text("description").default(""),
+  isDefault: tinyint("is_default").default(0),
+  createdAt: varchar("created_at", { length: 32 }).notNull(),
+});
+
+export const workPlanPhases = mysqlTable("work_plan_phases", {
+  id: int("id").autoincrement().primaryKey(),
+  workPlanId: int("work_plan_id").notNull(),
+  order: int("order").notNull().default(0),
+  title: text("title").notNull(),
+  subtitle: text("subtitle").default(""),
+});
+
+export const workPlanTasks = mysqlTable("work_plan_tasks", {
+  id: int("id").autoincrement().primaryKey(),
+  workPlanPhaseId: int("work_plan_phase_id").notNull(),
+  order: int("order").notNull().default(0),
+  name: text("name").notNull(),
+  assignee: varchar("assignee", { length: 128 }).default(""),
+  estimatedDays: int("estimated_days").default(0),
+  description: text("description").default(""),
+});
+
 export const contractTemplates = mysqlTable("contract_templates", {
   id: int("id").autoincrement().primaryKey(),
   name: text("name").notNull(),

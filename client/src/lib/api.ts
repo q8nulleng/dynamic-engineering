@@ -653,3 +653,99 @@ export function useDeleteAppointment() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["appointments"] }),
   });
 }
+
+// ── Work Plans ──────────────────────────────────────────────────────────────
+
+export interface WorkPlanTask {
+  id: number;
+  name: string;
+  description?: string;
+  estimatedDays?: number;
+  assignee?: string;
+  order: number;
+}
+
+export interface WorkPlanPhase {
+  id: number;
+  title: string;
+  subtitle?: string;
+  order: number;
+  tasks: WorkPlanTask[];
+}
+
+export interface WorkPlan {
+  id: number;
+  name: string;
+  description?: string;
+  projectType: string;
+  serviceType?: string;
+  phases: WorkPlanPhase[];
+}
+
+export function useWorkPlans() {
+  return useQuery<WorkPlan[]>({
+    queryKey: ["work-plans"],
+    queryFn: () => request("/api/work-plans"),
+  });
+}
+
+export function useWorkPlan(id: number | null) {
+  return useQuery<WorkPlan>({
+    queryKey: ["work-plans", id],
+    queryFn: () => request(`/api/work-plans/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useCreateWorkPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<WorkPlan>) =>
+      request<WorkPlan>("/api/work-plans", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["work-plans"] }),
+  });
+}
+
+export function useUpdateWorkPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<WorkPlan> & { id: number }) =>
+      request<WorkPlan>(`/api/work-plans/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["work-plans"] });
+      qc.invalidateQueries({ queryKey: ["work-plans", vars.id] });
+    },
+  });
+}
+
+export function useDeleteWorkPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => request(`/api/work-plans/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["work-plans"] }),
+  });
+}
+
+export function useApplyWorkPlan(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (planId: number) =>
+      request<{ created: number }>(`/api/work-plans/${planId}/apply/${projectId}`, { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["projects", projectId] });
+      qc.invalidateQueries({ queryKey: ["tasks", "all"] });
+    },
+  });
+}
+
+export function useCreatePhaseTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ phaseId, ...data }: { phaseId: number; name: string; description?: string; estimatedDays?: number; assignee?: string }) =>
+      request<{ id: number }>(`/api/phases/${phaseId}/tasks`, { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["projects", projectId] });
+      qc.invalidateQueries({ queryKey: ["tasks", "all"] });
+    },
+  });
+}

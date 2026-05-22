@@ -10,7 +10,8 @@ import { eq, desc, like } from "drizzle-orm";
 import { getDb } from "./db/mysql.js";
 import {
   clients, projects, phases, tasks, quotations, contracts,
-  invoices, invoiceLines, documents, crmLeads, contractTemplates, appointments
+  invoices, invoiceLines, documents, crmLeads, contractTemplates, appointments,
+  workPlans, workPlanPhases, workPlanTasks
 } from "../drizzle/schema.js";
 import { nanoid } from "nanoid";
 
@@ -872,5 +873,191 @@ apiRouter.delete("/api/appointments/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     await db.delete(appointments).where(eq(appointments.id, id));
     res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Work Plans (خطط العمل المركزية) ──────────────────────────────────────────
+
+// GET all work plans (with phase/task counts)
+apiRouter.get("/api/work-plans", async (_req, res) => {
+  try {
+    const db = getDb();
+    const plans = await db.select().from(workPlans).orderBy(workPlans.id);
+    const result = await Promise.all(plans.map(async (plan: any) => {
+      const planPhases = await db.select().from(workPlanPhases)
+        .where(eq(workPlanPhases.workPlanId, plan.id))
+        .orderBy(workPlanPhases.order);
+      let taskCount = 0;
+      for (const ph of planPhases) {
+        const ts = await db.select().from(workPlanTasks).where(eq(workPlanTasks.workPlanPhaseId, ph.id));
+        taskCount += ts.length;
+      }
+      return { ...plan, phaseCount: planPhases.length, taskCount };
+    }));
+    res.json(result);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// GET single work plan with full phases and tasks
+apiRouter.get("/api/work-plans/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    const id = parseInt(req.params.id);
+    const [plan] = await db.select().from(workPlans).where(eq(workPlans.id, id));
+    if (!plan) return res.status(404).json({ error: "not found" });
+    const planPhases = await db.select().from(workPlanPhases)
+      .where(eq(workPlanPhases.workPlanId, id))
+      .orderBy(workPlanPhases.order);
+    const phasesWithTasks = await Promise.all(planPhases.map(async (ph: any) => {
+      const ts = await db.select().from(workPlanTasks)
+        .where(eq(workPlanTasks.workPlanPhaseId, ph.id))
+        .orderBy(workPlanTasks.order);
+      return { ...ph, tasks: ts };
+    }));
+    res.json({ ...plan, phases: phasesWithTasks });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST create new work plan
+apiRouter.post("/api/work-plans", async (req, res) => {
+  try {
+    const db = getDb();
+    const now = new Date().toISOString().slice(0, 10);
+    const { phases: phasesData, ...planData } = req.body;
+    await db.insert(workPlans).values({ ...planData, createdAt: now });
+    const [plan] = await db.select().from(workPlans).orderBy(desc(workPlans.id));
+    if (Array.isArray(phasesData)) {
+      for (let i = 0; i < phasesData.length; i++) {
+        const { tasks: tasksData, ...phaseData } = phasesData[i];
+        await db.insert(workPlanPhases).values({ ...phaseData, workPlanId: plan.id, order: i });
+        const [ph] = await db.select().from(workPlanPhases)
+          .where(eq(workPlanPhases.workPlanId, plan.id))
+          .orderBy(desc(workPlanPhases.id));
+        if (Array.isArray(tasksData)) {
+          for (let j = 0; j < tasksData.length; j++) {
+            await db.insert(workPlanTasks).values({ ...tasksData[j], workPlanPhaseId: ph.id, order: j });
+          }
+        }
+      }
+    }
+    const full = await db.select().from(workPlans).where(eq(workPlans.id, plan.id));
+    res.status(201).json(full[0]);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT update work plan
+apiRouter.put("/api/work-plans/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    const id = parseInt(req.params.id);
+    const { phases: _phases, ...planData } = req.body;
+    await db.update(workPlans).set(planData).where(eq(workPlans.id, id));
+    const [row] = await db.select().from(workPlans).where(eq(workPlans.id, id));
+    res.json(row);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE work plan
+apiRouter.delete("/api/work-plans/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    const id = parseInt(req.params.id);
+    // Delete tasks → phases → plan
+    const planPhases = await db.select().from(workPlanPhases).where(eq(workPlanPhases.workPlanId, id));
+    for (const ph of planPhases) {
+      await db.delete(workPlanTasks).where(eq(workPlanTasks.workPlanPhaseId, ph.id));
+    }
+    await db.delete(workPlanPhases).where(eq(workPlanPhases.workPlanId, id));
+    await db.delete(workPlans).where(eq(workPlans.id, id));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST apply work plan to a project (import plan → create phases & tasks)
+apiRouter.post("/api/work-plans/:id/apply/:projectId", async (req, res) => {
+  try {
+    const db = getDb();
+    const planId = parseInt(req.params.id);
+    const projectId = req.params.projectId;
+
+    const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
+    if (!project) return res.status(404).json({ error: "project not found" });
+
+    const [plan] = await db.select().from(workPlans).where(eq(workPlans.id, planId));
+    if (!plan) return res.status(404).json({ error: "plan not found" });
+
+    // Get current max order for existing phases
+    const existingPhases = await db.select().from(phases).where(eq(phases.projectId, projectId));
+    let nextOrder = existingPhases.length;
+
+    const planPhases = await db.select().from(workPlanPhases)
+      .where(eq(workPlanPhases.workPlanId, planId))
+      .orderBy(workPlanPhases.order);
+
+    for (const ph of planPhases) {
+      await db.insert(phases).values({
+        projectId,
+        order: nextOrder++,
+        title: ph.title,
+        subtitle: ph.subtitle || "",
+      });
+      const [newPhase] = await db.select().from(phases)
+        .where(eq(phases.projectId, projectId))
+        .orderBy(desc(phases.id));
+
+      const planTasks = await db.select().from(workPlanTasks)
+        .where(eq(workPlanTasks.workPlanPhaseId, ph.id))
+        .orderBy(workPlanTasks.order);
+
+      for (let j = 0; j < planTasks.length; j++) {
+        await db.insert(tasks).values({
+          phaseId: newPhase.id,
+          name: planTasks[j].name,
+          assignee: planTasks[j].assignee || "",
+          estimatedDays: planTasks[j].estimatedDays || 0,
+          status: "pending",
+          autoCreated: 1,
+          order: j,
+        });
+      }
+    }
+
+    // Recalculate progress
+    const allPhases = await db.select().from(phases).where(eq(phases.projectId, projectId));
+    let total = 0, done = 0;
+    for (const p of allPhases) {
+      const pts = await db.select().from(tasks).where(eq(tasks.phaseId, p.id));
+      total += pts.length;
+      done += pts.filter((t: any) => t.status === "done").length;
+    }
+    const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+    await db.update(projects).set({ progress }).where(eq(projects.id, projectId));
+
+    res.json({ success: true, created: planPhases.length, phasesAdded: planPhases.length });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST add a single task to a phase
+apiRouter.post("/api/phases/:phaseId/tasks", async (req, res) => {
+  try {
+    const db = getDb();
+    const phaseId = parseInt(req.params.phaseId);
+    const { name, assignee, estimatedDays, status, description, deadline } = req.body;
+    const existingTasks = await db.select().from(tasks).where(eq(tasks.phaseId, phaseId));
+    await db.insert(tasks).values({
+      phaseId,
+      name: name || "مهمة جديدة",
+      assignee: assignee || "",
+      estimatedDays: estimatedDays || 0,
+      status: status || "pending",
+      description: description || "",
+      deadline: deadline || "",
+      order: existingTasks.length,
+      autoCreated: 0,
+    });
+    const [newTask] = await db.select().from(tasks)
+      .where(eq(tasks.phaseId, phaseId))
+      .orderBy(desc(tasks.id));
+    res.status(201).json(newTask);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
