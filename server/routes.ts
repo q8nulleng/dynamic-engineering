@@ -112,16 +112,124 @@ apiRouter.post("/api/projects", async (req, res) => {
     const now = new Date().toISOString().slice(0, 10);
     const id = projectData.id || `S${nanoid(5).toUpperCase()}`;
 
-    await db.insert(projects).values({ ...projectData, id, createdAt: projectData.createdAt || now });
+    // ── 1. إنشاء عميل تلقائياً إذا لم يكن مرتبطاً بعميل موجود ──
+    let clientId = projectData.clientId || null;
+    if (!clientId && projectData.client) {
+      const cid = `C${nanoid(6).toUpperCase()}`;
+      await db.insert(clients).values({
+        id: cid,
+        name: projectData.client,
+        phone: projectData.clientPhone || "",
+        type: "فرد",
+        area: projectData.area || "",
+        status: "active",
+        rating: 5,
+        createdAt: now,
+        projectType: projectData.type || "",
+        serviceType: projectData.serviceType || "",
+      });
+      clientId = cid;
+    }
 
-    if (Array.isArray(phasesData)) {
+    // ── 2. إنشاء المشروع ──
+    await db.insert(projects).values({ ...projectData, id, clientId, createdAt: projectData.createdAt || now });
+
+    // ── 3. إنشاء عقد فارغ مرتبط بالمشروع ──
+    const contractId = `CNT${nanoid(6).toUpperCase()}`;
+    await db.insert(contracts).values({
+      id: contractId,
+      projectId: id,
+      clientId: clientId || "",
+      client: projectData.client || "",
+      type: projectData.type || "",
+      service: projectData.serviceType || "",
+      status: "مسودة",
+      date: now,
+      amount: "0",
+      area: projectData.area || "",
+    });
+    await db.update(projects).set({ contractId }).where(eq(projects.id, id));
+
+    // ── 4. إنشاء مراحل العمل حسب نوع المشروع ──
+    if (!Array.isArray(phasesData) || phasesData.length === 0) {
+      const projectType = projectData.type || "";
+      let phaseDefs: { title: string; subtitle?: string }[] = [];
+
+      if (projectType === "مبنى صناعي" || projectType === "صناعي" || projectType === "مستودع" || projectType === "مصنع") {
+        phaseDefs = [
+          { title: "تجهيز الملف",          subtitle: "جمع الوثائق والملفات" },
+          { title: "التصميم المعماري",      subtitle: "الكروكي والواجهات" },
+          { title: "التصميم الإنشائي",     subtitle: "الحسابات الإنشائية" },
+          { title: "الرسم والإخراج",       subtitle: "إخراج المخططات" },
+          { title: "تقديم البلدية",        subtitle: "المراجعة والاعتماد" },
+          { title: "الإشراف",             subtitle: "الإشراف على التنفيذ" },
+        ];
+      } else if (projectType === "سكن خاص") {
+        phaseDefs = [
+          { title: "تجهيز الملف",          subtitle: "جمع الوثائق والملفات" },
+          { title: "التصميم المعماري",      subtitle: "الكروكي والواجهات" },
+          { title: "التصميم الإنشائي",     subtitle: "الحسابات الإنشائية" },
+          { title: "الرسم والإخراج",       subtitle: "إخراج المخططات" },
+          { title: "تقديم البلدية",        subtitle: "المراجعة والاعتماد" },
+          { title: "المخططات التفصيلية",   subtitle: "صحي وكهربائي" },
+          { title: "الإشراف",             subtitle: "الإشراف على التنفيذ" },
+        ];
+      } else if (projectType === "سكن استثماري" || projectType === "تجاري") {
+        phaseDefs = [
+          { title: "تجهيز الملف",          subtitle: "جمع الوثائق والملفات" },
+          { title: "التصميم المعماري",      subtitle: "الكروكي والواجهات" },
+          { title: "التصميم الإنشائي",     subtitle: "الحسابات الإنشائية" },
+          { title: "الرسم والإخراج",       subtitle: "إخراج المخططات" },
+          { title: "تقديم البلدية",        subtitle: "المراجعة والاعتماد" },
+          { title: "الإشراف",             subtitle: "الإشراف على التنفيذ" },
+        ];
+      } else {
+        phaseDefs = [
+          { title: "تجهيز الملف",    subtitle: "جمع الوثائق" },
+          { title: "التصميم",        subtitle: "التصميم والرسم" },
+          { title: "التقديم",        subtitle: "تقديم الجهات" },
+          { title: "الإشراف",       subtitle: "متابعة التنفيذ" },
+        ];
+      }
+
+      for (let i = 0; i < phaseDefs.length; i++) {
+        await db.insert(phases).values({
+          projectId: id,
+          order: i,
+          title: phaseDefs[i].title,
+          subtitle: phaseDefs[i].subtitle || "",
+        });
+      }
+
+      // مهام أولية للمرحلة الأولى
+      const [firstPhase] = await db.select().from(phases)
+        .where(eq(phases.projectId, id))
+        .orderBy(phases.order);
+      if (firstPhase) {
+        const initialTasks = [
+          { name: "تجميع مستندات العميل", assignee: "سكرتير", estimatedDays: 3, status: "in_progress" },
+          { name: "طلب تقرير تربة",       assignee: "سكرتير", estimatedDays: 5, status: "in_progress" },
+          { name: "تعبئة نماذج البلدية",  assignee: "سكرتير", estimatedDays: 2, status: "pending" },
+        ];
+        for (let j = 0; j < initialTasks.length; j++) {
+          await db.insert(tasks).values({
+            phaseId: firstPhase.id,
+            name: initialTasks[j].name,
+            status: initialTasks[j].status,
+            assignee: initialTasks[j].assignee,
+            estimatedDays: initialTasks[j].estimatedDays,
+            autoCreated: 1,
+            order: j,
+          });
+        }
+      }
+    } else {
       for (let i = 0; i < phasesData.length; i++) {
         const { tasks: tasksData, ...phaseData } = phasesData[i];
         await db.insert(phases).values({ ...phaseData, projectId: id, order: i });
         const [phase] = await db.select().from(phases)
           .where(eq(phases.projectId, id))
           .orderBy(desc(phases.id));
-
         if (Array.isArray(tasksData)) {
           for (let j = 0; j < tasksData.length; j++) {
             await db.insert(tasks).values({ ...tasksData[j], phaseId: phase.id, order: j });
@@ -131,7 +239,7 @@ apiRouter.post("/api/projects", async (req, res) => {
     }
 
     const [project] = await db.select().from(projects).where(eq(projects.id, id));
-    res.status(201).json(project);
+    res.status(201).json({ ...project, clientId, contractId });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
