@@ -601,6 +601,7 @@ export interface Appointment {
   leadId: string | null;
   clientId: string | null;
   clientName: string;
+  clientPhone: string;
   date: string;
   time: string;
   reason: string;

@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { useAppointments, useDeleteAppointment } from "@/lib/api";
 import { toast } from "sonner";
-import DashboardLayout from "@/components/DashboardLayout";
 
 const MONTHS_AR = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
@@ -31,7 +30,7 @@ function getStatusLabel(status: string) {
 }
 
 export default function Appointments() {
-  const { data: appointments = [], isLoading } = useAppointments();
+  const { data: appointments = [], isLoading, isError } = useAppointments();
   const deleteAppointment = useDeleteAppointment();
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -59,7 +58,8 @@ export default function Appointments() {
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
   const sendWhatsApp = (appt: any) => {
-    const phone = `965${(appt.clientPhone || "").replace(/\s/g, "")}`;
+    const rawPhone = (appt.clientPhone || "").replace(/\s/g, "").replace(/^0+/, "");
+    const phone = rawPhone.startsWith("965") ? rawPhone : `965${rawPhone}`;
     const dateStr = new Date(appt.date).toLocaleDateString("ar-KW", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
     const timeStr = appt.time ? ` الساعة ${appt.time}` : "";
     const assignedStr = appt.assignedTo ? `\nالمسؤول: ${appt.assignedTo}` : "";
@@ -69,16 +69,19 @@ export default function Appointments() {
 
   const handleDelete = async (id: number) => {
     if (!confirm("هل تريد حذف هذا الموعد؟")) return;
-    await deleteAppointment.mutateAsync(id);
-    toast.success("تم حذف الموعد");
+    try {
+      await deleteAppointment.mutateAsync(id);
+      toast.success("تم حذف الموعد");
+    } catch {
+      toast.error("فشل حذف الموعد");
+    }
   };
 
   // مواعيد اليوم
   const todayAppts = apptByDate[todayKey] || [];
 
   return (
-    <DashboardLayout>
-      <div className="p-4 space-y-4 max-w-5xl mx-auto" dir="rtl">
+    <div className="space-y-4 max-w-5xl mx-auto" dir="rtl">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -124,7 +127,9 @@ export default function Appointments() {
           </div>
         )}
 
-        {isLoading ? (
+        {isError ? (
+          <div className="flex justify-center py-12 text-red-500 text-sm">فشل تحميل المواعيد. يرجى تحديث الصفحة.</div>
+        ) : isLoading ? (
           <div className="flex justify-center py-12 text-muted-foreground text-sm">جاري التحميل...</div>
         ) : view === "calendar" ? (
           /* ── عرض التقويم ── */
@@ -160,7 +165,7 @@ export default function Appointments() {
                     <div className="space-y-0.5">
                       {dayAppts.slice(0, 2).map((appt: any) => (
                         <div key={appt.id} className="text-[10px] bg-orange-100 text-orange-800 rounded px-1 py-0.5 truncate cursor-pointer hover:bg-orange-200"
-                          title={`${appt.clientName} - ${appt.reason}${appt.time ? ` - ${appt.time}` : ""}`}>
+                          title={`${appt.clientName} - ${appt.reason}${appt.time ? ` - ${appt.time}` : ""}${appt.assignedTo ? ` - ${appt.assignedTo}` : ""}`}>
                           {appt.time && <span className="font-bold">{appt.time} </span>}
                           {appt.clientName}
                         </div>
@@ -229,7 +234,6 @@ export default function Appointments() {
             )}
           </div>
         )}
-      </div>
-    </DashboardLayout>
+    </div>
   );
 }

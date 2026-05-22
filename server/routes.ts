@@ -719,17 +719,18 @@ apiRouter.get("/api/appointments/lead/:leadId", async (req, res) => {
 apiRouter.post("/api/appointments", async (req, res) => {
   try {
     const db = getDb();
-    const { leadId, clientId, clientName, date, time, reason, notes, assignedTo } = req.body;
+    const { leadId, clientId, clientName, clientPhone, date, time, reason, notes, assignedTo } = req.body;
     const now = new Date().toISOString();
     await db.insert(appointments).values({
       leadId: leadId || null,
       clientId: clientId || null,
       clientName,
+      clientPhone: clientPhone || "",
       date,
       time: time || "",
       reason: reason || "",
       notes: notes || "",
-      assignedTo: assignedTo || null,
+      assignedTo: assignedTo || "",
       status: "scheduled",
       createdAt: now,
     });

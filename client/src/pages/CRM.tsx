@@ -815,11 +815,12 @@ function AppointmentDialog({ lead, onClose }: { lead: Lead; onClose: () => void 
         leadId: lead.id,
         clientId: null,
         clientName: lead.name,
+        clientPhone: lead.phone || "",
         date: form.date,
         time: form.time,
         reason: finalReason,
-        notes: form.notes || null,
-        assignedTo: form.assignedTo || null,
+        notes: form.notes || "",
+        assignedTo: form.assignedTo || "",
         status: "scheduled",
       });
       toast.success("تم حجز الموعد بنجاح");
