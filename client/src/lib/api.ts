@@ -592,3 +592,63 @@ export function useDeleteContractTemplate() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["contract-templates"] }),
   });
 }
+
+
+// ── Appointments ──────────────────────────────────────────────────────────────
+
+export interface Appointment {
+  id: number;
+  leadId: string | null;
+  clientId: string | null;
+  clientName: string;
+  date: string;
+  time: string;
+  reason: string;
+  notes: string | null;
+  assignedTo: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export function useAppointments() {
+  return useQuery<Appointment[]>({
+    queryKey: ["appointments"],
+    queryFn: () => request<Appointment[]>("/api/appointments"),
+  });
+}
+
+export function useAppointmentsByLead(leadId: string) {
+  return useQuery<Appointment[]>({
+    queryKey: ["appointments", "lead", leadId],
+    queryFn: () => request<Appointment[]>(`/api/appointments/lead/${leadId}`),
+    enabled: !!leadId,
+  });
+}
+
+export function useCreateAppointment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Omit<Appointment, "id" | "createdAt">) =>
+      request<Appointment>("/api/appointments", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["appointments"] });
+    },
+  });
+}
+
+export function useUpdateAppointment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<Appointment> & { id: number }) =>
+      request<Appointment>(`/api/appointments/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["appointments"] }),
+  });
+}
+
+export function useDeleteAppointment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => request(`/api/appointments/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["appointments"] }),
+  });
+}

@@ -26,6 +26,7 @@ import {
   Bell,
   FileSignature,
   Target,
+  CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 const navItems = [
   { path: "/", label: "لوحة التحكم", icon: LayoutDashboard },
   { path: "/crm", label: "CRM", icon: Target },
+  { path: "/appointments", label: "المواعيد", icon: CalendarDays },
   { path: "/clients", label: "العملاء", icon: Users, badge: 5 },
   { path: "/projects", label: "المشاريع", icon: FolderKanban },
   { path: "/tasks", label: "المهام", icon: ListChecks, badge: 5 },

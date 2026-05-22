@@ -25,3 +25,10 @@
 - [x] Upload signed contract PDF (extracted pages 1-3 from أوراق الجسار)
 - [x] Upload electricity request document (page 4 from أوراق الجسار)
 - [x] Update client type to "company" for شركة مايكوا
+
+## نظام المواعيد
+- [ ] إضافة جدول appointments في MySQL schema
+- [ ] إضافة API routes للمواعيد (CRUD)
+- [ ] إضافة خانة موعد في كرت CRM (تاريخ + وقت + سبب)
+- [ ] إنشاء صفحة تقويم لعرض جميع المواعيد
+- [ ] ربط التقويم بالـ sidebar

@@ -10,7 +10,7 @@ import { eq, desc, like } from "drizzle-orm";
 import { getDb } from "./db/mysql.js";
 import {
   clients, projects, phases, tasks, quotations, contracts,
-  invoices, invoiceLines, documents, crmLeads, contractTemplates
+  invoices, invoiceLines, documents, crmLeads, contractTemplates, appointments
 } from "../drizzle/schema.js";
 import { nanoid } from "nanoid";
 
@@ -692,6 +692,76 @@ apiRouter.delete("/api/contract-templates/:id", async (req, res) => {
     const db = getDb();
     const id = parseInt(req.params.id);
     await db.delete(contractTemplates).where(eq(contractTemplates.id, id));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+
+// ── Appointments ──────────────────────────────────────────────────────────────
+apiRouter.get("/api/appointments", async (_req, res) => {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(appointments).orderBy(desc(appointments.createdAt));
+    res.json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.get("/api/appointments/lead/:leadId", async (req, res) => {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(appointments)
+      .where(eq(appointments.leadId, req.params.leadId))
+      .orderBy(desc(appointments.createdAt));
+    res.json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post("/api/appointments", async (req, res) => {
+  try {
+    const db = getDb();
+    const { leadId, clientId, clientName, date, time, reason, notes, assignedTo } = req.body;
+    const now = new Date().toISOString();
+    await db.insert(appointments).values({
+      leadId: leadId || null,
+      clientId: clientId || null,
+      clientName,
+      date,
+      time: time || "",
+      reason: reason || "",
+      notes: notes || "",
+      assignedTo: assignedTo || null,
+      status: "scheduled",
+      createdAt: now,
+    });
+    const [row] = await db.select().from(appointments)
+      .orderBy(desc(appointments.id)).limit(1);
+    res.json(row);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.put("/api/appointments/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    const id = parseInt(req.params.id);
+    const { date, time, reason, notes, status, assignedTo } = req.body;
+    await db.update(appointments).set({
+      ...(date !== undefined && { date }),
+      ...(time !== undefined && { time }),
+      ...(reason !== undefined && { reason }),
+      ...(notes !== undefined && { notes }),
+      ...(status !== undefined && { status }),
+      ...(assignedTo !== undefined && { assignedTo }),
+    }).where(eq(appointments.id, id));
+    const [row] = await db.select().from(appointments).where(eq(appointments.id, id));
+    res.json(row);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.delete("/api/appointments/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    const id = parseInt(req.params.id);
+    await db.delete(appointments).where(eq(appointments.id, id));
     res.json({ success: true });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });

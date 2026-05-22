@@ -15,6 +15,13 @@
       "when": 1779294292376,
       "tag": "0001_aromatic_madripoor",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1779460231218,
+      "tag": "0002_omniscient_doorman",
+      "breakpoints": true
     }
   ]
 }

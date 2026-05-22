@@ -212,6 +212,19 @@ export const documents = mysqlTable("documents", {
   url: text("url").default(""),
 });
 
+export const appointments = mysqlTable("appointments", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: varchar("lead_id", { length: 64 }),
+  clientId: varchar("client_id", { length: 64 }),
+  clientName: text("client_name").notNull(),
+  date: varchar("date", { length: 32 }).notNull(),
+  time: varchar("time", { length: 16 }).notNull().default(""),
+  reason: varchar("reason", { length: 128 }).notNull().default(""),
+  notes: text("notes").default(""),
+  status: varchar("status", { length: 32 }).notNull().default("scheduled"),
+  createdAt: varchar("created_at", { length: 32 }).notNull(),
+});
+
 export const contractTemplates = mysqlTable("contract_templates", {
   id: int("id").autoincrement().primaryKey(),
   name: text("name").notNull(),

@@ -27,6 +27,7 @@ import {
   Building, Percent, Tag, Save,
   ClipboardList, MessageCircle, Activity, Users, MapPin, Loader2,
   Pencil, Trash2, Eye, CheckCircle, Hash, Ruler, ArrowRightLeft,
+  Clock, UserCheck, CalendarPlus, Bell,
 } from "lucide-react";
 import { Link } from "wouter";
 import { kuwaitGovernorates } from "./Clients";
@@ -36,6 +37,7 @@ import {
   useCrmLeads, useCreateCrmLead, useUpdateCrmLead, useDeleteCrmLead,
   useCreateClient, useCreateProject, useCreateContract, useUpdateContract,
   useCreateInvoice, useContracts, useContractsByLead, useProjects, useContractTemplates,
+  useAppointmentsByLead, useCreateAppointment, useDeleteAppointment,
 } from "@/lib/api";
 import { exportQuotationPdf, exportContractPdf } from "@/lib/pdf";
 import { toast } from "sonner";
@@ -763,6 +765,199 @@ function LeadContractSection({
   );
 }
 
+// ── قائمة موظفي المكتب ──────────────────────────────────────────────────────
+const officeStaff = [
+  "م. مصطفى",
+  "م. خالد",
+  "م. أمين",
+  "م. ناهد",
+  "محمد ثروت",
+  "عرفان",
+  "عفيف",
+];
+
+// ── أسباب الموعد الجاهزة ─────────────────────────────────────────────────────
+const appointmentReasons = [
+  "زيارة الموقع",
+  "اجتماع مع العميل",
+  "توقيع العقد",
+  "عرض التصميم",
+  "متابعة المشروع",
+  "تسليم المستندات",
+  "استلام الدفعة",
+  "معاينة أولية",
+  "أخرى",
+];
+
+function AppointmentDialog({ lead, onClose }: { lead: Lead; onClose: () => void }) {
+  const createAppointment = useCreateAppointment();
+  const deleteAppointment = useDeleteAppointment();
+  const { data: appointments = [], isLoading } = useAppointmentsByLead(lead.id);
+  const [form, setForm] = useState({
+    date: "",
+    time: "",
+    reason: "",
+    customReason: "",
+    notes: "",
+    assignedTo: "",
+  });
+  const [busy, setBusy] = useState(false);
+
+  const handleSave = async () => {
+    if (!form.date || !form.reason) {
+      toast.error("يرجى تحديد التاريخ والسبب");
+      return;
+    }
+    setBusy(true);
+    try {
+      const finalReason = form.reason === "أخرى" ? form.customReason : form.reason;
+      await createAppointment.mutateAsync({
+        leadId: lead.id,
+        clientId: null,
+        clientName: lead.name,
+        date: form.date,
+        time: form.time,
+        reason: finalReason,
+        notes: form.notes || null,
+        assignedTo: form.assignedTo || null,
+        status: "scheduled",
+      });
+      toast.success("تم حجز الموعد بنجاح");
+      setForm({ date: "", time: "", reason: "", customReason: "", notes: "", assignedTo: "" });
+    } catch {
+      toast.error("فشل حجز الموعد");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendWhatsApp = (appt: any) => {
+    const phone = `965${(lead.phone || "").replace(/\s/g, "")}`;
+    const dateStr = new Date(appt.date).toLocaleDateString("ar-KW", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    const timeStr = appt.time ? ` الساعة ${appt.time}` : "";
+    const assignedStr = appt.assignedTo ? `\nالمسؤول: ${appt.assignedTo}` : "";
+    const msg = `السلام عليكم ${lead.name}،\n\nتذكير بموعدكم مع مكتب ديناميك للاستشارات الهندسية:\n📅 ${dateStr}${timeStr}\n📋 ${appt.reason}${assignedStr}\n\nنتطلع لرؤيتكم. للاستفسار يرجى التواصل معنا.`;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank");
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-base font-bold flex items-center gap-2">
+            <CalendarPlus className="w-4 h-4 text-orange-500" />
+            مواعيد — {lead.name}
+          </DialogTitle>
+        </DialogHeader>
+
+        {/* نموذج موعد جديد */}
+        <div className="space-y-3 p-3 bg-orange-50 rounded-lg border border-orange-100">
+          <h4 className="text-sm font-bold text-orange-800 flex items-center gap-1.5">
+            <Plus className="w-3.5 h-3.5" />حجز موعد جديد
+          </h4>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">التاريخ *</label>
+              <Input type="date" dir="ltr" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">الوقت</label>
+              <Input type="time" dir="ltr" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} className="text-sm" />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">سبب الموعد *</label>
+            <Select value={form.reason} onValueChange={v => setForm(f => ({ ...f, reason: v }))}>
+              <SelectTrigger className="text-sm">
+                <SelectValue placeholder="اختر سبب الموعد..." />
+              </SelectTrigger>
+              <SelectContent>
+                {appointmentReasons.map(r => (
+                  <SelectItem key={r} value={r} className="text-sm">{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {form.reason === "أخرى" && (
+              <Input className="mt-1.5 text-sm" placeholder="اكتب سبب الموعد..." value={form.customReason} onChange={e => setForm(f => ({ ...f, customReason: e.target.value }))} />
+            )}
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">المسؤول</label>
+            <Select value={form.assignedTo} onValueChange={v => setForm(f => ({ ...f, assignedTo: v }))}>
+              <SelectTrigger className="text-sm">
+                <SelectValue placeholder="اختر المسؤول..." />
+              </SelectTrigger>
+              <SelectContent>
+                {officeStaff.map(s => (
+                  <SelectItem key={s} value={s} className="text-sm">{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">ملاحظات</label>
+            <Textarea placeholder="ملاحظات إضافية..." rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="text-sm" />
+          </div>
+          <Button onClick={handleSave} disabled={busy} className="w-full text-sm" style={{ backgroundColor: "oklch(0.65 0.15 50)" }}>
+            {busy ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Save className="w-4 h-4 ml-2" />}
+            حفظ الموعد
+          </Button>
+        </div>
+
+        {/* قائمة المواعيد السابقة */}
+        <div className="space-y-2">
+          <h4 className="text-sm font-bold flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+            المواعيد المحجوزة
+          </h4>
+          {isLoading ? (
+            <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+          ) : appointments.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">لا توجد مواعيد محجوزة</p>
+          ) : (
+            appointments.map((appt: any) => (
+              <div key={appt.id} className="p-3 rounded-lg border bg-card space-y-1.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="space-y-0.5 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-orange-500" />
+                        {new Date(appt.date).toLocaleDateString("ar-KW", { weekday: "short", year: "numeric", month: "short", day: "numeric" })}
+                      </span>
+                      {appt.time && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="w-3 h-3" />{appt.time}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs font-medium">{appt.reason}</p>
+                    {appt.assignedTo && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <UserCheck className="w-3 h-3" />{appt.assignedTo}
+                      </p>
+                    )}
+                    {appt.notes && <p className="text-[11px] text-muted-foreground">{appt.notes}</p>}
+                  </div>
+                  <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-400 hover:text-red-600 hover:bg-red-50 shrink-0"
+                    onClick={() => deleteAppointment.mutateAsync(appt.id)}>
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+                {/* زر واتساب تذكير */}
+                <Button size="sm" variant="outline" className="w-full text-xs h-7 text-green-700 border-green-200 hover:bg-green-50"
+                  onClick={() => sendWhatsApp(appt)}>
+                  <MessageCircle className="w-3 h-3 ml-1" />
+                  إرسال تذكير واتساب للعميل
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function CRM() {
   const { data: leadsData } = useCrmLeads();
   const { data: contractsData } = useContracts();
@@ -790,6 +985,7 @@ export default function CRM() {
   const [editForm, setEditForm] = useState(emptyForm);
   const [editActiveTab, setEditActiveTab] = useState<"basic" | "details" | "notes">("basic");
   const [signingBusy, setSigningBusy] = useState(false);
+  const [appointmentTarget, setAppointmentTarget] = useState<Lead | null>(null);
 
   const data = stageTemplates.map((t) => ({
     ...t,
@@ -1194,6 +1390,9 @@ export default function CRM() {
                               <Button size="sm" className="text-xs h-7" style={{ backgroundColor: "oklch(0.30 0.05 250)" }}
                                 onClick={() => setQuotationTarget(lead)}
                               ><FileText className="w-3 h-3 ml-1" />إنشاء عرض سعر</Button>
+                              <Button size="sm" variant="outline" className="text-xs h-7 text-orange-600 border-orange-200"
+                                onClick={() => setAppointmentTarget(lead)}
+                              ><CalendarPlus className="w-3 h-3 ml-1" />حجز موعد</Button>
                               <Button size="sm" variant="outline" className="text-xs h-7 text-red-600 border-red-200"
                                 onClick={async () => {
                                   await updateLead.mutateAsync({ id: lead.id, stage: "فرص خاسرة" });
@@ -1316,6 +1515,11 @@ export default function CRM() {
       {/* ==================== View Quote Dialog ==================== */}
       {viewQuoteTarget && (
         <ViewQuoteDialog lead={viewQuoteTarget} onClose={() => setViewQuoteTarget(null)} />
+      )}
+
+      {/* ==================== Appointment Dialog ==================== */}
+      {appointmentTarget && (
+        <AppointmentDialog lead={appointmentTarget} onClose={() => setAppointmentTarget(null)} />
       )}
 
       {/* ==================== Contract Dialog ==================== */}
