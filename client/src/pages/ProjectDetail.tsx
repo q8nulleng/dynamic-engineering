@@ -461,39 +461,37 @@ export default function ProjectDetail() {
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link href="/projects">
-          <Button variant="outline" size="sm" className="shrink-0"><ArrowRight className="w-4 h-4" /></Button>
-        </Link>
-        <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-bold truncate">{project.name}</h2>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-            <span className="flex items-center gap-1"><Users className="w-3 h-3" />{project.client}</span>
-            <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{project.area}</span>
-            <span className="flex items-center gap-1" dir="ltr" style={{ fontFamily: "'Space Grotesk'" }}>
-              <Link2 className="w-3 h-3" />{project.quotation}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Link href="/projects">
+            <Button variant="outline" size="sm" className="shrink-0 h-8 w-8 p-0"><ArrowRight className="w-4 h-4" /></Button>
+          </Link>
+          <h2 className="text-base font-bold flex-1 min-w-0 truncate">{project.name}</h2>
           {canAutoCreate && (
             <Button
               size="sm"
-              className="text-white text-xs"
+              className="text-white text-xs h-8 shrink-0"
               style={{ backgroundColor: "oklch(0.55 0.15 250)" }}
               onClick={handleAutoCreate}
               disabled={autoCreateTasks.isPending}
             >
               {autoCreateTasks.isPending
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin ml-1" />
-                : <Sparkles className="w-3.5 h-3.5 ml-1" />}
-              إنشاء مهام تلقائية
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <Sparkles className="w-3 h-3" />}
+              <span className="hidden sm:inline mr-1">إنشاء مهام</span>
             </Button>
           )}
-          <div className="text-left">
-            <Badge variant="outline" className="text-xs">{project.type}</Badge>
-            <Badge variant="secondary" className="text-xs mr-1">{project.serviceType}</Badge>
-          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="flex items-center gap-1 text-xs text-muted-foreground"><Users className="w-3 h-3" />{project.client}</span>
+          {project.area && <span className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="w-3 h-3" />{project.area}</span>}
+          <Badge variant="outline" className="text-[10px] h-5">{project.type}</Badge>
+          <Badge variant="secondary" className="text-[10px] h-5">{project.serviceType}</Badge>
+          {project.quotation && (
+            <span className="flex items-center gap-1 text-[10px] text-muted-foreground" dir="ltr" style={{ fontFamily: "'Space Grotesk'" }}>
+              <Link2 className="w-3 h-3" />{project.quotation}
+            </span>
+          )}
         </div>
       </div>
 
@@ -511,38 +509,59 @@ export default function ProjectDetail() {
         </span>
       </div>
 
-      {/* Phase Timeline */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-2">
-        {project.phases.map((phase, pi) => {
-          const phaseProgress = getPhaseProgress(phase);
-          const isCurrent = pi === project.currentPhase;
-          const isDone = phaseProgress === 100;
-          const color = phaseColors[pi % phaseColors.length];
-          return (
-            <div key={pi} className="flex items-center gap-1">
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs whitespace-nowrap ${isCurrent ? "shadow-sm" : ""}`}
-                style={{
-                  borderColor: isCurrent ? color : isDone ? "oklch(0.55 0.15 150)" : undefined,
-                  backgroundColor: isCurrent ? `color-mix(in oklch, ${color} 8%, white)` : undefined,
-                }}>
-                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                  style={{ backgroundColor: isDone ? "oklch(0.55 0.15 150)" : isCurrent ? color : "oklch(0.80 0.00 0)" }}>
-                  {isDone ? "✓" : pi + 1}
-                </div>
-                <div className="flex flex-col">
-                  <span className={`font-medium ${isDone ? "text-green-700" : isCurrent ? "" : "text-muted-foreground"}`}>{phase.title}</span>
-                  {phase.subtitle && <span className="text-[9px] text-muted-foreground">{phase.subtitle}</span>}
-                </div>
-                <span className="text-muted-foreground" style={{ fontFamily: "'Space Grotesk'" }}>{phaseProgress}%</span>
+      {/* Phase Timeline - scrollable horizontal strip */}
+      <div className="-mx-1">
+        <div className="flex items-stretch gap-0 overflow-x-auto pb-1 px-1" style={{ scrollbarWidth: "none" }}>
+          {project.phases.map((phase, pi) => {
+            const phaseProgress = getPhaseProgress(phase);
+            const isCurrent = pi === project.currentPhase;
+            const isDone = phaseProgress === 100;
+            const color = phaseColors[pi % phaseColors.length];
+            return (
+              <div key={pi} className="flex items-center shrink-0">
+                <button
+                  className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl border text-center transition-all ${
+                    isCurrent ? "shadow-sm" : "border-transparent"
+                  }`}
+                  style={{
+                    minWidth: "72px",
+                    borderColor: isCurrent ? color : isDone ? "oklch(0.55 0.15 150)" : "transparent",
+                    backgroundColor: isCurrent
+                      ? `color-mix(in oklch, ${color} 10%, white)`
+                      : isDone
+                      ? "oklch(0.97 0.02 150)"
+                      : "transparent",
+                  }}
+                >
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold"
+                    style={{ backgroundColor: isDone ? "oklch(0.55 0.15 150)" : isCurrent ? color : "oklch(0.82 0.00 0)" }}
+                  >
+                    {isDone ? "✓" : pi + 1}
+                  </div>
+                  <span
+                    className={`text-[10px] font-medium leading-tight text-center max-w-[64px] ${
+                      isDone ? "text-green-700" : isCurrent ? "text-foreground" : "text-muted-foreground"
+                    }`}
+                    style={{ wordBreak: "keep-all" }}
+                  >
+                    {phase.title}
+                  </span>
+                  <span className="text-[9px] text-muted-foreground" style={{ fontFamily: "'Space Grotesk'" }}>
+                    {phaseProgress}%
+                  </span>
+                </button>
+                {pi < project.phases.length - 1 && (
+                  <div className="w-3 h-px bg-border/60 shrink-0 mx-0.5" />
+                )}
               </div>
-              {pi < project.phases.length - 1 && <div className="w-4 h-px bg-border shrink-0" />}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
-      {/* Kanban Board */}
-      <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: "400px" }}>
+      {/* Kanban Board - horizontal scroll on mobile, grid on desktop */}
+      <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: "300px" }}>
         {project.phases.map((phase, pi) => {
           const color = phaseColors[pi % phaseColors.length];
           const phaseProgress = getPhaseProgress(phase);
@@ -550,7 +569,7 @@ export default function ProjectDetail() {
           const phaseDone = phase.tasks.filter(t => t.status === "done").length;
 
           return (
-            <div key={pi} className="min-w-[270px] w-[270px] shrink-0">
+            <div key={pi} className="min-w-[240px] w-[240px] sm:min-w-[270px] sm:w-[270px] shrink-0">
               {/* Phase Header */}
               <div className="mb-3 px-1">
                 <div className="flex items-center gap-2 mb-0.5">
@@ -580,7 +599,7 @@ export default function ProjectDetail() {
                   return (
                     <div
                       key={ti}
-                      className={`p-3 rounded-xl border bg-background transition-all cursor-pointer hover:shadow-md group ${locked ? "opacity-60" : ""}`}
+                      className={`p-2.5 rounded-xl border bg-background transition-all cursor-pointer active:scale-[0.98] group ${locked ? "opacity-60" : ""}`}
                       style={{ borderColor: "transparent", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
                       onClick={() => {
                         if (task.name === "تصميم الكروكي") {
