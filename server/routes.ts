@@ -1068,7 +1068,7 @@ apiRouter.post("/api/phases/:phaseId/tasks", async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // GET brief for a project
-apiRouter.get("/projects/:projectId/brief", async (req, res) => {
+apiRouter.get("/api/projects/:projectId/brief", async (req, res) => {
   try {
     const db = await getDb();
     const rows = await db.select().from(projectBriefs)
@@ -1080,7 +1080,7 @@ apiRouter.get("/projects/:projectId/brief", async (req, res) => {
 });
 
 // POST create brief
-apiRouter.post("/projects/:projectId/brief", async (req, res) => {
+apiRouter.post("/api/projects/:projectId/brief", async (req, res) => {
   try {
     const db = await getDb();
     const { ownerName, ownerPhone, governorate, area, block, plot, autoNumber,
@@ -1114,7 +1114,7 @@ apiRouter.post("/projects/:projectId/brief", async (req, res) => {
 });
 
 // PUT update brief
-apiRouter.put("/projects/:projectId/brief/:id", async (req, res) => {
+apiRouter.put("/api/projects/:projectId/brief/:id", async (req, res) => {
   try {
     const db = await getDb();
     const { ownerName, ownerPhone, governorate, area, block, plot, autoNumber,
@@ -1149,7 +1149,7 @@ apiRouter.put("/projects/:projectId/brief/:id", async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // GET meetings for a project
-apiRouter.get("/projects/:projectId/meetings", async (req, res) => {
+apiRouter.get("/api/projects/:projectId/meetings", async (req, res) => {
   try {
     const db = await getDb();
     const rows = await db.select().from(projectMeetings)
@@ -1160,7 +1160,7 @@ apiRouter.get("/projects/:projectId/meetings", async (req, res) => {
 });
 
 // POST create meeting
-apiRouter.post("/projects/:projectId/meetings", async (req, res) => {
+apiRouter.post("/api/projects/:projectId/meetings", async (req, res) => {
   try {
     const db = await getDb();
     const { date, attendees, agreed, changes, notes, status } = req.body;
@@ -1182,7 +1182,7 @@ apiRouter.post("/projects/:projectId/meetings", async (req, res) => {
 });
 
 // PUT update meeting status
-apiRouter.put("/projects/:projectId/meetings/:id", async (req, res) => {
+apiRouter.put("/api/projects/:projectId/meetings/:id", async (req, res) => {
   try {
     const db = await getDb();
     const { status, attendees, agreed, changes, notes } = req.body;
@@ -1199,7 +1199,7 @@ apiRouter.put("/projects/:projectId/meetings/:id", async (req, res) => {
 });
 
 // DELETE meeting
-apiRouter.delete("/projects/:projectId/meetings/:id", async (req, res) => {
+apiRouter.delete("/api/projects/:projectId/meetings/:id", async (req, res) => {
   try {
     const db = await getDb();
     await db.delete(projectMeetings).where(eq(projectMeetings.id, parseInt(req.params.id)));
@@ -1212,7 +1212,7 @@ apiRouter.delete("/projects/:projectId/meetings/:id", async (req, res) => {
 // عند اكتمال مهمة trigger → إنشاء مهام المرحلة التالية تلقائياً
 // ══════════════════════════════════════════════════════════════════════════════
 
-apiRouter.post("/tasks/:taskId/complete-and-trigger", async (req, res) => {
+apiRouter.post("/api/tasks/:taskId/complete-and-trigger", async (req, res) => {
   try {
     const db = await getDb();
     const taskId = parseInt(req.params.taskId);
@@ -1224,16 +1224,36 @@ apiRouter.post("/tasks/:taskId/complete-and-trigger", async (req, res) => {
     const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
     if (!task) return res.status(404).json({ error: "Task not found" });
     
+    // ═══ Task-level triggers ═══
+    // Find tasks that depend on this completed task (dependsOn = taskId)
+    const dependentTasks = await db.select().from(tasks).where(eq(tasks.dependsOn, taskId));
+    const triggeredTasks: string[] = [];
+    
+    for (const depTask of dependentTasks) {
+      // Activate dependent tasks (change from pending to in-progress)
+      if ((depTask as any).status === "pending") {
+        await db.update(tasks).set({ status: "in-progress" }).where(eq(tasks.id, depTask.id));
+        triggeredTasks.push((depTask as any).name);
+      }
+    }
+    
+    // ═══ Phase-level triggers ═══
     // Get the phase this task belongs to
     const [phase] = await db.select().from(phases).where(eq(phases.id, task.phaseId));
-    if (!phase) return res.json({ completed: true, triggered: [] });
+    if (!phase) return res.json({ completed: true, triggered: triggeredTasks });
     
     // Check if ALL tasks in this phase are completed
     const phaseTasks = await db.select().from(tasks).where(eq(tasks.phaseId, phase.id));
     const allCompleted = phaseTasks.every((t: any) => t.status === "completed");
     
     if (!allCompleted) {
-      return res.json({ completed: true, triggered: [], message: "مهام أخرى في المرحلة لم تكتمل بعد" });
+      return res.json({
+        completed: true,
+        triggered: triggeredTasks,
+        message: triggeredTasks.length > 0
+          ? `تم تفعيل ${triggeredTasks.length} مهمة تابعة`
+          : "مهام أخرى في المرحلة لم تكتمل بعد",
+      });
     }
     
     // All tasks in phase completed → find next phase
@@ -1245,18 +1265,24 @@ apiRouter.post("/tasks/:taskId/complete-and-trigger", async (req, res) => {
     const nextPhase = projectPhases[currentIdx + 1];
     
     if (!nextPhase) {
-      // Update project progress
       await db.update(projects).set({ progress: 100 }).where(eq(projects.id, phase.projectId));
-      return res.json({ completed: true, triggered: [], message: "المشروع مكتمل!" });
+      return res.json({ completed: true, triggered: triggeredTasks, message: "المشروع مكتمل!" });
     }
     
-    // Check if next phase already has tasks
+    // Activate first tasks in next phase
     const nextPhaseTasks = await db.select().from(tasks).where(eq(tasks.phaseId, nextPhase.id));
+    for (const npt of nextPhaseTasks) {
+      // Only activate tasks with no dependencies or dependsOn = 0
+      if ((npt as any).dependsOn === 0 || (npt as any).dependsOn === null) {
+        if ((npt as any).status === "pending") {
+          await db.update(tasks).set({ status: "in-progress" }).where(eq(tasks.id, npt.id));
+          triggeredTasks.push((npt as any).name);
+        }
+      }
+    }
     
-    // Update project current phase
+    // Update project current phase and progress
     await db.update(projects).set({ currentPhase: nextPhase.order }).where(eq(projects.id, phase.projectId));
-    
-    // Calculate progress
     const totalPhases = projectPhases.length;
     const completedPhases = currentIdx + 1;
     const progress = Math.round((completedPhases / totalPhases) * 100);
@@ -1264,7 +1290,7 @@ apiRouter.post("/tasks/:taskId/complete-and-trigger", async (req, res) => {
     
     res.json({
       completed: true,
-      triggered: nextPhaseTasks.map((t: any) => t.name),
+      triggered: triggeredTasks,
       nextPhase: nextPhase.title,
       progress,
       message: `تم الانتقال إلى مرحلة: ${nextPhase.title}`,
