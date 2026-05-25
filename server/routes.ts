@@ -11,7 +11,7 @@ import { getDb } from "./db/mysql.js";
 import {
   clients, projects, phases, tasks, quotations, contracts,
   invoices, invoiceLines, documents, crmLeads, contractTemplates, appointments,
-  workPlans, workPlanPhases, workPlanTasks
+  workPlans, workPlanPhases, workPlanTasks, projectBriefs, projectMeetings
 } from "../drizzle/schema.js";
 import { nanoid } from "nanoid";
 
@@ -1059,5 +1059,215 @@ apiRouter.post("/api/phases/:phaseId/tasks", async (req, res) => {
       .where(eq(tasks.phaseId, phaseId))
       .orderBy(desc(tasks.id));
     res.status(201).json(newTask);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Project Briefs (نموذج طلبات المشروع)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET brief for a project
+apiRouter.get("/projects/:projectId/brief", async (req, res) => {
+  try {
+    const db = await getDb();
+    const rows = await db.select().from(projectBriefs)
+      .where(eq(projectBriefs.projectId, req.params.projectId));
+    if (rows.length === 0) return res.json(null);
+    const brief = rows[0];
+    res.json(brief);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST create brief
+apiRouter.post("/projects/:projectId/brief", async (req, res) => {
+  try {
+    const db = await getDb();
+    const { ownerName, ownerPhone, governorate, area, block, plot, autoNumber,
+      plotArea, plotShape, northDirection, architecturalStyle, floorsCount,
+      floorsDetails, sketchData, notes } = req.body;
+    await db.insert(projectBriefs).values({
+      projectId: req.params.projectId,
+      ownerName: ownerName || "",
+      ownerPhone: ownerPhone || "",
+      governorate: governorate || "",
+      area: area || "",
+      block: block || "",
+      plot: plot || "",
+      autoNumber: autoNumber || "",
+      plotArea: plotArea || "",
+      plotShape: plotShape || "",
+      northDirection: northDirection || "",
+      architecturalStyle: architecturalStyle || "",
+      floorsCount: floorsCount || 0,
+      floorsDetails: typeof floorsDetails === "string" ? floorsDetails : JSON.stringify(floorsDetails || []),
+      sketchData: sketchData || "",
+      notes: notes || "",
+      createdAt: new Date().toISOString().split("T")[0],
+      updatedAt: new Date().toISOString().split("T")[0],
+    });
+    const [inserted] = await db.select().from(projectBriefs)
+      .where(eq(projectBriefs.projectId, req.params.projectId))
+      .orderBy(desc(projectBriefs.id));
+    res.status(201).json(inserted);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT update brief
+apiRouter.put("/projects/:projectId/brief/:id", async (req, res) => {
+  try {
+    const db = await getDb();
+    const { ownerName, ownerPhone, governorate, area, block, plot, autoNumber,
+      plotArea, plotShape, northDirection, architecturalStyle, floorsCount,
+      floorsDetails, sketchData, notes } = req.body;
+    await db.update(projectBriefs)
+      .set({
+        ownerName: ownerName || "",
+        ownerPhone: ownerPhone || "",
+        governorate: governorate || "",
+        area: area || "",
+        block: block || "",
+        plot: plot || "",
+        autoNumber: autoNumber || "",
+        plotArea: plotArea || "",
+        plotShape: plotShape || "",
+        northDirection: northDirection || "",
+        architecturalStyle: architecturalStyle || "",
+        floorsCount: floorsCount || 0,
+        floorsDetails: typeof floorsDetails === "string" ? floorsDetails : JSON.stringify(floorsDetails || []),
+        sketchData: sketchData || "",
+        notes: notes || "",
+        updatedAt: new Date().toISOString().split("T")[0],
+      })
+      .where(eq(projectBriefs.id, parseInt(req.params.id)));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Project Meetings (جلسات التصميم)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET meetings for a project
+apiRouter.get("/projects/:projectId/meetings", async (req, res) => {
+  try {
+    const db = await getDb();
+    const rows = await db.select().from(projectMeetings)
+      .where(eq(projectMeetings.projectId, req.params.projectId))
+      .orderBy(desc(projectMeetings.id));
+    res.json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST create meeting
+apiRouter.post("/projects/:projectId/meetings", async (req, res) => {
+  try {
+    const db = await getDb();
+    const { date, attendees, agreed, changes, notes, status } = req.body;
+    await db.insert(projectMeetings).values({
+      projectId: req.params.projectId,
+      date: date || new Date().toISOString().split("T")[0],
+      attendees: typeof attendees === "string" ? attendees : JSON.stringify(attendees || []),
+      agreed: typeof agreed === "string" ? agreed : JSON.stringify(agreed || []),
+      changes: changes || "",
+      notes: notes || "",
+      status: status || "pending",
+      createdAt: new Date().toISOString().split("T")[0],
+    });
+    const rows = await db.select().from(projectMeetings)
+      .where(eq(projectMeetings.projectId, req.params.projectId))
+      .orderBy(desc(projectMeetings.id));
+    res.status(201).json(rows[0]);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT update meeting status
+apiRouter.put("/projects/:projectId/meetings/:id", async (req, res) => {
+  try {
+    const db = await getDb();
+    const { status, attendees, agreed, changes, notes } = req.body;
+    const updates: any = {};
+    if (status) updates.status = status;
+    if (attendees) updates.attendees = typeof attendees === "string" ? attendees : JSON.stringify(attendees);
+    if (agreed) updates.agreed = typeof agreed === "string" ? agreed : JSON.stringify(agreed);
+    if (changes !== undefined) updates.changes = changes;
+    if (notes !== undefined) updates.notes = notes;
+    await db.update(projectMeetings).set(updates)
+      .where(eq(projectMeetings.id, parseInt(req.params.id)));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE meeting
+apiRouter.delete("/projects/:projectId/meetings/:id", async (req, res) => {
+  try {
+    const db = await getDb();
+    await db.delete(projectMeetings).where(eq(projectMeetings.id, parseInt(req.params.id)));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Task Auto-Trigger (الإطلاق التلقائي للمهام)
+// عند اكتمال مهمة trigger → إنشاء مهام المرحلة التالية تلقائياً
+// ══════════════════════════════════════════════════════════════════════════════
+
+apiRouter.post("/tasks/:taskId/complete-and-trigger", async (req, res) => {
+  try {
+    const db = await getDb();
+    const taskId = parseInt(req.params.taskId);
+    
+    // Mark task as completed
+    await db.update(tasks).set({ status: "completed" }).where(eq(tasks.id, taskId));
+    
+    // Get the task details
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    
+    // Get the phase this task belongs to
+    const [phase] = await db.select().from(phases).where(eq(phases.id, task.phaseId));
+    if (!phase) return res.json({ completed: true, triggered: [] });
+    
+    // Check if ALL tasks in this phase are completed
+    const phaseTasks = await db.select().from(tasks).where(eq(tasks.phaseId, phase.id));
+    const allCompleted = phaseTasks.every((t: any) => t.status === "completed");
+    
+    if (!allCompleted) {
+      return res.json({ completed: true, triggered: [], message: "مهام أخرى في المرحلة لم تكتمل بعد" });
+    }
+    
+    // All tasks in phase completed → find next phase
+    const projectPhases = await db.select().from(phases)
+      .where(eq(phases.projectId, phase.projectId));
+    projectPhases.sort((a: any, b: any) => a.order - b.order);
+    
+    const currentIdx = projectPhases.findIndex((p: any) => p.id === phase.id);
+    const nextPhase = projectPhases[currentIdx + 1];
+    
+    if (!nextPhase) {
+      // Update project progress
+      await db.update(projects).set({ progress: 100 }).where(eq(projects.id, phase.projectId));
+      return res.json({ completed: true, triggered: [], message: "المشروع مكتمل!" });
+    }
+    
+    // Check if next phase already has tasks
+    const nextPhaseTasks = await db.select().from(tasks).where(eq(tasks.phaseId, nextPhase.id));
+    
+    // Update project current phase
+    await db.update(projects).set({ currentPhase: nextPhase.order }).where(eq(projects.id, phase.projectId));
+    
+    // Calculate progress
+    const totalPhases = projectPhases.length;
+    const completedPhases = currentIdx + 1;
+    const progress = Math.round((completedPhases / totalPhases) * 100);
+    await db.update(projects).set({ progress }).where(eq(projects.id, phase.projectId));
+    
+    res.json({
+      completed: true,
+      triggered: nextPhaseTasks.map((t: any) => t.name),
+      nextPhase: nextPhase.title,
+      progress,
+      message: `تم الانتقال إلى مرحلة: ${nextPhase.title}`,
+    });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });

@@ -22,6 +22,7 @@ import DocumentsTaskPanel from "@/components/DocumentsTaskPanel";
 import ContractPaymentPanel from "@/components/ContractPaymentPanel";
 import FormsTaskPanel from "@/components/FormsTaskPanel";
 import SupervisionTaskPanel from "@/components/SupervisionTaskPanel";
+import ProjectBriefForm from "@/components/ProjectBriefForm";
 
 /* ===== Types ===== */
 interface SubTask { name: string; done: boolean; assignee?: string; }
@@ -372,6 +373,8 @@ export default function ProjectDetail() {
   const [showContractPanel, setShowContractPanel] = useState(false);
   const [showFormsPanel, setShowFormsPanel] = useState(false);
   const [showSupervisionPanel, setShowSupervisionPanel] = useState(false);
+  const [showBriefForm, setShowBriefForm] = useState(false);
+  const [briefData, setBriefData] = useState<any>(null);
 
   // Work Plans state
   const [showImportPlan, setShowImportPlan] = useState(false);
@@ -529,6 +532,15 @@ export default function ProjectDetail() {
           >
             <ClipboardList className="w-3 h-3" />
             <span className="hidden sm:inline mr-1">خطة عمل</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs h-8 shrink-0"
+            onClick={() => setShowBriefForm(true)}
+          >
+            <FileText className="w-3 h-3" />
+            <span className="hidden sm:inline mr-1">نموذج الطلبات</span>
           </Button>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -832,6 +844,14 @@ export default function ProjectDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Project Brief Form */}
+      {showBriefForm && (
+        <ProjectBriefForm
+          projectId={projectId}
+          onClose={() => setShowBriefForm(false)}
+        />
       )}
     </div>
   );

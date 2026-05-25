@@ -227,6 +227,48 @@ export const appointments = mysqlTable("appointments", {
   createdAt: varchar("created_at", { length: 32 }).notNull(),
 });
 
+// ── Project Briefs (نموذج طلبات المشروع) ──────────────────────────────────────
+export const projectBriefs = mysqlTable("project_briefs", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: varchar("project_id", { length: 64 }).notNull(),
+  // بيانات المالك
+  ownerName: text("owner_name").default(""),
+  ownerPhone: varchar("owner_phone", { length: 32 }).default(""),
+  // بيانات القسيمة
+  governorate: varchar("governorate", { length: 64 }).default(""),
+  area: varchar("area", { length: 128 }).default(""),
+  block: varchar("block", { length: 32 }).default(""),
+  plot: varchar("plot", { length: 32 }).default(""),
+  autoNumber: varchar("auto_number", { length: 32 }).default(""),
+  plotArea: varchar("plot_area", { length: 32 }).default(""),
+  plotShape: varchar("plot_shape", { length: 64 }).default(""),
+  northDirection: varchar("north_direction", { length: 32 }).default(""),
+  // الطابع المعماري
+  architecturalStyle: varchar("architectural_style", { length: 64 }).default(""),
+  floorsCount: int("floors_count").default(0),
+  // تفاصيل الأدوار (JSON)
+  floorsDetails: text("floors_details").default("[]"),
+  // الكروكي (Canvas data URL)
+  sketchData: text("sketch_data").default(""),
+  // ملاحظات
+  notes: text("notes").default(""),
+  createdAt: varchar("created_at", { length: 32 }).notNull(),
+  updatedAt: varchar("updated_at", { length: 32 }).default(""),
+});
+
+// ── Project Meetings (جلسات التصميم) ──────────────────────────────────────────
+export const projectMeetings = mysqlTable("project_meetings", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: varchar("project_id", { length: 64 }).notNull(),
+  date: varchar("date", { length: 32 }).notNull(),
+  attendees: text("attendees").default("[]"),
+  agreed: text("agreed").default("[]"),
+  changes: text("changes").default(""),
+  status: varchar("status", { length: 32 }).default("pending"),
+  notes: text("notes").default(""),
+  createdAt: varchar("created_at", { length: 32 }).notNull(),
+});
+
 // ── Work Plans (خطط العمل المركزية) ──────────────────────────────────────────
 export const workPlans = mysqlTable("work_plans", {
   id: int("id").autoincrement().primaryKey(),
