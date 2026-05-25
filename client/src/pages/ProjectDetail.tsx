@@ -23,6 +23,7 @@ import ContractPaymentPanel from "@/components/ContractPaymentPanel";
 import FormsTaskPanel from "@/components/FormsTaskPanel";
 import SupervisionTaskPanel from "@/components/SupervisionTaskPanel";
 import ProjectBriefForm from "@/components/ProjectBriefForm";
+import { FilePreparationCard, ArchitecturalDesignCard, StructuralDesignCard, MunicipalSubmissionCard } from "@/components/InteractivePhaseCards";
 
 /* ===== Types ===== */
 interface SubTask { name: string; done: boolean; assignee?: string; }
@@ -43,9 +44,10 @@ interface Task {
 }
 interface Phase { title: string; subtitle?: string; tasks: Task[]; }
 interface ProjectData {
-  id: string; name: string; client: string; type: string; serviceType: string;
+  id: string; name: string; client: string; clientId?: string; type: string; serviceType: string;
   area: string; quotation: string; progress: number; currentPhase: number;
   status?: string; phases: Phase[];
+  clientPhone?: string; block?: string; plot?: string;
 }
 
 /* ========================================================================
@@ -619,6 +621,61 @@ export default function ProjectDetail() {
             );
           })}
         </div>
+      </div>
+
+      {/* ═══ Interactive Phase Cards (الكروت التفاعلية المدمجة) ═══ */}
+      <div className="space-y-3">
+        {/* كرت تجهيز الملف */}
+        {project.phases.some(p => p.title.includes("تجهيز")) && (
+          <FilePreparationCard
+            projectId={projectId}
+            clientId={project.clientId}
+            clientName={project.client}
+            projectName={project.name}
+            area={project.area}
+            plot={project.plot}
+            block={project.block}
+            phaseColor={phaseColors[0]}
+            tasks={project.phases.find(p => p.title.includes("تجهيز"))?.tasks || []}
+          />
+        )}
+
+        {/* كرت التصميم المعماري */}
+        {project.phases.some(p => p.title.includes("المعماري")) && (
+          <ArchitecturalDesignCard
+            projectId={projectId}
+            clientId={project.clientId}
+            clientName={project.client}
+            clientPhone={project.clientPhone}
+            phaseColor={phaseColors[1]}
+            tasks={project.phases.find(p => p.title.includes("المعماري"))?.tasks || []}
+            onOpenBrief={() => setShowBriefForm(true)}
+          />
+        )}
+
+        {/* كرت الإنشائي والواجهات */}
+        {project.phases.some(p => p.title.includes("الإنشائي") || p.title.includes("الرسم")) && (
+          <StructuralDesignCard
+            projectId={projectId}
+            clientId={project.clientId}
+            clientName={project.client}
+            clientPhone={project.clientPhone}
+            phaseColor={phaseColors[2]}
+            tasks={[
+              ...(project.phases.find(p => p.title.includes("الإنشائي"))?.tasks || []),
+              ...(project.phases.find(p => p.title.includes("الرسم"))?.tasks || []),
+            ]}
+          />
+        )}
+
+        {/* كرت تقديم البلدية */}
+        {project.phases.some(p => p.title.includes("البلدية") || p.title.includes("التقديم")) && (
+          <MunicipalSubmissionCard
+            projectId={projectId}
+            phaseColor={phaseColors[4]}
+            tasks={project.phases.find(p => p.title.includes("البلدية") || p.title.includes("التقديم"))?.tasks || []}
+          />
+        )}
       </div>
 
       {/* Kanban Board - horizontal scroll on mobile, grid on desktop */}

@@ -749,3 +749,79 @@ export function useCreatePhaseTask(projectId: string) {
     },
   });
 }
+
+
+// ── Send Email ───────────────────────────────────────────────────────────────
+
+export interface SendEmailPayload {
+  to: string;
+  subject: string;
+  body: string;
+  attachmentUrls?: string[];
+  projectId?: string;
+  type?: "soil" | "electricity" | "general";
+}
+
+export function useSendEmail() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: SendEmailPayload) =>
+      request<{ success: boolean; message: string }>("/api/send-email", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (_d, vars) => {
+      if (vars.projectId) {
+        qc.invalidateQueries({ queryKey: ["projects", vars.projectId] });
+      }
+    },
+  });
+}
+
+// ── Task Approval ────────────────────────────────────────────────────────────
+
+export function useApproveTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (taskId: number) =>
+      request<{ approved: boolean; triggered: string[] }>(`/api/tasks/${taskId}/approve`, { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["projects", projectId] });
+      qc.invalidateQueries({ queryKey: ["tasks", "all"] });
+    },
+  });
+}
+
+// ── Project Meetings ─────────────────────────────────────────────────────────
+
+export interface ProjectMeeting {
+  id: number;
+  projectId: string;
+  date: string;
+  attendees: string;
+  agreed: string;
+  changes: string;
+  notes: string;
+  status: string;
+  createdAt: string;
+}
+
+export function useProjectMeetings(projectId: string) {
+  return useQuery<ProjectMeeting[]>({
+    queryKey: ["project-meetings", projectId],
+    queryFn: () => request(`/api/projects/${projectId}/meetings`),
+    enabled: !!projectId,
+  });
+}
+
+export function useCreateProjectMeeting(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<ProjectMeeting>) =>
+      request<ProjectMeeting>(`/api/projects/${projectId}/meetings`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["project-meetings", projectId] }),
+  });
+}

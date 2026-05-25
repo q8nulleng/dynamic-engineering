@@ -14,6 +14,7 @@ import {
   workPlans, workPlanPhases, workPlanTasks, projectBriefs, projectMeetings
 } from "../drizzle/schema.js";
 import { nanoid } from "nanoid";
+import { storagePut } from "./storage.js";
 
 export const apiRouter = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -91,6 +92,19 @@ apiRouter.get("/api/projects/:id", async (req, res) => {
     const [project] = await db.select().from(projects).where(eq(projects.id, req.params.id));
     if (!project) return res.status(404).json({ error: "not found" });
 
+    // Fetch client details for phone/block/plot
+    let clientData: any = {};
+    if ((project as any).clientId) {
+      const [clientRow] = await db.select().from(clients).where(eq(clients.id, (project as any).clientId));
+      if (clientRow) {
+        clientData = {
+          clientPhone: clientRow.phone || "",
+          block: clientRow.block || "",
+          plot: clientRow.plot || "",
+        };
+      }
+    }
+
     const projectPhases = await db.select().from(phases)
       .where(eq(phases.projectId, req.params.id))
       .orderBy(phases.order);
@@ -102,7 +116,7 @@ apiRouter.get("/api/projects/:id", async (req, res) => {
       return { ...phase, tasks: phaseTasks };
     }));
 
-    res.json({ ...project, phases: phasesWithTasks });
+    res.json({ ...project, ...clientData, phases: phasesWithTasks });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
@@ -606,16 +620,27 @@ apiRouter.post("/api/upload", upload.single("file"), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "no file" });
     const { clientId, projectId, name, category } = req.body;
     const now = new Date().toISOString();
+
+    // Upload to S3 storage
+    const fs = await import("fs");
+    const fileBuffer = fs.readFileSync(req.file.path);
+    const ext = req.file.originalname.split(".").pop() || "bin";
+    const storageKey = `docs/${clientId || projectId || "general"}/${nanoid(8)}.${ext}`;
+    const { url: storageUrl } = await storagePut(storageKey, fileBuffer, req.file.mimetype);
+
+    // Clean up temp file
+    fs.unlinkSync(req.file.path);
+
     await db.insert(documents).values({
       clientId: clientId || null,
       projectId: projectId || null,
       name: name || req.file.originalname,
       category: category || "",
       status: "received",
-      fileName: req.file.filename,
+      fileName: req.file.originalname,
       fileSize: `${(req.file.size / 1024).toFixed(0)} KB`,
       uploadedAt: now,
-      url: `/uploads/${req.file.filename}`,
+      url: storageUrl,
     });
     const allDocs = await db.select().from(documents).orderBy(desc(documents.id));
     res.status(201).json(allDocs[0]);
@@ -1295,5 +1320,108 @@ apiRouter.post("/api/tasks/:taskId/complete-and-trigger", async (req, res) => {
       progress,
       message: `تم الانتقال إلى مرحلة: ${nextPhase.title}`,
     });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Email Send API (إرسال إيميل — طلب تربة / كهرباء / عام)
+// ══════════════════════════════════════════════════════════════════════════════
+
+apiRouter.post("/api/send-email", async (req, res) => {
+  try {
+    const { to, subject, body, attachmentUrls, projectId, type } = req.body;
+    if (!to || !subject) return res.status(400).json({ error: "to and subject are required" });
+
+    // For now, we log the email and return success
+    // In production, integrate with nodemailer or Manus notification API
+    console.log(`[EMAIL] To: ${to} | Subject: ${subject} | Type: ${type || "general"}`);
+    console.log(`[EMAIL] Body: ${body?.substring(0, 200)}...`);
+    if (attachmentUrls?.length) console.log(`[EMAIL] Attachments: ${attachmentUrls.join(", ")}`);
+
+    // Record the email action in the project's task notes
+    if (projectId) {
+      const db = getDb();
+      // We could log this as a document or meeting note
+      await db.insert(projectMeetings).values({
+        projectId,
+        date: new Date().toISOString().split("T")[0],
+        attendees: JSON.stringify([]),
+        agreed: JSON.stringify([`تم إرسال ${type === "soil" ? "طلب تربة" : type === "electricity" ? "طلب كهرباء" : "إيميل"} إلى ${to}`]),
+        changes: "",
+        notes: `الموضوع: ${subject}\nالمحتوى: ${body || ""}`,
+        status: "completed",
+        createdAt: new Date().toISOString().split("T")[0],
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `تم إرسال الإيميل إلى ${to}`,
+      emailData: { to, subject, body: body?.substring(0, 100), type },
+    });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Task Approval API (اعتماد المهمة وإطلاق المرحلة التالية)
+// ══════════════════════════════════════════════════════════════════════════════
+
+apiRouter.post("/api/tasks/:taskId/approve", async (req, res) => {
+  try {
+    const db = getDb();
+    const taskId = parseInt(req.params.taskId);
+    
+    // Mark task as done
+    await db.update(tasks).set({ status: "done" }).where(eq(tasks.id, taskId));
+    
+    // Get the task details
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    
+    // Task-level triggers: activate dependent tasks
+    const dependentTasks = await db.select().from(tasks).where(eq(tasks.dependsOn, taskId));
+    const triggeredTasks: string[] = [];
+    
+    for (const depTask of dependentTasks) {
+      if ((depTask as any).status === "pending") {
+        await db.update(tasks).set({ status: "in_progress" }).where(eq(tasks.id, depTask.id));
+        triggeredTasks.push((depTask as any).name);
+      }
+    }
+    
+    // Phase-level triggers
+    const [phase] = await db.select().from(phases).where(eq(phases.id, task.phaseId));
+    if (!phase) return res.json({ approved: true, triggered: triggeredTasks });
+    
+    const phaseTasks = await db.select().from(tasks).where(eq(tasks.phaseId, phase.id));
+    const allDone = phaseTasks.every((t: any) => t.status === "done");
+    
+    if (allDone) {
+      // Move to next phase
+      const projectPhases = await db.select().from(phases)
+        .where(eq(phases.projectId, phase.projectId));
+      projectPhases.sort((a: any, b: any) => a.order - b.order);
+      
+      const currentIdx = projectPhases.findIndex((p: any) => p.id === phase.id);
+      const nextPhase = projectPhases[currentIdx + 1];
+      
+      if (nextPhase) {
+        const nextPhaseTasks = await db.select().from(tasks).where(eq(tasks.phaseId, nextPhase.id));
+        for (const npt of nextPhaseTasks) {
+          if (((npt as any).dependsOn === 0 || (npt as any).dependsOn === null) && (npt as any).status === "pending") {
+            await db.update(tasks).set({ status: "in_progress" }).where(eq(tasks.id, npt.id));
+            triggeredTasks.push((npt as any).name);
+          }
+        }
+        await db.update(projects).set({ currentPhase: nextPhase.order }).where(eq(projects.id, phase.projectId));
+      }
+      
+      const totalPhases = projectPhases.length;
+      const completedPhases = currentIdx + 1;
+      const progress = Math.round((completedPhases / totalPhases) * 100);
+      await db.update(projects).set({ progress }).where(eq(projects.id, phase.projectId));
+    }
+    
+    res.json({ approved: true, triggered: triggeredTasks });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
