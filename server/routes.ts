@@ -350,6 +350,8 @@ apiRouter.post("/api/projects/:id/auto-tasks", async (req, res) => {
     if (!project) return res.status(404).json({ error: "not found" });
 
     const existingPhases = await db.select().from(phases).where(eq(phases.projectId, projectId));
+
+    // ── منع التكرار: إذا كانت هناك مهام تلقائية موجودة مسبقاً ──
     for (const ph of existingPhases) {
       const allTasks = await db.select().from(tasks).where(eq(tasks.phaseId, ph.id));
       const autoTasks = allTasks.filter((t: any) => t.autoCreated === 1);
@@ -357,6 +359,12 @@ apiRouter.post("/api/projects/:id/auto-tasks", async (req, res) => {
         return res.status(400).json({ error: "auto tasks already created" });
       }
     }
+
+    // ── حذف المراحل والمهام الحالية وإعادة بناء نظيفة ──
+    for (const ep of existingPhases) {
+      await db.delete(tasks).where(eq(tasks.phaseId, ep.id));
+    }
+    await db.delete(phases).where(eq(phases.projectId, projectId));
 
     const phaseDefs = [
       { title: "تجهيز الملف",          subtitle: "جمع الوثائق والملفات" },
@@ -369,16 +377,13 @@ apiRouter.post("/api/projects/:id/auto-tasks", async (req, res) => {
     ];
 
     const phaseMap: Record<string, number> = {};
-    for (const ep of existingPhases) phaseMap[ep.title] = ep.id;
-    let nextOrder = existingPhases.length;
+    let nextOrder = 0;
     for (const pd of phaseDefs) {
-      if (!phaseMap[pd.title]) {
-        await db.insert(phases).values({ projectId, order: nextOrder++, title: pd.title, subtitle: pd.subtitle });
-        const [ph] = await db.select().from(phases)
-          .where(eq(phases.projectId, projectId))
-          .orderBy(desc(phases.id));
-        phaseMap[pd.title] = ph.id;
-      }
+      await db.insert(phases).values({ projectId, order: nextOrder++, title: pd.title, subtitle: pd.subtitle });
+      const [ph] = await db.select().from(phases)
+        .where(eq(phases.projectId, projectId))
+        .orderBy(desc(phases.id));
+      phaseMap[pd.title] = ph.id;
     }
 
     const taskDefs: { name: string; phase: string; assignee: string; depIdx: number; estimatedDays: number; status: string }[] = [
@@ -1011,18 +1016,22 @@ apiRouter.post("/api/work-plans/:id/apply/:projectId", async (req, res) => {
     const [plan] = await db.select().from(workPlans).where(eq(workPlans.id, planId));
     if (!plan) return res.status(404).json({ error: "plan not found" });
 
-    // Get current max order for existing phases
-    const existingPhases = await db.select().from(phases).where(eq(phases.projectId, projectId));
-    let nextOrder = existingPhases.length;
-
     const planPhases = await db.select().from(workPlanPhases)
       .where(eq(workPlanPhases.workPlanId, planId))
       .orderBy(workPlanPhases.order);
 
-    for (const ph of planPhases) {
+    // ── حذف جميع المراحل والمهام الحالية ثم إعادة البناء من خطة العمل ──
+    const existingPhases = await db.select().from(phases).where(eq(phases.projectId, projectId));
+    for (const ep of existingPhases) {
+      await db.delete(tasks).where(eq(tasks.phaseId, ep.id));
+    }
+    await db.delete(phases).where(eq(phases.projectId, projectId));
+
+    for (let i = 0; i < planPhases.length; i++) {
+      const ph = planPhases[i];
       await db.insert(phases).values({
         projectId,
-        order: nextOrder++,
+        order: i,
         title: ph.title,
         subtitle: ph.subtitle || "",
       });
