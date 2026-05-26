@@ -19,6 +19,7 @@ import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
 import Appointments from "./pages/Appointments";
 import WorkPlans from "./pages/WorkPlans";
+import ClientDocuments from "./pages/ClientDocuments";
 import DashboardLayout from "./components/DashboardLayout";
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -33,6 +34,7 @@ function Router() {
       <Route path="/clients/:id" component={ClientDetail} />
       <Route path="/tasks" component={Tasks} />
       <Route path="/documents" component={Documents} />
+      <Route path="/documents/:clientId" component={ClientDocuments} />
       <Route path="/payments" component={Payments} />
       <Route path="/client-portal" component={ClientPortal} />
       <Route path="/reports" component={Reports} />

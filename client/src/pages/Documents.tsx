@@ -13,6 +13,7 @@ import {
   ChevronLeft, Folder, FolderOpen as FolderOpenIcon, Home,
 } from "lucide-react";
 import { useDocuments, useUploadDocument, useProjects, useClients } from "@/lib/api";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 /* ─── فئات الوثائق ─── */
@@ -56,6 +57,7 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function Documents() {
+  const [, navigate] = useLocation();
   const { data: docs = [],     isLoading } = useDocuments();
   const { data: projects = [] }            = useProjects();
   const { data: clients  = [] }            = useClients();
@@ -220,25 +222,30 @@ export default function Documents() {
               <div key={cid} className="rounded-xl border shadow-sm overflow-hidden bg-card">
 
                 {/* ── مستوى 1: العميل ── */}
-                <button
-                  onClick={() => toggleClient(cid)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-right hover:bg-muted/30 transition-colors"
-                >
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-white text-sm font-bold"
-                    style={{ backgroundColor: "oklch(0.45 0.12 250)" }}>
+                <div className="w-full flex items-center gap-3 px-4 py-3 text-right hover:bg-muted/30 transition-colors">
+                  <button
+                    onClick={() => navigate(`/documents/${cid}`)}
+                    className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-white text-sm font-bold hover:opacity-80 transition-opacity"
+                    style={{ backgroundColor: "oklch(0.45 0.12 250)" }}
+                    title="فتح ملف العميل"
+                  >
                     {cName.charAt(0)}
-                  </div>
-                  <div className="flex-1 text-right">
-                    <p className="font-semibold text-sm">{cName}</p>
+                  </button>
+                  <button
+                    onClick={() => toggleClient(cid)}
+                    className="flex-1 text-right"
+                  >
+                    <p className="font-semibold text-sm hover:underline cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate(`/documents/${cid}`); }}>{cName}</p>
                     <p className="text-xs text-muted-foreground">
                       {Object.keys(projectsMap).length} مشروع • {clientDocCount} ملف
                     </p>
-                  </div>
+                  </button>
                   <ChevronDown
-                    className="w-4 h-4 text-muted-foreground transition-transform shrink-0"
+                    onClick={() => toggleClient(cid)}
+                    className="w-4 h-4 text-muted-foreground transition-transform shrink-0 cursor-pointer"
                     style={{ transform: isClientOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
                   />
-                </button>
+                </div>
 
                 {/* ── مستوى 2: المشاريع ── */}
                 {isClientOpen && (
