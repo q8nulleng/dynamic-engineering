@@ -1,25 +1,28 @@
 /*
- * Documents - إدارة المستندات والملفات
+ * Documents — عرض هرمي: العميل ← المشروع ← فئة الوثيقة
  */
 import { useRef, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Upload, FileText, Image, File, Zap, Droplets, PenTool,
-  Building2, Eye, Download, Search, FolderOpen, X, CheckCircle2,
-  User, ScrollText, ClipboardList, Wrench, Banknote
+  Upload, FileText, Image, File, PenTool, Building2, Eye,
+  Download, Search, FolderOpen, X, CheckCircle2, User,
+  ScrollText, ClipboardList, Wrench, Banknote, ChevronDown,
+  ChevronLeft, Folder, FolderOpen as FolderOpenIcon, Home,
 } from "lucide-react";
-import { useDocuments, useUploadDocument, useProjects } from "@/lib/api";
+import { useDocuments, useUploadDocument, useProjects, useClients } from "@/lib/api";
 import { toast } from "sonner";
 
-/* ─── هيكل المجلدات وفق القسم 8.2 ─── */
+/* ─── فئات الوثائق ─── */
 const CATEGORIES = [
   "بيانات العميل",
+  "مستندات العميل",
   "عقود وعروض",
+  "عقود موقعة",
   "تقارير",
+  "مستندات حكومية",
   "مخططات معمارية",
   "مخططات إنشائية",
   "مخططات تنفيذية",
@@ -31,7 +34,10 @@ const CATEGORIES = [
 
 const categoryIcons: Record<string, React.ElementType> = {
   "بيانات العميل":    User,
+  "مستندات العميل":  User,
   "عقود وعروض":      ScrollText,
+  "عقود موقعة":      ScrollText,
+  "مستندات حكومية": Building2,
   "تقارير":          ClipboardList,
   "مخططات معمارية":  Building2,
   "مخططات إنشائية":  Wrench,
@@ -42,41 +48,73 @@ const categoryIcons: Record<string, React.ElementType> = {
   "أخرى":            FolderOpen,
 };
 
-export default function Documents() {
-  const { data: docs = [], isLoading } = useDocuments();
-  const { data: projects = [] }        = useProjects();
-  const uploadMutation = useUploadDocument();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [search,           setSearch]           = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("الكل");
-  const [selectedProject,  setSelectedProject]  = useState<string>("all");
-  const [uploadCategory,   setUploadCategory]   = useState("أخرى");
-  const [uploadProjectId,  setUploadProjectId]  = useState<string>("none");
+const PROJECT_TYPE_LABELS: Record<string, string> = {
+  residential: "سكن خاص",
+  industrial:  "صناعي",
+  commercial:  "تجاري",
+  investment:  "استثماري",
+};
 
-  const filtered = docs.filter((d) => {
-    const matchSearch  = !search || d.name.toLowerCase().includes(search.toLowerCase());
-    const matchCat     = selectedCategory === "الكل" || d.category === selectedCategory;
-    const matchProject = selectedProject === "all" || d.projectId === selectedProject;
-    return matchSearch && matchCat && matchProject;
+export default function Documents() {
+  const { data: docs = [],     isLoading } = useDocuments();
+  const { data: projects = [] }            = useProjects();
+  const { data: clients  = [] }            = useClients();
+  const uploadMutation = useUploadDocument();
+  const fileInputRef   = useRef<HTMLInputElement>(null);
+
+  const [search,          setSearch]          = useState("");
+  const [uploadCategory,  setUploadCategory]  = useState("أخرى");
+  const [uploadProjectId, setUploadProjectId] = useState<string>("none");
+
+  /* ─── حالة فتح/إغلاق كل مستوى ─── */
+  const [openClients,    setOpenClients]    = useState<Record<string, boolean>>({});
+  const [openProjects,   setOpenProjects]   = useState<Record<string, boolean>>({});
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
+
+  const toggleClient   = (id: string) => setOpenClients(p   => ({ ...p, [id]: !p[id] }));
+  const toggleProject  = (id: string) => setOpenProjects(p  => ({ ...p, [id]: !p[id] }));
+  const toggleCategory = (id: string) => setOpenCategories(p => ({ ...p, [id]: !p[id] }));
+
+  /* ─── فلترة بالبحث (اسم الملف + اسم العميل + فئة الوثيقة) ─── */
+  const filtered = docs.filter(d => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    const nameMatch     = d.name.toLowerCase().includes(q);
+    const catMatch      = (d.category || "").toLowerCase().includes(q);
+    const clientMatch   = clientName(d.clientId || "__no_client__").toLowerCase().includes(q);
+    const projectMatch  = projectInfo(d.projectId || "__no_project__").name.toLowerCase().includes(q);
+    return nameMatch || catMatch || clientMatch || projectMatch;
   });
 
-  /* تجميع حسب التصنيف */
-  const grouped: Record<string, typeof docs> = {};
+  /* ─── بناء الهيكل الهرمي ─── */
+  // clientId → projectId → category → docs[]
+  type DocType = typeof docs[0];
+  const tree: Record<string, Record<string, Record<string, DocType[]>>> = {};
+
   for (const doc of filtered) {
-    const cat = doc.category || "أخرى";
-    (grouped[cat] = grouped[cat] || []).push(doc);
+    const cid = doc.clientId || "__no_client__";
+    const pid = doc.projectId || "__no_project__";
+    const cat = doc.category  || "أخرى";
+    if (!tree[cid]) tree[cid] = {};
+    if (!tree[cid][pid]) tree[cid][pid] = {};
+    if (!tree[cid][pid][cat]) tree[cid][pid][cat] = [];
+    tree[cid][pid][cat].push(doc);
   }
 
-  /* ترتيب المجلدات حسب الهيكل القياسي */
-  const sortedGroups = Object.entries(grouped).sort(([a], [b]) => {
-    const ai = CATEGORIES.indexOf(a);
-    const bi = CATEGORIES.indexOf(b);
-    if (ai === -1 && bi === -1) return a.localeCompare(b);
-    if (ai === -1) return 1;
-    if (bi === -1) return -1;
-    return ai - bi;
-  });
+  /* ─── مساعد: اسم العميل ─── */
+  const clientName = (id: string) => {
+    if (id === "__no_client__") return "بدون عميل";
+    return clients.find(c => c.id === id)?.name || id;
+  };
 
+  /* ─── مساعد: اسم المشروع + نوعه ─── */
+  const projectInfo = (id: string) => {
+    if (id === "__no_project__") return { name: "بدون مشروع", type: "" };
+    const p = projects.find(p => p.id === id);
+    return { name: p?.name || id, type: PROJECT_TYPE_LABELS[p?.type || ""] || p?.type || "" };
+  };
+
+  /* ─── رفع ملف ─── */
   function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -87,48 +125,55 @@ export default function Documents() {
     if (uploadProjectId && uploadProjectId !== "none") fd.append("projectId", uploadProjectId);
     uploadMutation.mutate(fd, {
       onSuccess: () => toast.success(`تم رفع: ${file.name}`),
-      onError: () => toast.error("فشل رفع الملف"),
+      onError:   () => toast.error("فشل رفع الملف"),
     });
     e.target.value = "";
   }
 
+  const totalDocs = docs.length;
+
   return (
     <div className="space-y-5">
-      {/* Search + Upload */}
+
+      {/* ─── شريط البحث + رفع ─── */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 max-w-xs">
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="بحث في المستندات..." className="pr-10" />
+          <Input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="بحث في المستندات..."
+            className="pr-10"
+          />
         </div>
-        {/* Project filter */}
-        <Select value={selectedProject} onValueChange={setSelectedProject}>
-          <SelectTrigger className="w-44 text-xs"><SelectValue placeholder="كل المشاريع" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">كل المشاريع</SelectItem>
-            {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        {/* Upload controls */}
-        <div className="flex items-center gap-2 mr-auto">
+
+        {/* أدوات الرفع */}
+        <div className="flex items-center gap-2 mr-auto flex-wrap">
           <Select value={uploadProjectId} onValueChange={setUploadProjectId}>
-            <SelectTrigger className="w-40 text-xs"><SelectValue placeholder="ربط بمشروع" /></SelectTrigger>
+            <SelectTrigger className="w-40 text-xs">
+              <SelectValue placeholder="ربط بمشروع" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">بدون مشروع</SelectItem>
-              {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              {projects.map(p => (
+                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
+
           <select
             value={uploadCategory}
-            onChange={(e) => setUploadCategory(e.target.value)}
+            onChange={e => setUploadCategory(e.target.value)}
             className="text-xs border rounded-md px-2 py-2 bg-background text-foreground"
           >
-            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
+
           <Button
             style={{ backgroundColor: "oklch(0.30 0.05 250)" }}
             onClick={() => fileInputRef.current?.click()}
             disabled={uploadMutation.isPending}
+            className="text-white"
           >
             {uploadMutation.isPending
               ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin ml-2" />جاري الرفع...</>
@@ -138,102 +183,194 @@ export default function Documents() {
         </div>
       </div>
 
-      {/* فلتر التصنيفات */}
-      <div className="flex gap-2 flex-wrap">
-        {["الكل", ...CATEGORIES].map((cat) => {
-          const count = cat === "الكل" ? docs.length : docs.filter((d) => d.category === cat).length;
-          const Icon = categoryIcons[cat] || FolderOpen;
-          return (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all"
-              style={{
-                backgroundColor: selectedCategory === cat ? "oklch(0.30 0.05 250 / 0.08)" : "transparent",
-                borderColor: selectedCategory === cat ? "oklch(0.30 0.05 250 / 0.4)" : "hsl(var(--border))",
-                color: selectedCategory === cat ? "oklch(0.30 0.05 250)" : "hsl(var(--muted-foreground))",
-              }}
-            >
-              <Icon className="w-3 h-3" />
-              {cat}
-              {count > 0 && <span className="text-[10px] font-bold bg-muted px-1.5 py-0.5 rounded-full">{count}</span>}
-            </button>
-          );
-        })}
+      {/* ─── إحصاء سريع ─── */}
+      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <span className="font-semibold text-foreground">{totalDocs}</span> ملف
+        <span>•</span>
+        <span className="font-semibold text-foreground">{Object.keys(tree).length}</span> عميل
+        <span>•</span>
+        <span className="font-semibold text-foreground">
+          {Object.values(tree).reduce((s, ps) => s + Object.keys(ps).length, 0)}
+        </span> مشروع
       </div>
 
+      {/* ─── محتوى ─── */}
       {isLoading ? (
         <div className="flex items-center justify-center min-h-64 text-muted-foreground">جاري التحميل...</div>
-      ) : docs.length === 0 ? (
-        /* حالة فارغة */
-        <Card className="border-0 shadow-sm">
-          <CardContent className="py-16 text-center">
-            <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-4">
-              <FolderOpen className="w-8 h-8 opacity-30" />
-            </div>
-            <p className="text-sm font-medium text-muted-foreground">لا توجد ملفات مرفوعة بعد</p>
-            <p className="text-xs text-muted-foreground mt-1">استخدم زر "رفع ملف" لإضافة مستندات</p>
-          </CardContent>
-        </Card>
-      ) : sortedGroups.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground text-sm">لا توجد نتائج</div>
+      ) : totalDocs === 0 ? (
+        <div className="rounded-xl border-0 shadow-sm bg-card p-16 text-center">
+          <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-4">
+            <FolderOpen className="w-8 h-8 opacity-30" />
+          </div>
+          <p className="text-sm font-medium text-muted-foreground">لا توجد ملفات مرفوعة بعد</p>
+          <p className="text-xs text-muted-foreground mt-1">استخدم زر "رفع ملف" لإضافة مستندات</p>
+        </div>
+      ) : Object.keys(tree).length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground text-sm">لا توجد نتائج للبحث</div>
       ) : (
-        <div className="space-y-4">
-          {sortedGroups.map(([cat, catDocs]) => {
-            const Icon = categoryIcons[cat] || FolderOpen;
+        <div className="space-y-3">
+          {Object.entries(tree).map(([cid, projectsMap]) => {
+            const cName     = clientName(cid);
+            const isClientOpen = openClients[cid] !== false; // مفتوح افتراضياً
+            const clientDocCount = Object.values(projectsMap)
+              .flatMap(cats => Object.values(cats))
+              .flat().length;
+
             return (
-              <Card key={cat} className="border-0 shadow-sm">
-                <CardHeader className="pb-2 pt-4">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Icon className="w-4 h-4" style={{ color: "oklch(0.72 0.10 60)" }} />
-                    {cat}
-                    <Badge variant="secondary" className="text-xs mr-auto">{catDocs.length} ملف</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pb-3">
-                  <div className="space-y-2">
-                    {catDocs.map((doc) => {
-                      const ext = doc.name.split(".").pop()?.toLowerCase() || "";
-                      const FileIcon = ["png","jpg","jpeg","webp","svg"].includes(ext) ? Image
-                        : ["pdf"].includes(ext) ? FileText
-                        : File;
+              <div key={cid} className="rounded-xl border shadow-sm overflow-hidden bg-card">
+
+                {/* ── مستوى 1: العميل ── */}
+                <button
+                  onClick={() => toggleClient(cid)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-right hover:bg-muted/30 transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-white text-sm font-bold"
+                    style={{ backgroundColor: "oklch(0.45 0.12 250)" }}>
+                    {cName.charAt(0)}
+                  </div>
+                  <div className="flex-1 text-right">
+                    <p className="font-semibold text-sm">{cName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {Object.keys(projectsMap).length} مشروع • {clientDocCount} ملف
+                    </p>
+                  </div>
+                  <ChevronDown
+                    className="w-4 h-4 text-muted-foreground transition-transform shrink-0"
+                    style={{ transform: isClientOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+                  />
+                </button>
+
+                {/* ── مستوى 2: المشاريع ── */}
+                {isClientOpen && (
+                  <div className="border-t divide-y">
+                    {Object.entries(projectsMap).map(([pid, catsMap]) => {
+                      const { name: pName, type: pType } = projectInfo(pid);
+                      const isProjectOpen = openProjects[pid] !== false; // مفتوح افتراضياً
+                      const projectDocCount = Object.values(catsMap).flat().length;
+
                       return (
-                        <div key={doc.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer group">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                            style={{ backgroundColor: "oklch(0.30 0.05 250 / 0.08)" }}>
-                            <FileIcon className="w-4 h-4" style={{ color: "oklch(0.30 0.05 250)" }} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm truncate font-medium">{doc.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {doc.fileSize}
-                              {doc.uploadedAt ? ` • ${doc.uploadedAt.slice(0, 10)}` : ""}
-                              {doc.projectId ? ` • ${projects.find(p => p.id === doc.projectId)?.name || doc.projectId}` : ""}
-                            </p>
-                          </div>
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {doc.url && (
-                              <>
-                                <a href={doc.url} target="_blank" rel="noopener noreferrer">
-                                  <Button variant="ghost" size="icon" className="h-7 w-7"><Eye className="w-3.5 h-3.5" /></Button>
-                                </a>
-                                <a href={doc.url} download={doc.name}>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7"><Download className="w-3.5 h-3.5" /></Button>
-                                </a>
-                              </>
+                        <div key={pid} className="bg-muted/10">
+
+                          {/* عنوان المشروع */}
+                          <button
+                            onClick={() => toggleProject(pid)}
+                            className="w-full flex items-center gap-3 px-5 py-2.5 text-right hover:bg-muted/30 transition-colors"
+                          >
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                              style={{ backgroundColor: "oklch(0.72 0.10 60 / 0.15)" }}>
+                              {isProjectOpen
+                                ? <FolderOpenIcon className="w-4 h-4" style={{ color: "oklch(0.55 0.12 60)" }} />
+                                : <Folder className="w-4 h-4" style={{ color: "oklch(0.55 0.12 60)" }} />}
+                            </div>
+                            <div className="flex-1 text-right">
+                              <p className="text-sm font-medium">{pName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {pType && <span className="ml-1">{pType} •</span>}
+                                {Object.keys(catsMap).length} فئة • {projectDocCount} ملف
+                              </p>
+                            </div>
+                            {pType && (
+                              <Badge variant="outline" className="text-[10px] shrink-0">
+                                <Home className="w-2.5 h-2.5 ml-1" />{pType}
+                              </Badge>
                             )}
-                          </div>
-                          <div className="shrink-0">
-                            {doc.status === "received"
-                              ? <CheckCircle2 className="w-4 h-4 text-green-500" />
-                              : <X className="w-4 h-4 text-red-400" />}
-                          </div>
+                            <ChevronLeft
+                              className="w-4 h-4 text-muted-foreground transition-transform shrink-0"
+                              style={{ transform: isProjectOpen ? "rotate(-90deg)" : "rotate(0deg)" }}
+                            />
+                          </button>
+
+                          {/* ── مستوى 3: الفئات ── */}
+                          {isProjectOpen && (
+                            <div className="pb-2 px-3 space-y-1">
+                              {CATEGORIES
+                                .filter(cat => catsMap[cat])
+                                .concat(Object.keys(catsMap).filter(k => !CATEGORIES.includes(k)))
+                                .map(cat => {
+                                  const catDocs = catsMap[cat] || [];
+                                  if (!catDocs.length) return null;
+                                  const catKey = `${pid}-${cat}`;
+                                  const isCatOpen = openCategories[catKey] !== false; // مفتوح افتراضياً
+                                  const CatIcon = categoryIcons[cat] || FolderOpen;
+
+                                  return (
+                                    <div key={cat} className="rounded-lg overflow-hidden border border-border/50">
+
+                                      {/* عنوان الفئة */}
+                                      <button
+                                        onClick={() => toggleCategory(catKey)}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-right hover:bg-muted/20 transition-colors bg-background/50"
+                                      >
+                                        <CatIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "oklch(0.30 0.05 250)" }} />
+                                        <span className="text-xs font-medium flex-1">{cat}</span>
+                                        <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                                          {catDocs.length}
+                                        </Badge>
+                                        <ChevronDown
+                                          className="w-3.5 h-3.5 text-muted-foreground transition-transform shrink-0"
+                                          style={{ transform: isCatOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+                                        />
+                                      </button>
+
+                                      {/* قائمة الملفات */}
+                                      {isCatOpen && (
+                                        <div className="divide-y divide-border/30">
+                                          {catDocs.map(doc => {
+                                            const ext = doc.name.split(".").pop()?.toLowerCase() || "";
+                                            const FileIcon = ["png","jpg","jpeg","webp","svg"].includes(ext) ? Image
+                                              : ["pdf"].includes(ext) ? FileText
+                                              : File;
+                                            return (
+                                              <div key={doc.id}
+                                                className="flex items-center gap-3 px-3 py-2 hover:bg-muted/20 transition-colors group">
+                                                <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
+                                                  style={{ backgroundColor: "oklch(0.30 0.05 250 / 0.08)" }}>
+                                                  <FileIcon className="w-3.5 h-3.5" style={{ color: "oklch(0.30 0.05 250)" }} />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                  <p className="text-xs truncate font-medium">{doc.name}</p>
+                                                  <p className="text-[10px] text-muted-foreground">
+                                                    {doc.fileSize}
+                                                    {doc.uploadedAt ? ` • ${doc.uploadedAt.slice(0, 10)}` : ""}
+                                                  </p>
+                                                </div>
+                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                                  {doc.url && (
+                                                    <>
+                                                      <a href={doc.url} target="_blank" rel="noopener noreferrer">
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                                                          <Eye className="w-3 h-3" />
+                                                        </Button>
+                                                      </a>
+                                                      <a href={doc.url} download={doc.name}>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                                                          <Download className="w-3 h-3" />
+                                                        </Button>
+                                                      </a>
+                                                    </>
+                                                  )}
+                                                </div>
+                                                <div className="shrink-0">
+                                                  {doc.status === "received"
+                                                    ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                                                    : <X className="w-3.5 h-3.5 text-muted-foreground/40" />}
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
-                </CardContent>
-              </Card>
+                )}
+              </div>
             );
           })}
         </div>
