@@ -67,8 +67,13 @@ function FilePreviewModal({
   if (!doc) return null;
 
   const ext = doc.name.split(".").pop()?.toLowerCase() || "";
-  const isImage = ["png", "jpg", "jpeg", "webp", "gif", "svg"].includes(ext);
-  const isPDF   = ext === "pdf";
+  const isImage  = ["png", "jpg", "jpeg", "webp", "gif", "svg"].includes(ext);
+  const isPDF    = ext === "pdf";
+  // ملفات Office تُعرض عبر Google Docs Viewer
+  const isOffice = ["doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods"].includes(ext);
+  const googleViewerUrl = isOffice
+    ? `https://docs.google.com/viewer?url=${encodeURIComponent(doc.url)}&embedded=true`
+    : null;
 
   return (
     <div
@@ -138,6 +143,13 @@ function FilePreviewModal({
             style={{ minHeight: "70vh", maxWidth: "900px" }}
             title={doc.name}
           />
+        ) : isOffice && googleViewerUrl ? (
+          <iframe
+            src={googleViewerUrl}
+            className="w-full h-full rounded-lg border-0"
+            style={{ minHeight: "70vh", maxWidth: "900px" }}
+            title={doc.name}
+          />
         ) : isImage ? (
           <img
             src={doc.url}
@@ -155,7 +167,8 @@ function FilePreviewModal({
             <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center mx-auto">
               <File className="w-10 h-10 text-white/50" />
             </div>
-            <p className="text-sm">لا يمكن معاينة هذا النوع من الملفات</p>
+            <p className="text-sm font-medium text-white/90">{doc.name}</p>
+            <p className="text-xs text-white/50">نوع الملف: .{ext} — لا يدعم المعاينة المباشرة</p>
             <a href={doc.url} download={doc.name}>
               <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
                 <Download className="w-4 h-4 ml-2" />
