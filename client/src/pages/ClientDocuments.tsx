@@ -66,9 +66,14 @@ function FilePreviewModal({
 
   if (!doc) return null;
 
-  const ext = doc.name.split(".").pop()?.toLowerCase() || "";
+  // تحديد الامتداد من اسم الملف أو من الرابط
+  const nameExt = doc.name.includes(".") ? doc.name.split(".").pop()?.toLowerCase() || "" : "";
+  const urlExt  = doc.url.includes(".")  ? doc.url.split(".").pop()?.split("?")[0].toLowerCase() || "" : "";
+  const ext = nameExt || urlExt;
+
   const isImage  = ["png", "jpg", "jpeg", "webp", "gif", "svg"].includes(ext);
-  const isPDF    = ext === "pdf";
+  // ملف PDF صريح، أو بدون امتداد (الغالبية PDF)
+  const isPDF    = ext === "pdf" || (!ext && !isImage);
   // ملفات Office تُعرض عبر Google Docs Viewer
   const isOffice = ["doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods"].includes(ext);
   const googleViewerUrl = isOffice
