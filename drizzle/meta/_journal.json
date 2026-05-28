@@ -43,6 +43,13 @@
       "when": 1779703095096,
       "tag": "0005_curious_morg",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1779900000000,
+      "tag": "0006_unique_gideon",
+      "breakpoints": true
     }
   ]
 }

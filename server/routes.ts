@@ -646,6 +646,8 @@ apiRouter.post("/api/upload", upload.single("file"), async (req, res) => {
       fileSize: `${(req.file.size / 1024).toFixed(0)} KB`,
       uploadedAt: now,
       url: storageUrl,
+      mimeType: req.file.mimetype || "",
+      fileExtension: ext || "",
     });
     const allDocs = await db.select().from(documents).orderBy(desc(documents.id));
     res.status(201).json(allDocs[0]);

@@ -1,64 +1,64 @@
 /**
- * ClientDocuments — صفحة تفاصيل مستندات عميل محدد
- * تعرض الملفات مرتبة: وثائق أولاً ثم مخططات
- * مع معاينة الملف مباشرة بدون تنزيل
+ * ClientDocuments — صفحة مستندات عميل محدد
+ * عرض الملفات مرتبة بالفئات مع معاينة أونلاين + تنزيل + مشاركة واتساب
  */
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  ArrowRight, FileText, Image, File, PenTool, Building2, Eye,
-  Download, FolderOpen, X, User, ScrollText, ClipboardList,
-  Wrench, Banknote, ChevronDown, Folder, FolderOpen as FolderOpenIcon,
-  ExternalLink, ZoomIn, ZoomOut, RotateCw,
+  ArrowRight, FileText, Image, File, Eye, Download,
+  FolderOpen, X, Upload, Share2, ChevronDown,
+  ZoomIn, ZoomOut, RotateCw, ExternalLink, Folder,
 } from "lucide-react";
-import { useDocuments, useProjects, useClients } from "@/lib/api";
+import { useDocuments, useProjects, useClients, useUploadDocument } from "@/lib/api";
+import { toast } from "sonner";
 
-/* ─── تصنيف الفئات: وثائق أولاً ثم مخططات ─── */
-const DOCUMENT_CATEGORIES = [
-  "بيانات العميل",
+/* ─── ترتيب الفئات ─── */
+const CATEGORY_ORDER = [
   "مستندات العميل",
+  "بيانات العميل",
+  "تجهيز الملف",
   "عقود وعروض",
   "عقود موقعة",
   "مستندات حكومية",
-  "تجهيز الملف",
-  "تقارير",
   "بلدية",
+  "مخططات معمارية",
+  "مخططات إنشائية",
+  "مخططات تنفيذية",
+  "تقارير",
   "إشراف",
   "مالي",
   "أخرى",
 ];
 
-const DRAWING_CATEGORIES = [
-  "مخططات معمارية",
-  "مخططات إنشائية",
-  "مخططات تنفيذية",
-];
-
-const categoryIcons: Record<string, React.ElementType> = {
-  "بيانات العميل":     User,
-  "مستندات العميل":   User,
-  "عقود وعروض":       ScrollText,
-  "عقود موقعة":       ScrollText,
-  "مستندات حكومية":  Building2,
-  "تجهيز الملف":      FolderOpen,
-  "تقارير":           ClipboardList,
-  "مخططات معمارية":   Building2,
-  "مخططات إنشائية":   Wrench,
-  "مخططات تنفيذية":   PenTool,
-  "بلدية":            FileText,
-  "إشراف":            Eye,
-  "مالي":             Banknote,
-  "أخرى":             FolderOpen,
-};
+/* ─── تحديد نوع الملف ─── */
+function getFileType(doc: { name: string; url: string; mimeType?: string; fileExtension?: string }) {
+  // أولاً: استخدم mimeType إذا متوفر
+  if (doc.mimeType) {
+    if (doc.mimeType.includes("pdf")) return "pdf";
+    if (doc.mimeType.startsWith("image/")) return "image";
+    if (doc.mimeType.includes("dwg") || doc.mimeType.includes("autocad")) return "cad";
+    if (doc.mimeType.includes("word") || doc.mimeType.includes("document")) return "word";
+    if (doc.mimeType.includes("sheet") || doc.mimeType.includes("excel")) return "excel";
+  }
+  // ثانياً: استخدم fileExtension
+  const ext = doc.fileExtension || doc.name.split(".").pop()?.toLowerCase() || "";
+  if (ext === "pdf") return "pdf";
+  if (["png", "jpg", "jpeg", "webp", "gif", "svg", "bmp"].includes(ext)) return "image";
+  if (["dwg", "dxf"].includes(ext)) return "cad";
+  if (["doc", "docx", "odt"].includes(ext)) return "word";
+  if (["xls", "xlsx", "ods"].includes(ext)) return "excel";
+  // افتراضي: PDF (لأن غالبية الملفات PDF)
+  return "pdf";
+}
 
 /* ─── نافذة معاينة الملف ─── */
 function FilePreviewModal({
   doc,
   onClose,
 }: {
-  doc: { name: string; url: string; category?: string } | null;
+  doc: { name: string; url: string; mimeType?: string; fileExtension?: string; category?: string } | null;
   onClose: () => void;
 }) {
   const [zoom, setZoom] = useState(100);
@@ -66,74 +66,58 @@ function FilePreviewModal({
 
   if (!doc) return null;
 
-  // تحديد الامتداد من اسم الملف أو من الرابط
-  const nameExt = doc.name.includes(".") ? doc.name.split(".").pop()?.toLowerCase() || "" : "";
-  const urlExt  = doc.url.includes(".")  ? doc.url.split(".").pop()?.split("?")[0].toLowerCase() || "" : "";
-  const ext = nameExt || urlExt;
+  const fileType = getFileType(doc);
+  const fullUrl = doc.url.startsWith("http") ? doc.url : window.location.origin + doc.url;
 
-  const isImage  = ["png", "jpg", "jpeg", "webp", "gif", "svg"].includes(ext);
-  // ملف PDF صريح، أو بدون امتداد (الغالبية PDF)
-  const isPDF    = ext === "pdf" || (!ext && !isImage);
-  // ملفات Office تُعرض عبر Google Docs Viewer
-  const isOffice = ["doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods"].includes(ext);
-  const googleViewerUrl = isOffice
-    ? `https://docs.google.com/viewer?url=${encodeURIComponent(doc.url)}&embedded=true`
-    : null;
+  // مشاركة واتساب
+  const shareWhatsApp = () => {
+    const text = `📄 ${doc.name}\n${fullUrl}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col"
-      style={{ backgroundColor: "rgba(0,0,0,0.85)" }}
+      className="fixed inset-0 z-50 flex flex-col bg-black/90"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       {/* شريط العنوان */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-card/90 backdrop-blur border-b shrink-0">
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-        >
+      <div className="flex items-center gap-3 px-4 py-3 bg-card/95 backdrop-blur border-b shrink-0">
+        <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors">
           <X className="w-4 h-4" />
         </button>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{doc.name}</p>
-          {doc.category && (
-            <p className="text-xs text-muted-foreground">{doc.category}</p>
-          )}
+          {doc.category && <p className="text-xs text-muted-foreground">{doc.category}</p>}
         </div>
 
         {/* أدوات الصورة */}
-        {isImage && (
+        {fileType === "image" && (
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost" size="icon" className="h-7 w-7"
-              onClick={() => setZoom(z => Math.max(25, z - 25))}
-            >
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom(z => Math.max(25, z - 25))}>
               <ZoomOut className="w-3.5 h-3.5" />
             </Button>
             <span className="text-xs w-10 text-center">{zoom}%</span>
-            <Button
-              variant="ghost" size="icon" className="h-7 w-7"
-              onClick={() => setZoom(z => Math.min(300, z + 25))}
-            >
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom(z => Math.min(300, z + 25))}>
               <ZoomIn className="w-3.5 h-3.5" />
             </Button>
-            <Button
-              variant="ghost" size="icon" className="h-7 w-7"
-              onClick={() => setRotation(r => (r + 90) % 360)}
-            >
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setRotation(r => (r + 90) % 360)}>
               <RotateCw className="w-3.5 h-3.5" />
             </Button>
           </div>
         )}
 
-        <a href={doc.url} download={doc.name}>
+        {/* أزرار الإجراءات */}
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={shareWhatsApp} title="مشاركة واتساب">
+          <Share2 className="w-4 h-4" />
+        </Button>
+        <a href={fullUrl} download={doc.name}>
           <Button variant="outline" size="sm" className="text-xs gap-1.5">
             <Download className="w-3.5 h-3.5" />
             تنزيل
           </Button>
         </a>
-        <a href={doc.url} target="_blank" rel="noopener noreferrer">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+        <a href={fullUrl} target="_blank" rel="noopener noreferrer">
+          <Button variant="ghost" size="icon" className="h-8 w-8" title="فتح في تبويب جديد">
             <ExternalLink className="w-3.5 h-3.5" />
           </Button>
         </a>
@@ -141,23 +125,16 @@ function FilePreviewModal({
 
       {/* محتوى المعاينة */}
       <div className="flex-1 overflow-auto flex items-center justify-center p-4">
-        {isPDF ? (
+        {fileType === "pdf" ? (
           <iframe
-            src={doc.url + "#toolbar=1&navpanes=0&scrollbar=1"}
-            className="w-full h-full rounded-lg border-0"
-            style={{ minHeight: "70vh", maxWidth: "900px" }}
+            src={fullUrl}
+            className="w-full h-full rounded-lg border-0 bg-white"
+            style={{ minHeight: "75vh", maxWidth: "900px" }}
             title={doc.name}
           />
-        ) : isOffice && googleViewerUrl ? (
-          <iframe
-            src={googleViewerUrl}
-            className="w-full h-full rounded-lg border-0"
-            style={{ minHeight: "70vh", maxWidth: "900px" }}
-            title={doc.name}
-          />
-        ) : isImage ? (
+        ) : fileType === "image" ? (
           <img
-            src={doc.url}
+            src={fullUrl}
             alt={doc.name}
             className="rounded-lg shadow-2xl object-contain"
             style={{
@@ -167,14 +144,23 @@ function FilePreviewModal({
               transition: "transform 0.2s ease",
             }}
           />
+        ) : fileType === "word" || fileType === "excel" ? (
+          <iframe
+            src={`https://docs.google.com/viewer?url=${encodeURIComponent(fullUrl)}&embedded=true`}
+            className="w-full h-full rounded-lg border-0"
+            style={{ minHeight: "75vh", maxWidth: "900px" }}
+            title={doc.name}
+          />
         ) : (
           <div className="text-center text-white/70 space-y-4">
             <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center mx-auto">
               <File className="w-10 h-10 text-white/50" />
             </div>
             <p className="text-sm font-medium text-white/90">{doc.name}</p>
-            <p className="text-xs text-white/50">نوع الملف: .{ext} — لا يدعم المعاينة المباشرة</p>
-            <a href={doc.url} download={doc.name}>
+            <p className="text-xs text-white/50">
+              {fileType === "cad" ? "ملف أوتوكاد — يُفتح ببرنامج AutoCAD" : "هذا النوع لا يدعم المعاينة المباشرة"}
+            </p>
+            <a href={fullUrl} download={doc.name}>
               <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
                 <Download className="w-4 h-4 ml-2" />
                 تنزيل الملف
@@ -187,89 +173,137 @@ function FilePreviewModal({
   );
 }
 
-/* ─── مكوّن قسم الفئات ─── */
-function CategorySection({
-  title,
-  icon: SectionIcon,
-  categories,
-  catsMap,
-  accentColor,
-}: {
-  title: string;
-  icon: React.ElementType;
-  categories: string[];
-  catsMap: Record<string, any[]>;
-  accentColor: string;
-}) {
+/* ─── الصفحة الرئيسية ─── */
+export default function ClientDocuments() {
+  const { clientId } = useParams<{ clientId: string }>();
+  const [, navigate] = useLocation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: docs = [], isLoading } = useDocuments();
+  const { data: projects = [] } = useProjects();
+  const { data: clients = [] } = useClients();
+  const uploadMutation = useUploadDocument();
+
+  const [previewDoc, setPreviewDoc] = useState<any>(null);
   const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
-  const [previewDoc, setPreviewDoc] = useState<{ name: string; url: string; category?: string } | null>(null);
+  const [uploadCategory, setUploadCategory] = useState("");
 
-  const toggleCat = (cat: string) =>
-    setOpenCats(p => ({ ...p, [cat]: !p[cat] }));
+  /* اسم العميل */
+  const client = clients.find(c => c.id === clientId);
+  const cName = client?.name || (clientId === "__no_client__" ? "بدون عميل" : clientId || "");
 
-  // عرض فئات هذا القسم فقط — الفئات غير المعروفة تذهب إلى قسم الوثائق فقط
-  const ALL_KNOWN_CATS = [...DOCUMENT_CATEGORIES, ...DRAWING_CATEGORIES];
-  const relevantCats = categories
-    .filter(c => catsMap[c]?.length)
-    .concat(
-      // الفئات غير المعروفة تُضاف فقط لقسم الوثائق (وليس المخططات)
-      title.includes("الوثائق")
-        ? Object.keys(catsMap).filter(k => !ALL_KNOWN_CATS.includes(k) && catsMap[k]?.length)
-        : []
-    );
+  /* فلترة ملفات هذا العميل */
+  const clientDocs = docs.filter(d =>
+    clientId === "__no_client__" ? !d.clientId : d.clientId === clientId
+  );
 
-  if (relevantCats.length === 0) return null;
+  /* تجميع حسب الفئة */
+  const catGroups: Record<string, typeof docs> = {};
+  for (const doc of clientDocs) {
+    const cat = doc.category || "أخرى";
+    if (!catGroups[cat]) catGroups[cat] = [];
+    catGroups[cat].push(doc);
+  }
 
-  const totalFiles = relevantCats.reduce((s, c) => s + (catsMap[c]?.length || 0), 0);
+  /* ترتيب الفئات */
+  const sortedCats = Object.keys(catGroups).sort((a, b) => {
+    const ia = CATEGORY_ORDER.indexOf(a);
+    const ib = CATEGORY_ORDER.indexOf(b);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+
+  const toggleCat = (cat: string) => setOpenCats(p => ({ ...p, [cat]: !p[cat] }));
+
+  /* رفع ملف */
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    if (clientId && clientId !== "__no_client__") formData.append("clientId", clientId);
+    formData.append("name", file.name);
+    formData.append("category", uploadCategory || "أخرى");
+    try {
+      await uploadMutation.mutateAsync(formData);
+      toast.success("تم رفع الملف بنجاح");
+    } catch {
+      toast.error("فشل رفع الملف");
+    }
+    e.target.value = "";
+  };
+
+  /* مشاركة واتساب */
+  const shareWhatsApp = (doc: any) => {
+    const fullUrl = doc.url.startsWith("http") ? doc.url : window.location.origin + doc.url;
+    const text = `📄 ${doc.name}\n${fullUrl}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  };
 
   return (
-    <>
+    <div className="space-y-5">
+      {/* نافذة المعاينة */}
       {previewDoc && (
         <FilePreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />
       )}
 
-      <div className="rounded-xl border shadow-sm overflow-hidden">
-        {/* عنوان القسم */}
+      {/* ─── رأس الصفحة ─── */}
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate("/documents")}>
+          <ArrowRight className="w-4 h-4" />
+        </Button>
         <div
-          className="flex items-center gap-3 px-4 py-3"
-          style={{ backgroundColor: accentColor + "15" }}
+          className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 text-white font-bold text-sm"
+          style={{ backgroundColor: "oklch(0.45 0.12 250)" }}
         >
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-            style={{ backgroundColor: accentColor + "25" }}
-          >
-            <SectionIcon className="w-4 h-4" style={{ color: accentColor }} />
-          </div>
-          <div className="flex-1">
-            <p className="font-semibold text-sm">{title}</p>
-            <p className="text-xs text-muted-foreground">{relevantCats.length} فئة • {totalFiles} ملف</p>
-          </div>
+          {cName.charAt(0)}
         </div>
+        <div className="flex-1">
+          <h1 className="font-bold text-lg leading-tight">{cName}</h1>
+          <p className="text-xs text-muted-foreground">
+            {clientDocs.length} ملف • {sortedCats.length} فئة
+          </p>
+        </div>
+        <Button size="sm" className="gap-1.5" onClick={() => fileInputRef.current?.click()}>
+          <Upload className="w-3.5 h-3.5" />
+          رفع
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept=".pdf,.jpg,.jpeg,.png,.webp,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+          onChange={handleUpload}
+        />
+      </div>
 
-        {/* الفئات */}
-        <div className="divide-y bg-card">
-          {relevantCats.map(cat => {
-            const catDocs = catsMap[cat] || [];
+      {/* ─── محتوى ─── */}
+      {isLoading ? (
+        <div className="flex items-center justify-center min-h-40 text-muted-foreground">
+          جاري التحميل...
+        </div>
+      ) : clientDocs.length === 0 ? (
+        <div className="rounded-xl border bg-card p-12 text-center">
+          <FolderOpen className="w-12 h-12 mx-auto mb-3 opacity-20" />
+          <p className="text-sm text-muted-foreground">لا توجد ملفات لهذا العميل</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {sortedCats.map(cat => {
+            const catDocs = catGroups[cat];
             const isOpen = openCats[cat] !== false; // مفتوح افتراضياً
-            const CatIcon = categoryIcons[cat] || FolderOpen;
 
             return (
-              <div key={cat}>
+              <div key={cat} className="rounded-xl border bg-card overflow-hidden">
                 {/* عنوان الفئة */}
                 <button
                   onClick={() => toggleCat(cat)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-right hover:bg-muted/30 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 text-right hover:bg-muted/20 transition-colors"
                 >
-                  <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 bg-muted/30">
-                    {isOpen
-                      ? <FolderOpenIcon className="w-3.5 h-3.5 text-muted-foreground" />
-                      : <Folder className="w-3.5 h-3.5 text-muted-foreground" />}
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-primary/10">
+                    {isOpen ? <FolderOpen className="w-4 h-4 text-primary" /> : <Folder className="w-4 h-4 text-primary" />}
                   </div>
-                  <CatIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                  <span className="text-sm flex-1 text-right">{cat}</span>
-                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">
-                    {catDocs.length}
-                  </Badge>
+                  <span className="text-sm font-medium flex-1 text-right">{cat}</span>
+                  <Badge variant="secondary" className="shrink-0">{catDocs.length}</Badge>
                   <ChevronDown
                     className="w-4 h-4 text-muted-foreground transition-transform shrink-0"
                     style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
@@ -278,215 +312,59 @@ function CategorySection({
 
                 {/* قائمة الملفات */}
                 {isOpen && (
-                  <div className="bg-muted/10 divide-y divide-border/30 px-2 pb-1">
+                  <div className="border-t divide-y">
                     {catDocs.map((doc: any) => {
-                      const ext = (doc.name || "").split(".").pop()?.toLowerCase() || "";
-                      const isImg = ["png", "jpg", "jpeg", "webp", "gif", "svg"].includes(ext);
-                      const isPdf = ext === "pdf";
-                      const FileIcon = isImg ? Image : isPdf ? FileText : File;
+                      const fileType = getFileType(doc);
+                      const FileIcon = fileType === "image" ? Image : fileType === "pdf" ? FileText : File;
 
                       return (
                         <div
                           key={doc.id}
-                          className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/20 transition-colors group rounded-lg my-0.5"
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-muted/10 transition-colors"
                         >
                           {/* أيقونة الملف */}
-                          <div
-                            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                            style={{ backgroundColor: accentColor + "12" }}
-                          >
-                            <FileIcon className="w-4 h-4" style={{ color: accentColor }} />
+                          <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-muted/30">
+                            <FileIcon className="w-4 h-4 text-muted-foreground" />
                           </div>
 
                           {/* اسم الملف */}
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium truncate">{doc.name}</p>
-                            <p className="text-[10px] text-muted-foreground">
+                            <p className="text-sm font-medium truncate">{doc.name}</p>
+                            <p className="text-xs text-muted-foreground">
                               {doc.fileSize}
                               {doc.uploadedAt ? ` • ${doc.uploadedAt.slice(0, 10)}` : ""}
+                              {doc.fileExtension ? ` • .${doc.fileExtension}` : ""}
                             </p>
                           </div>
 
                           {/* أزرار الإجراءات */}
                           <div className="flex gap-1 shrink-0">
-                            {doc.url && (
-                              <>
-                                {/* زر المعاينة */}
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 opacity-60 hover:opacity-100 transition-opacity"
-                                  title="معاينة"
-                                  onClick={() => setPreviewDoc({ name: doc.name, url: doc.url, category: cat })}
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                </Button>
-                                {/* زر التنزيل */}
-                                <a href={doc.url} download={doc.name}>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 opacity-60 hover:opacity-100 transition-opacity"
-                                    title="تنزيل"
-                                  >
-                                    <Download className="w-3.5 h-3.5" />
-                                  </Button>
-                                </a>
-                              </>
-                            )}
+                            {/* معاينة */}
+                            <Button
+                              variant="ghost" size="icon" className="h-8 w-8"
+                              title="معاينة"
+                              onClick={() => setPreviewDoc({ ...doc, category: cat })}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            {/* تنزيل */}
+                            <a href={doc.url} download={doc.name}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" title="تنزيل">
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            </a>
+                            {/* واتساب */}
+                            <Button
+                              variant="ghost" size="icon" className="h-8 w-8"
+                              title="مشاركة واتساب"
+                              onClick={() => shareWhatsApp(doc)}
+                            >
+                              <Share2 className="w-4 h-4" />
+                            </Button>
                           </div>
                         </div>
                       );
                     })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </>
-  );
-}
-
-/* ─── الصفحة الرئيسية ─── */
-export default function ClientDocuments() {
-  const { clientId } = useParams<{ clientId: string }>();
-  const [, navigate] = useLocation();
-
-  const { data: docs = [],     isLoading } = useDocuments();
-  const { data: projects = [] }            = useProjects();
-  const { data: clients  = [] }            = useClients();
-
-  /* اسم العميل */
-  const client = clients.find(c => c.id === clientId);
-  const cName  = client?.name || clientId || "بدون عميل";
-
-  /* فلترة ملفات هذا العميل فقط */
-  const clientDocs = docs.filter(d => d.clientId === clientId);
-
-  /* تجميع حسب المشروع ثم الفئة */
-  // projectId → category → docs[]
-  const byProject: Record<string, Record<string, any[]>> = {};
-  for (const doc of clientDocs) {
-    const pid = doc.projectId || "__no_project__";
-    const cat = doc.category  || "أخرى";
-    if (!byProject[pid]) byProject[pid] = {};
-    if (!byProject[pid][cat]) byProject[pid][cat] = [];
-    byProject[pid][cat].push(doc);
-  }
-
-  /* اسم المشروع */
-  const projectName = (pid: string) => {
-    if (pid === "__no_project__") return "بدون مشروع";
-    return projects.find(p => p.id === pid)?.name || pid;
-  };
-
-  const projectType = (pid: string) => {
-    if (pid === "__no_project__") return "";
-    return projects.find(p => p.id === pid)?.type || "";
-  };
-
-  const [openProjects, setOpenProjects] = useState<Record<string, boolean>>({});
-  const toggleProject = (pid: string) =>
-    setOpenProjects(p => ({ ...p, [pid]: !p[pid] }));
-
-  return (
-    <div className="space-y-5">
-
-      {/* ─── رأس الصفحة ─── */}
-      <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0"
-          onClick={() => navigate("/documents")}
-        >
-          <ArrowRight className="w-4 h-4" />
-        </Button>
-        <div
-          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-white font-bold text-sm"
-          style={{ backgroundColor: "oklch(0.45 0.12 250)" }}
-        >
-          {cName.charAt(0)}
-        </div>
-        <div>
-          <h1 className="font-bold text-lg leading-tight">{cName}</h1>
-          <p className="text-xs text-muted-foreground">
-            {Object.keys(byProject).length} مشروع • {clientDocs.length} ملف
-          </p>
-        </div>
-      </div>
-
-      {/* ─── محتوى ─── */}
-      {isLoading ? (
-        <div className="flex items-center justify-center min-h-64 text-muted-foreground">
-          جاري التحميل...
-        </div>
-      ) : clientDocs.length === 0 ? (
-        <div className="rounded-xl border bg-card p-16 text-center">
-          <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-4">
-            <FolderOpen className="w-8 h-8 opacity-30" />
-          </div>
-          <p className="text-sm font-medium text-muted-foreground">لا توجد ملفات لهذا العميل</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {Object.entries(byProject).map(([pid, catsMap]) => {
-            const pName = projectName(pid);
-            const pType = projectType(pid);
-            const isOpen = openProjects[pid] !== false; // مفتوح افتراضياً
-            const totalFiles = Object.values(catsMap).flat().length;
-
-            return (
-              <div key={pid} className="space-y-3">
-                {/* عنوان المشروع */}
-                <button
-                  onClick={() => toggleProject(pid)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border bg-card hover:bg-muted/20 transition-colors text-right"
-                >
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: "oklch(0.72 0.10 60 / 0.15)" }}>
-                    {isOpen
-                      ? <FolderOpenIcon className="w-4 h-4" style={{ color: "oklch(0.55 0.12 60)" }} />
-                      : <Folder className="w-4 h-4" style={{ color: "oklch(0.55 0.12 60)" }} />}
-                  </div>
-                  <div className="flex-1 text-right">
-                    <p className="font-semibold text-sm">{pName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {pType && <span className="ml-1">{pType} •</span>}
-                      {totalFiles} ملف
-                    </p>
-                  </div>
-                  {pType && (
-                    <Badge variant="outline" className="text-[10px] shrink-0">{pType}</Badge>
-                  )}
-                  <ChevronDown
-                    className="w-4 h-4 text-muted-foreground transition-transform shrink-0"
-                    style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
-                  />
-                </button>
-
-                {/* أقسام الوثائق والمخططات */}
-                {isOpen && (
-                  <div className="pr-4 space-y-3">
-                    {/* قسم الوثائق */}
-                    <CategorySection
-                      title="الوثائق والمستندات"
-                      icon={FileText}
-                      categories={DOCUMENT_CATEGORIES}
-                      catsMap={catsMap}
-                      accentColor="oklch(0.45 0.12 250)"
-                    />
-
-                    {/* قسم المخططات */}
-                    <CategorySection
-                      title="المخططات الهندسية"
-                      icon={PenTool}
-                      categories={DRAWING_CATEGORIES}
-                      catsMap={catsMap}
-                      accentColor="oklch(0.50 0.14 160)"
-                    />
                   </div>
                 )}
               </div>

@@ -426,6 +426,8 @@ export interface Document {
   fileSize: string;
   uploadedAt: string;
   url: string;
+  mimeType?: string;
+  fileExtension?: string;
 }
 
 export function useDocuments(params?: { clientId?: string; projectId?: string }) {

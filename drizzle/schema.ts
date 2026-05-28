@@ -210,6 +210,8 @@ export const documents = mysqlTable("documents", {
   fileSize: varchar("file_size", { length: 32 }).default(""),
   uploadedAt: varchar("uploaded_at", { length: 32 }).default(""),
   url: text("url").default(""),
+  mimeType: varchar("mime_type", { length: 128 }).default(""),
+  fileExtension: varchar("file_extension", { length: 16 }).default(""),
 });
 
 export const appointments = mysqlTable("appointments", {
