@@ -659,6 +659,118 @@ apiRouter.post("/api/upload", upload.single("file"), async (req, res) => {
 // Serve uploaded files
 apiRouter.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
+// ── Download file with correct filename ──────────────────────────────────
+apiRouter.get("/api/documents/:docId/download", async (req, res) => {
+  try {
+    const db = getDb();
+    const [doc] = await db.select().from(documents).where(eq(documents.id, parseInt(req.params.docId)));
+    if (!doc) return res.status(404).json({ error: "Document not found" });
+
+    // Build a human-readable filename: prefer doc.name, append extension if missing
+    let fileName = doc.name || doc.fileName || "file";
+    const ext = doc.fileExtension ? doc.fileExtension.toLowerCase() : "";
+    if (ext && !fileName.toLowerCase().endsWith(`.${ext}`)) {
+      fileName = `${fileName}.${ext}`;
+    }
+    const storageUrl = doc.url || "";
+
+    // For /uploads/ files (legacy), redirect with Content-Disposition
+    if (storageUrl.startsWith("/uploads/")) {
+      const filePath = path.join(__dirname, "..", storageUrl);
+      res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+      return res.sendFile(filePath);
+    }
+
+    // For /manus-storage/ files, proxy the content through
+    if (storageUrl.startsWith("/manus-storage/")) {
+      const key = storageUrl.replace("/manus-storage/", "");
+      const forgeUrl = (process.env.BUILT_IN_FORGE_API_URL || "").replace(/\/+$/, "");
+      const forgeKey = process.env.BUILT_IN_FORGE_API_KEY || "";
+
+      const presignUrl = new URL("v1/storage/presign/get", forgeUrl + "/");
+      presignUrl.searchParams.set("path", key);
+
+      const presignResp = await fetch(presignUrl, {
+        headers: { Authorization: `Bearer ${forgeKey}` },
+      });
+      if (!presignResp.ok) return res.status(502).send("Storage error");
+
+      const { url: s3Url } = (await presignResp.json()) as { url: string };
+      if (!s3Url) return res.status(502).send("Empty signed URL");
+
+      // Fetch from S3 and pipe to response
+      const s3Resp = await fetch(s3Url);
+      if (!s3Resp.ok) return res.status(502).send("S3 fetch error");
+
+      const contentType = doc.mimeType || s3Resp.headers.get("content-type") || "application/octet-stream";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+
+      const buffer = Buffer.from(await s3Resp.arrayBuffer());
+      res.send(buffer);
+    } else {
+      res.status(400).json({ error: "Unknown storage type" });
+    }
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── View file inline (for PDF preview in iframe) ─────────────────────────
+apiRouter.get("/api/documents/:docId/view", async (req, res) => {
+  try {
+    const db = getDb();
+    const [doc] = await db.select().from(documents).where(eq(documents.id, parseInt(req.params.docId)));
+    if (!doc) return res.status(404).json({ error: "Document not found" });
+
+    const storageUrl = doc.url || "";
+    // Build a human-readable filename: prefer doc.name, append extension if missing
+    let viewFileName = doc.name || doc.fileName || "file";
+    const viewExt = doc.fileExtension ? doc.fileExtension.toLowerCase() : "";
+    if (viewExt && !viewFileName.toLowerCase().endsWith(`.${viewExt}`)) {
+      viewFileName = `${viewFileName}.${viewExt}`;
+    }
+
+    // For /uploads/ files (legacy)
+    if (storageUrl.startsWith("/uploads/")) {
+      const filePath = path.join(__dirname, "..", storageUrl);
+      const contentType = doc.mimeType || "application/pdf";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(viewFileName)}`);
+      return res.sendFile(filePath);
+    }
+
+    // For /manus-storage/ files, proxy inline
+    if (storageUrl.startsWith("/manus-storage/")) {
+      const key = storageUrl.replace("/manus-storage/", "");
+      const forgeUrl = (process.env.BUILT_IN_FORGE_API_URL || "").replace(/\/+$/, "");
+      const forgeKey = process.env.BUILT_IN_FORGE_API_KEY || "";
+
+      const presignUrl = new URL("v1/storage/presign/get", forgeUrl + "/");
+      presignUrl.searchParams.set("path", key);
+
+      const presignResp = await fetch(presignUrl, {
+        headers: { Authorization: `Bearer ${forgeKey}` },
+      });
+      if (!presignResp.ok) return res.status(502).send("Storage error");
+
+      const { url: s3Url } = (await presignResp.json()) as { url: string };
+      if (!s3Url) return res.status(502).send("Empty signed URL");
+
+      const s3Resp = await fetch(s3Url);
+      if (!s3Resp.ok) return res.status(502).send("S3 fetch error");
+
+      const contentType = doc.mimeType || s3Resp.headers.get("content-type") || "application/pdf";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(viewFileName)}`);
+      res.setHeader("Cache-Control", "private, max-age=300");
+
+      const buffer = Buffer.from(await s3Resp.arrayBuffer());
+      res.send(buffer);
+    } else {
+      res.status(400).json({ error: "Unknown storage type" });
+    }
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
 // ── Reports charts ────────────────────────────────────────────────────────
 apiRouter.get("/api/reports/charts", async (_req, res) => {
   try {

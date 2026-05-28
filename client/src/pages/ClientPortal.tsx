@@ -266,7 +266,7 @@ export default function ClientPortal() {
                             <p className="text-xs text-muted-foreground">{doc.fileSize} · {doc.category}</p>
                           </div>
                           {doc.url ? (
-                            <a href={doc.url} download={doc.name}>
+                            <a href={`/api/documents/${doc.id}/download`}>
                               <Button variant="ghost" size="icon" className="h-7 w-7">
                                 <Download className="w-3.5 h-3.5" />
                               </Button>

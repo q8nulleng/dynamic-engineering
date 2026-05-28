@@ -34,7 +34,6 @@ const CATEGORY_ORDER = [
 
 /* ─── تحديد نوع الملف ─── */
 function getFileType(doc: { name: string; url: string; mimeType?: string; fileExtension?: string }) {
-  // أولاً: استخدم mimeType إذا متوفر
   if (doc.mimeType) {
     if (doc.mimeType.includes("pdf")) return "pdf";
     if (doc.mimeType.startsWith("image/")) return "image";
@@ -42,14 +41,12 @@ function getFileType(doc: { name: string; url: string; mimeType?: string; fileEx
     if (doc.mimeType.includes("word") || doc.mimeType.includes("document")) return "word";
     if (doc.mimeType.includes("sheet") || doc.mimeType.includes("excel")) return "excel";
   }
-  // ثانياً: استخدم fileExtension
   const ext = (doc.fileExtension || doc.name.split(".").pop() || "").toLowerCase();
   if (ext === "pdf") return "pdf";
   if (["png", "jpg", "jpeg", "webp", "gif", "svg", "bmp"].includes(ext)) return "image";
   if (["dwg", "dxf"].includes(ext)) return "cad";
   if (["doc", "docx", "odt"].includes(ext)) return "word";
   if (["xls", "xlsx", "ods"].includes(ext)) return "excel";
-  // افتراضي: PDF (لأن غالبية الملفات PDF)
   return "pdf";
 }
 
@@ -58,7 +55,7 @@ function FilePreviewModal({
   doc,
   onClose,
 }: {
-  doc: { name: string; url: string; mimeType?: string; fileExtension?: string; category?: string } | null;
+  doc: { id: number; name: string; url: string; mimeType?: string; fileExtension?: string; category?: string } | null;
   onClose: () => void;
 }) {
   const [zoom, setZoom] = useState(100);
@@ -67,11 +64,13 @@ function FilePreviewModal({
   if (!doc) return null;
 
   const fileType = getFileType(doc);
-  const fullUrl = doc.url.startsWith("http") ? doc.url : window.location.origin + doc.url;
+  // Use proxy endpoints for reliable viewing
+  const viewUrl = `/api/documents/${doc.id}/view`;
+  const downloadUrl = `/api/documents/${doc.id}/download`;
+  const shareUrl = doc.url.startsWith("http") ? doc.url : window.location.origin + doc.url;
 
-  // مشاركة واتساب
   const shareWhatsApp = () => {
-    const text = `📄 ${doc.name}\n${fullUrl}`;
+    const text = `📄 ${doc.name}\n${shareUrl}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   };
 
@@ -90,7 +89,6 @@ function FilePreviewModal({
           {doc.category && <p className="text-xs text-muted-foreground">{doc.category}</p>}
         </div>
 
-        {/* أدوات الصورة */}
         {fileType === "image" && (
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom(z => Math.max(25, z - 25))}>
@@ -106,17 +104,16 @@ function FilePreviewModal({
           </div>
         )}
 
-        {/* أزرار الإجراءات */}
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={shareWhatsApp} title="مشاركة واتساب">
           <Share2 className="w-4 h-4" />
         </Button>
-        <a href={fullUrl} download={doc.name}>
+        <a href={downloadUrl}>
           <Button variant="outline" size="sm" className="text-xs gap-1.5">
             <Download className="w-3.5 h-3.5" />
             تنزيل
           </Button>
         </a>
-        <a href={fullUrl} target="_blank" rel="noopener noreferrer">
+        <a href={viewUrl} target="_blank" rel="noopener noreferrer">
           <Button variant="ghost" size="icon" className="h-8 w-8" title="فتح في تبويب جديد">
             <ExternalLink className="w-3.5 h-3.5" />
           </Button>
@@ -127,14 +124,14 @@ function FilePreviewModal({
       <div className="flex-1 overflow-auto flex items-center justify-center p-4">
         {fileType === "pdf" ? (
           <iframe
-            src={fullUrl}
+            src={viewUrl}
             className="w-full h-full rounded-lg border-0 bg-white"
             style={{ minHeight: "75vh", maxWidth: "900px" }}
             title={doc.name}
           />
         ) : fileType === "image" ? (
           <img
-            src={fullUrl}
+            src={viewUrl}
             alt={doc.name}
             className="rounded-lg shadow-2xl object-contain"
             style={{
@@ -145,12 +142,19 @@ function FilePreviewModal({
             }}
           />
         ) : fileType === "word" || fileType === "excel" ? (
-          <iframe
-            src={`https://docs.google.com/viewer?url=${encodeURIComponent(fullUrl)}&embedded=true`}
-            className="w-full h-full rounded-lg border-0"
-            style={{ minHeight: "75vh", maxWidth: "900px" }}
-            title={doc.name}
-          />
+          <div className="text-center text-white/70 space-y-4">
+            <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center mx-auto">
+              <File className="w-10 h-10 text-white/50" />
+            </div>
+            <p className="text-sm font-medium text-white/90">{doc.name}</p>
+            <p className="text-xs text-white/50">ملف {fileType === "word" ? "Word" : "Excel"} — قم بتنزيله لعرضه</p>
+            <a href={downloadUrl}>
+              <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
+                <Download className="w-4 h-4 ml-2" />
+                تنزيل الملف
+              </Button>
+            </a>
+          </div>
         ) : (
           <div className="text-center text-white/70 space-y-4">
             <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center mx-auto">
@@ -160,7 +164,7 @@ function FilePreviewModal({
             <p className="text-xs text-white/50">
               {fileType === "cad" ? "ملف أوتوكاد — يُفتح ببرنامج AutoCAD" : "هذا النوع لا يدعم المعاينة المباشرة"}
             </p>
-            <a href={fullUrl} download={doc.name}>
+            <a href={downloadUrl}>
               <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
                 <Download className="w-4 h-4 ml-2" />
                 تنزيل الملف
@@ -188,16 +192,13 @@ export default function ClientDocuments() {
   const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
   const [uploadCategory, setUploadCategory] = useState("");
 
-  /* اسم العميل */
   const client = clients.find(c => c.id === clientId);
   const cName = client?.name || (clientId === "__no_client__" ? "بدون عميل" : clientId || "");
 
-  /* فلترة ملفات هذا العميل */
   const clientDocs = docs.filter(d =>
     clientId === "__no_client__" ? !d.clientId : d.clientId === clientId
   );
 
-  /* تجميع حسب الفئة */
   const catGroups: Record<string, typeof docs> = {};
   for (const doc of clientDocs) {
     const cat = doc.category || "أخرى";
@@ -205,7 +206,6 @@ export default function ClientDocuments() {
     catGroups[cat].push(doc);
   }
 
-  /* ترتيب الفئات */
   const sortedCats = Object.keys(catGroups).sort((a, b) => {
     const ia = CATEGORY_ORDER.indexOf(a);
     const ib = CATEGORY_ORDER.indexOf(b);
@@ -214,7 +214,6 @@ export default function ClientDocuments() {
 
   const toggleCat = (cat: string) => setOpenCats(p => ({ ...p, [cat]: !p[cat] }));
 
-  /* رفع ملف */
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -232,7 +231,6 @@ export default function ClientDocuments() {
     e.target.value = "";
   };
 
-  /* مشاركة واتساب */
   const shareWhatsApp = (doc: any) => {
     const fullUrl = doc.url.startsWith("http") ? doc.url : window.location.origin + doc.url;
     const text = `📄 ${doc.name}\n${fullUrl}`;
@@ -241,7 +239,6 @@ export default function ClientDocuments() {
 
   return (
     <div className="space-y-5">
-      {/* نافذة المعاينة */}
       {previewDoc && (
         <FilePreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />
       )}
@@ -296,11 +293,10 @@ export default function ClientDocuments() {
         <div className="space-y-3">
           {sortedCats.map(cat => {
             const catDocs = catGroups[cat];
-            const isOpen = openCats[cat] !== false; // مفتوح افتراضياً
+            const isOpen = openCats[cat] !== false;
 
             return (
               <div key={cat} className="rounded-xl border bg-card overflow-hidden">
-                {/* عنوان الفئة */}
                 <button
                   onClick={() => toggleCat(cat)}
                   className="w-full flex items-center gap-3 px-4 py-3 text-right hover:bg-muted/20 transition-colors"
@@ -316,7 +312,6 @@ export default function ClientDocuments() {
                   />
                 </button>
 
-                {/* قائمة الملفات */}
                 {isOpen && (
                   <div className="border-t divide-y">
                     {catDocs.map((doc: any) => {
@@ -328,12 +323,10 @@ export default function ClientDocuments() {
                           key={doc.id}
                           className="flex items-center gap-3 px-4 py-3 hover:bg-muted/10 transition-colors"
                         >
-                          {/* أيقونة الملف */}
                           <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-muted/30">
                             <FileIcon className="w-4 h-4 text-muted-foreground" />
                           </div>
 
-                          {/* اسم الملف */}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{doc.name}</p>
                             <p className="text-xs text-muted-foreground">
@@ -343,9 +336,7 @@ export default function ClientDocuments() {
                             </p>
                           </div>
 
-                          {/* أزرار الإجراءات */}
                           <div className="flex gap-1 shrink-0">
-                            {/* معاينة */}
                             <Button
                               variant="ghost" size="icon" className="h-8 w-8"
                               title="معاينة"
@@ -353,13 +344,11 @@ export default function ClientDocuments() {
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
-                            {/* تنزيل */}
-                            <a href={doc.url} download={doc.name}>
+                            <a href={`/api/documents/${doc.id}/download`}>
                               <Button variant="ghost" size="icon" className="h-8 w-8" title="تنزيل">
                                 <Download className="w-4 h-4" />
                               </Button>
                             </a>
-                            {/* واتساب */}
                             <Button
                               variant="ghost" size="icon" className="h-8 w-8"
                               title="مشاركة واتساب"
