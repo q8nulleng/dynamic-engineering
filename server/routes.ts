@@ -629,7 +629,9 @@ apiRouter.post("/api/upload", upload.single("file"), async (req, res) => {
     // Upload to S3 storage
     const fs = await import("fs");
     const fileBuffer = fs.readFileSync(req.file.path);
-    const ext = req.file.originalname.split(".").pop() || "bin";
+    // Extract extension robustly: lowercase, handle no-extension case
+    const nameParts = req.file.originalname.split(".");
+    const ext = nameParts.length > 1 ? (nameParts.pop() || "bin").toLowerCase() : "bin";
     const storageKey = `docs/${clientId || projectId || "general"}/${nanoid(8)}.${ext}`;
     const { url: storageUrl } = await storagePut(storageKey, fileBuffer, req.file.mimetype);
 
@@ -647,7 +649,7 @@ apiRouter.post("/api/upload", upload.single("file"), async (req, res) => {
       uploadedAt: now,
       url: storageUrl,
       mimeType: req.file.mimetype || "",
-      fileExtension: ext || "",
+      fileExtension: ext.toLowerCase() || "",
     });
     const allDocs = await db.select().from(documents).orderBy(desc(documents.id));
     res.status(201).json(allDocs[0]);

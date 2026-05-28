@@ -40,9 +40,9 @@ export default function Documents() {
   const [uploadProjectId, setUploadProjectId] = useState("");
   const [uploadCategory, setUploadCategory] = useState("");
 
-  const { data: docs = [], isLoading } = useDocuments();
+  const { data: docs = [], isLoading, error: docsError } = useDocuments();
   const { data: projects = [] } = useProjects();
-  const { data: clients = [] } = useClients();
+  const { data: clients = [], error: clientsError } = useClients();
   const uploadMutation = useUploadDocument();
 
   /* ─── فلترة حسب القسم ─── */
@@ -204,7 +204,13 @@ export default function Documents() {
       </div>
 
       {/* ─── قائمة العملاء ─── */}
-      {isLoading ? (
+      {(docsError || clientsError) ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-8 text-center">
+          <p className="text-sm text-destructive font-medium">حدث خطأ في تحميل البيانات</p>
+          <p className="text-xs text-muted-foreground mt-1">تحقق من الاتصال وأعد المحاولة</p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => window.location.reload()}>إعادة المحاولة</Button>
+        </div>
+      ) : isLoading ? (
         <div className="flex items-center justify-center min-h-40 text-muted-foreground">
           جاري التحميل...
         </div>
