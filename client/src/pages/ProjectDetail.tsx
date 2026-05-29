@@ -25,6 +25,7 @@ import ContractPaymentPanel from "@/components/ContractPaymentPanel";
 import FormsTaskPanel from "@/components/FormsTaskPanel";
 import SupervisionTaskPanel from "@/components/SupervisionTaskPanel";
 import ProjectBriefForm from "@/components/ProjectBriefForm";
+import ResidentialKanban from "@/pages/ResidentialKanban";
 
 /* ===== Types ===== */
 interface SubTask { name: string; done: boolean; assignee?: string; }
@@ -447,6 +448,11 @@ export default function ProjectDetail() {
   };
 
   if (isLoading) return <div className="flex items-center justify-center min-h-96 text-muted-foreground">جاري التحميل...</div>;
+
+  // تحويل مشاريع السكن الخاص - بناء جديد إلى Kanban
+  if (project && project.type === "سكن خاص" && project.serviceType === "بناء جديد") {
+    return <ResidentialKanban projectId={projectId} />;
+  }
 
   if (!project) {
     return (
