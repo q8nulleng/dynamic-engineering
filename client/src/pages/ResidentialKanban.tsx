@@ -12,11 +12,13 @@ import {
   ArrowRight, Users, MapPin, Link2, CheckCircle2, Circle,
   Clock, X, Plus, Calendar, FileText, Banknote, Wrench,
   Building2, Layers, ChevronRight, ClipboardList, MessageSquare,
-  Phone, Pencil, Check, AlertCircle, Zap, Upload
+  Phone, Pencil, Check, AlertCircle, Zap, Upload,
+  Eye, Download, File, Image as ImageIcon, ExternalLink
 } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
-import { useProject, useUpdateTask, useCreateProjectMeeting, useProjectMeetings } from "@/lib/api";
+import { useProject, useUpdateTask, useCreateProjectMeeting, useProjectMeetings, useDocuments } from "@/lib/api";
+import type { Document } from "@/lib/api";
 
 /* ─── Types ─── */
 interface SubTask { name: string; done: boolean; assignee?: string; }
@@ -60,6 +62,123 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ─── Phase 1: تجهيز الملف ─── */
+
+// Helper: تحديد نوع الملف
+function getFileType(doc: { name: string; mimeType?: string; fileExtension?: string }) {
+  if (doc.mimeType) {
+    if (doc.mimeType.includes("pdf")) return "pdf";
+    if (doc.mimeType.startsWith("image/")) return "image";
+    if (doc.mimeType.includes("word") || doc.mimeType.includes("document")) return "word";
+  }
+  const ext = (doc.fileExtension || doc.name.split(".").pop() || "").toLowerCase();
+  if (ext === "pdf") return "pdf";
+  if (["png", "jpg", "jpeg", "webp", "gif", "bmp"].includes(ext)) return "image";
+  if (["doc", "docx"].includes(ext)) return "word";
+  return "file";
+}
+
+// Component: قائمة الملفات المرفوعة مسبقاً لقسم معين
+function UploadedFilesList({ docs, newlyUploaded }: {
+  docs: Document[];
+  newlyUploaded?: string[];
+}) {
+  const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
+
+  const allDocs = [
+    ...docs,
+    // الملفات المرفوعة حديثاً في هذه الجلسة (تظهر فوراً قبل إعادة الجلب)
+  ];
+
+  if (allDocs.length === 0 && (!newlyUploaded || newlyUploaded.length === 0)) return null;
+
+  return (
+    <>
+      {/* نافذة معاينة الملف */}
+      {previewDoc && (
+        <div
+          className="fixed inset-0 z-[60] flex flex-col bg-black/90"
+          onClick={e => { if (e.target === e.currentTarget) setPreviewDoc(null); }}
+        >
+          <div className="flex items-center gap-3 px-4 py-3 bg-card/95 backdrop-blur border-b shrink-0">
+            <button onClick={() => setPreviewDoc(null)} className="p-2 rounded-lg hover:bg-muted transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{previewDoc.name}</p>
+              <p className="text-xs text-muted-foreground">{previewDoc.category}</p>
+            </div>
+            <a href={`/api/documents/${previewDoc.id}/download`} className="p-2 rounded-lg hover:bg-muted transition-colors">
+              <Download className="w-4 h-4" />
+            </a>
+            <a href={`/api/documents/${previewDoc.id}/view`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg hover:bg-muted transition-colors">
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          </div>
+          <div className="flex-1 overflow-auto flex items-center justify-center p-4">
+            {getFileType(previewDoc) === "image" ? (
+              <img
+                src={`/api/documents/${previewDoc.id}/view`}
+                alt={previewDoc.name}
+                className="max-w-full max-h-full object-contain rounded-lg"
+              />
+            ) : (
+              <iframe
+                src={`/api/documents/${previewDoc.id}/view`}
+                className="w-full h-full rounded-lg bg-white"
+                title={previewDoc.name}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-lg border bg-muted/20 overflow-hidden">
+        <div className="px-3 py-2 border-b bg-muted/30">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+            الملفات المرفوعة ({allDocs.length})
+          </p>
+        </div>
+        <div className="divide-y">
+          {allDocs.map(doc => {
+            const ft = getFileType(doc);
+            const FileIcon = ft === "image" ? ImageIcon : ft === "pdf" ? FileText : File;
+            return (
+              <div key={doc.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted/20 transition-colors">
+                <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 bg-muted/40">
+                  <FileIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate">{doc.name}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString("ar-KW", { day: "numeric", month: "short" }) : ""}
+                    {doc.fileExtension ? ` • .${doc.fileExtension.toUpperCase()}` : ""}
+                  </p>
+                </div>
+                <div className="flex gap-0.5 shrink-0">
+                  <button
+                    onClick={() => setPreviewDoc(doc)}
+                    className="w-6 h-6 rounded flex items-center justify-center hover:bg-muted/60 transition-colors"
+                    title="معاينة"
+                  >
+                    <Eye className="w-3 h-3 text-muted-foreground" />
+                  </button>
+                  <a
+                    href={`/api/documents/${doc.id}/download`}
+                    className="w-6 h-6 rounded flex items-center justify-center hover:bg-muted/60 transition-colors"
+                    title="تنزيل"
+                  >
+                    <Download className="w-3 h-3 text-muted-foreground" />
+                  </a>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // Upload button component for file sections
 function FileUploadButton({ label, category, projectId, clientId, onUploaded }: {
   label: string; category: string; projectId: string; clientId?: string;
@@ -117,7 +236,25 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
 }) {
   const color = PHASE_COLORS[0];
   const [expandedGroup, setExpandedGroup] = useState<string | null>("docs");
-  const [uploadedFiles, setUploadedFiles] = useState<Record<string, string[]>>({});
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // جلب جميع مستندات المشروع من قاعدة البيانات
+  const { data: allProjectDocs = [], refetch: refetchDocs } = useDocuments({ projectId: project.id });
+
+  // تصفية المستندات حسب الفئة لكل قسم
+  const docsDocs = allProjectDocs.filter(d =>
+    d.category === "بطاقة مدنية" ||
+    d.category === "وثيقة ملكية" ||
+    d.category === "خريطة موقع" ||
+    d.category === "وثيقة أخرى"
+  );
+  const techDocs = allProjectDocs.filter(d =>
+    d.category === "فحص تربة" ||
+    d.category === "كتاب كهرباء"
+  );
+  const formsDocs = allProjectDocs.filter(d =>
+    d.category === "نماذج بلدية"
+  );
 
   const paymentTask = phase.tasks.find(t => t.name.includes("تحصيل") || t.name.includes("دفعة"));
   const techTasks = phase.tasks.filter(t =>
@@ -130,8 +267,10 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
   const doneCount = phase.tasks.filter(t => t.status === "done").length;
   const progress = phase.tasks.length > 0 ? Math.round((doneCount / phase.tasks.length) * 100) : 0;
 
-  const handleFileUploaded = (group: string, doc: { name: string }) => {
-    setUploadedFiles(prev => ({ ...prev, [group]: [...(prev[group] || []), doc.name] }));
+  const handleFileUploaded = (_group: string, _doc: { name: string }) => {
+    // إعادة جلب المستندات من قاعدة البيانات لتحديث القائمة فوراً
+    setTimeout(() => refetchDocs(), 500);
+    setRefreshKey(k => k + 1);
   };
 
   return (
@@ -184,9 +323,9 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {uploadedFiles["docs"]?.length > 0 && (
+                {docsDocs.length > 0 && (
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `color-mix(in oklch, ${color} 15%, white)`, color }}>
-                    {uploadedFiles["docs"].length} ملف
+                    {docsDocs.length} ملف
                   </span>
                 )}
                 <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedGroup === "docs" ? "rotate-90" : ""}`} />
@@ -201,17 +340,7 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
                   <FileUploadButton label="خريطة الموقع العام" category="خريطة موقع" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("docs", d)} />
                   <FileUploadButton label="أخرى" category="وثيقة أخرى" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("docs", d)} />
                 </div>
-                {uploadedFiles["docs"]?.length > 0 && (
-                  <div className="space-y-1 pt-1">
-                    <p className="text-[10px] font-medium text-muted-foreground">الملفات المرفوعة:</p>
-                    {uploadedFiles["docs"].map((name, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-[11px]">
-                        <CheckCircle2 className="w-3 h-3 text-green-500" />
-                        <span className="truncate">{name}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <UploadedFilesList docs={docsDocs} key={refreshKey} />
                 {/* مهام الوثائق من قاعدة البيانات */}
                 {phase.tasks.filter(t =>
                   t.name.includes("بطاقات") || t.name.includes("سند") || t.name.includes("ملكية") ||
@@ -255,9 +384,9 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {uploadedFiles["tech"]?.length > 0 && (
+                {techDocs.length > 0 && (
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "color-mix(in oklch, oklch(0.60 0.12 30) 15%, white)", color: "oklch(0.45 0.10 30)" }}>
-                    {uploadedFiles["tech"].length} ملف
+                    {techDocs.length} ملف
                   </span>
                 )}
                 <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedGroup === "tech" ? "rotate-90" : ""}`} />
@@ -270,17 +399,7 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
                   <FileUploadButton label="فحص التربة" category="فحص تربة" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
                   <FileUploadButton label="كتاب الكهرباء" category="كتاب كهرباء" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
                 </div>
-                {uploadedFiles["tech"]?.length > 0 && (
-                  <div className="space-y-1 pt-1">
-                    <p className="text-[10px] font-medium text-muted-foreground">الملفات المرفوعة:</p>
-                    {uploadedFiles["tech"].map((name, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-[11px]">
-                        <CheckCircle2 className="w-3 h-3 text-green-500" />
-                        <span className="truncate">{name}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <UploadedFilesList docs={techDocs} key={refreshKey + 100} />
                 {/* مهام الفحوصات من قاعدة البيانات */}
                 {techTasks.map(task => (
                   <div key={task.id} className="flex items-center justify-between py-1.5 border-t">
@@ -321,9 +440,9 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {uploadedFiles["forms"]?.length > 0 && (
+                {formsDocs.length > 0 && (
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "color-mix(in oklch, oklch(0.55 0.15 150) 15%, white)", color: "oklch(0.40 0.12 150)" }}>
-                    {uploadedFiles["forms"].length} ملف
+                    {formsDocs.length} ملف
                   </span>
                 )}
                 <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedGroup === "forms" ? "rotate-90" : ""}`} />
@@ -335,17 +454,7 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
                 <div className="flex flex-wrap gap-2">
                   <FileUploadButton label="رفع نماذج البلدية" category="نماذج بلدية" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("forms", d)} />
                 </div>
-                {uploadedFiles["forms"]?.length > 0 && (
-                  <div className="space-y-1 pt-1">
-                    <p className="text-[10px] font-medium text-muted-foreground">الملفات المرفوعة:</p>
-                    {uploadedFiles["forms"].map((name, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-[11px]">
-                        <CheckCircle2 className="w-3 h-3 text-green-500" />
-                        <span className="truncate">{name}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <UploadedFilesList docs={formsDocs} key={refreshKey + 200} />
                 {/* مهام النماذج من قاعدة البيانات */}
                 {formTasks.map(task => (
                   <div key={task.id} className="flex items-center justify-between py-1.5 border-t">
