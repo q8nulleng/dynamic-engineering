@@ -1,10 +1,10 @@
 /**
  * ProjectBriefForm - نموذج طلبات المشروع الرقمي
- * يحتوي على:
- * - بيانات المالك والقسيمة
- * - تفاصيل مكونات كل دور
- * - مساحة Canvas للرسم الحر (سكتش الكروكي) بالقلم على الآيباد
- * - حفظ تلقائي مرتبط بالمشروع
+ * - ملء البيانات الرئيسية تلقائياً من بيانات المشروع والعميل
+ * - شكل القسيمة: زاوية / سد / بطن وظهر / ثلاث جهات
+ * - اتجاه الشمال
+ * - تصدير PDF
+ * - حفظ في بوابة العميل (كمستند)
  */
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   X, Save, Eraser, Undo2, Trash2, Plus, PenLine,
-  ChevronDown, ChevronUp, Compass, Building2, Palette
+  ChevronDown, ChevronUp, Compass, Building2, Palette,
+  FileDown, Globe, CheckCircle2
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,9 +44,26 @@ interface BriefData {
   notes: string;
 }
 
+interface ProjectInfo {
+  id: string;
+  name?: string;
+  client?: string;
+  clientId?: string;
+  clientPhone?: string;
+  area?: string;
+  block?: string;
+  plot?: string;
+  quotation?: string;
+  type?: string;
+  serviceType?: string;
+}
+
 const FLOOR_NAMES = ["سرداب", "الدور الأرضي", "الدور الأول", "الدور الثاني", "الدور الثالث", "السطح", "الملحق"];
 const STYLES = ["مودرن", "كلاسيك", "مودرن كلاسيك", "نيو كلاسيك", "عربي", "أخرى"];
-const SHAPES = ["مستطيل", "زاوية", "رأس", "مثلث", "غير منتظم"];
+
+// شكل القسيمة المطلوب
+const SHAPES = ["زاوية", "سد", "بطن وظهر", "ثلاث جهات", "مستطيل", "غير منتظم"];
+
 const DIRECTIONS = ["شمال", "جنوب", "شرق", "غرب", "شمال شرق", "شمال غرب", "جنوب شرق", "جنوب غرب"];
 
 /* ─── Canvas Drawing Hook ─── */
@@ -131,44 +149,142 @@ function useCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   return { startDraw, draw, stopDraw, undo, clear, penColor, setPenColor, penSize, setPenSize };
 }
 
+/* ─── PDF Export Helper ─── */
+async function exportToPDF(brief: BriefData, sketchDataUrl: string, projectInfo?: ProjectInfo) {
+  // Build HTML content for PDF
+  const floors = brief.floorsDetails.map(f =>
+    `<tr><td style="padding:6px 10px;border:1px solid #ddd;font-weight:600">${f.name}</td>
+     <td style="padding:6px 10px;border:1px solid #ddd">${f.rooms || "—"}</td>
+     <td style="padding:6px 10px;border:1px solid #ddd">${f.notes || "—"}</td></tr>`
+  ).join("");
+
+  const html = `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: 'Arial', sans-serif; direction: rtl; padding: 30px; color: #222; font-size: 13px; }
+  h1 { font-size: 20px; color: #1a3a5c; border-bottom: 3px solid #c8a84b; padding-bottom: 8px; margin-bottom: 20px; }
+  h2 { font-size: 14px; color: #1a3a5c; background: #f5f0e8; padding: 6px 12px; border-radius: 4px; margin: 20px 0 10px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field { margin-bottom: 8px; }
+  .label { font-size: 11px; color: #888; margin-bottom: 2px; }
+  .value { font-size: 13px; font-weight: 600; border-bottom: 1px solid #eee; padding-bottom: 3px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th { background: #1a3a5c; color: white; padding: 7px 10px; text-align: right; }
+  .sketch { max-width: 100%; border: 1px solid #ddd; border-radius: 6px; margin-top: 8px; }
+  .header-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .company { font-size: 12px; color: #888; }
+  .badge { display: inline-block; background: #c8a84b; color: white; padding: 2px 10px; border-radius: 20px; font-size: 11px; }
+</style>
+</head>
+<body>
+<div class="header-info">
+  <div>
+    <h1>نموذج طلبات المشروع</h1>
+    <span class="badge">${projectInfo?.name || brief.projectId}</span>
+  </div>
+  <div class="company">
+    <strong>ديناميك للاستشارات الهندسية</strong><br>
+    تاريخ: ${new Date().toLocaleDateString("ar-KW")}
+  </div>
+</div>
+
+<h2>📋 بيانات المالك</h2>
+<div class="grid">
+  <div class="field"><div class="label">اسم المالك</div><div class="value">${brief.ownerName || "—"}</div></div>
+  <div class="field"><div class="label">رقم التلفون</div><div class="value">${brief.ownerPhone || "—"}</div></div>
+</div>
+
+<h2>📍 بيانات القسيمة</h2>
+<div class="grid">
+  <div class="field"><div class="label">المنطقة</div><div class="value">${brief.area || "—"}</div></div>
+  <div class="field"><div class="label">القطعة</div><div class="value">${brief.block || "—"}</div></div>
+  <div class="field"><div class="label">القسيمة</div><div class="value">${brief.plot || "—"}</div></div>
+  <div class="field"><div class="label">الرقم الآلي</div><div class="value">${brief.autoNumber || "—"}</div></div>
+  <div class="field"><div class="label">مساحة الأرض</div><div class="value">${brief.plotArea || "—"} م²</div></div>
+  <div class="field"><div class="label">شكل القسيمة</div><div class="value">${brief.plotShape || "—"}</div></div>
+  <div class="field"><div class="label">اتجاه الشمال</div><div class="value">${brief.northDirection || "—"}</div></div>
+</div>
+
+<h2>🏛️ الطابع المعماري</h2>
+<div class="grid">
+  <div class="field"><div class="label">الطابع</div><div class="value">${brief.architecturalStyle || "—"}</div></div>
+  <div class="field"><div class="label">عدد الأدوار</div><div class="value">${brief.floorsCount}</div></div>
+</div>
+
+<h2>🏗️ تفاصيل مكونات المشروع</h2>
+<table>
+  <thead><tr><th>الدور</th><th>المكونات</th><th>ملاحظات</th></tr></thead>
+  <tbody>${floors}</tbody>
+</table>
+
+${brief.notes ? `<h2>📝 ملاحظات عامة</h2><p>${brief.notes}</p>` : ""}
+
+${sketchDataUrl && sketchDataUrl !== "data:," ? `<h2>✏️ الكروكي / السكتش</h2><img src="${sketchDataUrl}" class="sketch" />` : ""}
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `نموذج_طلبات_${brief.projectId}_${new Date().toISOString().split("T")[0]}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success("تم تصدير النموذج — افتح الملف واطبعه كـ PDF من المتصفح");
+}
+
 /* ─── Main Component ─── */
 export default function ProjectBriefForm({
   projectId,
   onClose,
   initialData,
+  projectInfo,
 }: {
   projectId: string;
   onClose: () => void;
   initialData?: any;
+  projectInfo?: ProjectInfo;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { startDraw, draw, stopDraw, undo, clear, penColor, setPenColor, penSize, setPenSize } = useCanvas(canvasRef);
 
   const [saving, setSaving] = useState(false);
-  const [sectionsOpen, setSectionsOpen] = useState({ owner: true, plot: true, style: true, floors: true, sketch: true });
-  const [brief, setBrief] = useState<BriefData>({
-    projectId,
-    ownerName: initialData?.ownerName || "",
-    ownerPhone: initialData?.ownerPhone || "",
-    governorate: initialData?.governorate || "",
-    area: initialData?.area || "",
-    block: initialData?.block || "",
-    plot: initialData?.plot || "",
-    autoNumber: initialData?.autoNumber || "",
-    plotArea: initialData?.plotArea || "",
-    plotShape: initialData?.plotShape || "",
-    northDirection: initialData?.northDirection || "",
-    architecturalStyle: initialData?.architecturalStyle || "",
-    floorsCount: initialData?.floorsCount || 3,
-    floorsDetails: initialData?.floorsDetails || [
-      { name: "سرداب", rooms: "", notes: "" },
-      { name: "الدور الأرضي", rooms: "", notes: "" },
-      { name: "الدور الأول", rooms: "", notes: "" },
-      { name: "السطح", rooms: "", notes: "" },
-    ],
-    sketchData: initialData?.sketchData || "",
-    notes: initialData?.notes || "",
-    ...(initialData?.id ? { id: initialData.id } : {}),
+  const [savingPortal, setSavingPortal] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [savedToPortal, setSavedToPortal] = useState(false);
+  const [sectionsOpen, setSectionsOpen] = useState({ owner: true, plot: true, style: true, floors: true, sketch: false });
+
+  // ملء البيانات تلقائياً من بيانات المشروع والعميل
+  const [brief, setBrief] = useState<BriefData>(() => {
+    const autoFill = {
+      ownerName: initialData?.ownerName || projectInfo?.client || "",
+      ownerPhone: initialData?.ownerPhone || projectInfo?.clientPhone || "",
+      area: initialData?.area || projectInfo?.area || "",
+      block: initialData?.block || projectInfo?.block || "",
+      plot: initialData?.plot || projectInfo?.plot || "",
+    };
+    return {
+      projectId,
+      ...autoFill,
+      governorate: initialData?.governorate || "",
+      autoNumber: initialData?.autoNumber || "",
+      plotArea: initialData?.plotArea || "",
+      plotShape: initialData?.plotShape || "",
+      northDirection: initialData?.northDirection || "",
+      architecturalStyle: initialData?.architecturalStyle || "",
+      floorsCount: initialData?.floorsCount || 3,
+      floorsDetails: initialData?.floorsDetails || [
+        { name: "سرداب", rooms: "", notes: "" },
+        { name: "الدور الأرضي", rooms: "", notes: "" },
+        { name: "الدور الأول", rooms: "", notes: "" },
+        { name: "السطح", rooms: "", notes: "" },
+      ],
+      sketchData: initialData?.sketchData || "",
+      notes: initialData?.notes || "",
+      ...(initialData?.id ? { id: initialData.id } : {}),
+    };
   });
 
   // Load existing sketch on canvas
@@ -236,6 +352,77 @@ export default function ProjectBriefForm({
     }
   };
 
+  // حفظ النموذج في بوابة العميل كمستند PDF
+  const handleSaveToPortal = async () => {
+    if (!projectInfo?.clientId) {
+      toast.error("لا يوجد عميل مرتبط بهذا المشروع");
+      return;
+    }
+    setSavingPortal(true);
+    try {
+      // أولاً احفظ النموذج
+      await handleSave();
+
+      // ثم أنشئ مستنداً في بوابة العميل يشير إلى النموذج
+      const sketchData = canvasRef.current?.toDataURL("image/png") || "";
+      const summaryText = [
+        `نموذج طلبات المشروع — ${projectInfo?.name || projectId}`,
+        `المالك: ${brief.ownerName}`,
+        `المنطقة: ${brief.area} | القطعة: ${brief.block} | القسيمة: ${brief.plot}`,
+        `شكل القسيمة: ${brief.plotShape} | اتجاه الشمال: ${brief.northDirection}`,
+        `الطابع: ${brief.architecturalStyle} | الأدوار: ${brief.floorsCount}`,
+      ].filter(Boolean).join("\n");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `نموذج_طلبات_${projectId}.txt`,
+          content: summaryText,
+          category: "نموذج طلبات",
+          projectId,
+          clientId: projectInfo.clientId,
+          fileSize: `${summaryText.length} حرف`,
+          url: `/api/projects/${projectId}/brief`,
+        }),
+      });
+
+      // إذا فشل upload، نحاول عبر documents API مباشرة
+      if (!res.ok) {
+        const docRes = await fetch("/api/documents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: `نموذج طلبات المشروع — ${projectInfo?.name || projectId}`,
+            category: "نموذج طلبات",
+            projectId,
+            clientId: projectInfo.clientId,
+            fileSize: "نموذج رقمي",
+            url: `/api/projects/${projectId}/brief`,
+          }),
+        });
+        if (!docRes.ok) throw new Error("فشل الحفظ في بوابة العميل");
+      }
+
+      setSavedToPortal(true);
+      toast.success("تم حفظ النموذج في بوابة العميل بنجاح");
+    } catch (err) {
+      toast.error("حدث خطأ أثناء الحفظ في بوابة العميل");
+    } finally {
+      setSavingPortal(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setExportingPdf(true);
+    try {
+      const sketchData = canvasRef.current?.toDataURL("image/png") || "";
+      await exportToPDF(brief, sketchData, projectInfo);
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex" dir="rtl" onClick={onClose}>
       <div className="flex-1 bg-black/40" />
@@ -247,18 +434,54 @@ export default function ProjectBriefForm({
         <div className="flex items-center justify-between p-4 border-b bg-gradient-to-l from-amber-50 to-white">
           <div className="flex items-center gap-2">
             <PenLine className="w-5 h-5 text-amber-600" />
-            <h2 className="text-lg font-bold">نموذج طلبات المشروع</h2>
+            <div>
+              <h2 className="text-base font-bold">نموذج طلبات المشروع</h2>
+              {projectInfo?.name && (
+                <p className="text-[11px] text-muted-foreground">{projectInfo.name}</p>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={handleSave} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white">
-              <Save className="w-4 h-4 ml-1" />
-              {saving ? "جاري الحفظ..." : "حفظ"}
+          <div className="flex items-center gap-1.5">
+            {/* تصدير PDF */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleExportPDF}
+              disabled={exportingPdf}
+              className="gap-1 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              PDF
+            </Button>
+            {/* حفظ في بوابة العميل */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSaveToPortal}
+              disabled={savingPortal || savedToPortal}
+              className={`gap-1 text-xs ${savedToPortal ? "border-green-300 text-green-700 bg-green-50" : "border-blue-300 text-blue-700 hover:bg-blue-50"}`}
+            >
+              {savedToPortal ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
+              {savingPortal ? "جاري..." : savedToPortal ? "محفوظ" : "بوابة العميل"}
+            </Button>
+            {/* حفظ */}
+            <Button size="sm" onClick={handleSave} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white gap-1 text-xs">
+              <Save className="w-3.5 h-3.5" />
+              {saving ? "..." : "حفظ"}
             </Button>
             <button onClick={onClose} className="p-1 rounded hover:bg-muted">
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
+
+        {/* Auto-fill notice */}
+        {(brief.ownerName || brief.area || brief.block) && (
+          <div className="px-4 py-2 bg-green-50 border-b border-green-100 flex items-center gap-2">
+            <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" />
+            <p className="text-[11px] text-green-700">تم ملء البيانات الرئيسية تلقائياً من بيانات المشروع — يمكنك التعديل</p>
+          </div>
+        )}
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -278,9 +501,59 @@ export default function ProjectBriefForm({
               <Field label="القطعة" value={brief.block} onChange={v => setBrief(p => ({ ...p, block: v }))} />
               <Field label="القسيمة" value={brief.plot} onChange={v => setBrief(p => ({ ...p, plot: v }))} />
               <Field label="الرقم الآلي" value={brief.autoNumber} onChange={v => setBrief(p => ({ ...p, autoNumber: v }))} />
-              <Field label="مساحة الأرض" value={brief.plotArea} onChange={v => setBrief(p => ({ ...p, plotArea: v }))} />
-              <SelectField label="شكل القسيمة" value={brief.plotShape} options={SHAPES} onChange={v => setBrief(p => ({ ...p, plotShape: v }))} />
-              <SelectField label="اتجاه الشمال" value={brief.northDirection} options={DIRECTIONS} onChange={v => setBrief(p => ({ ...p, northDirection: v }))} />
+              <Field label="مساحة الأرض (م²)" value={brief.plotArea} onChange={v => setBrief(p => ({ ...p, plotArea: v }))} />
+              {/* شكل القسيمة مع أيقونات توضيحية */}
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">شكل القسيمة</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {SHAPES.map(shape => (
+                    <button
+                      key={shape}
+                      type="button"
+                      onClick={() => setBrief(p => ({ ...p, plotShape: shape }))}
+                      className={`px-2 py-1.5 text-xs rounded-lg border-2 font-medium transition-all ${
+                        brief.plotShape === shape
+                          ? "border-amber-500 bg-amber-50 text-amber-800"
+                          : "border-border bg-background hover:border-amber-300 hover:bg-amber-50/50"
+                      }`}
+                    >
+                      {shape === "زاوية" && "⌐ "}
+                      {shape === "سد" && "▬ "}
+                      {shape === "بطن وظهر" && "⬡ "}
+                      {shape === "ثلاث جهات" && "⊏ "}
+                      {shape}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* اتجاه الشمال */}
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">اتجاه الشمال</label>
+                <div className="grid grid-cols-2 gap-1">
+                  {DIRECTIONS.map(dir => (
+                    <button
+                      key={dir}
+                      type="button"
+                      onClick={() => setBrief(p => ({ ...p, northDirection: dir }))}
+                      className={`px-2 py-1 text-xs rounded-md border transition-all ${
+                        brief.northDirection === dir
+                          ? "border-blue-500 bg-blue-50 text-blue-800 font-semibold"
+                          : "border-border hover:border-blue-300"
+                      }`}
+                    >
+                      {dir === "شمال" && "↑ "}
+                      {dir === "جنوب" && "↓ "}
+                      {dir === "شرق" && "→ "}
+                      {dir === "غرب" && "← "}
+                      {dir === "شمال شرق" && "↗ "}
+                      {dir === "شمال غرب" && "↖ "}
+                      {dir === "جنوب شرق" && "↘ "}
+                      {dir === "جنوب غرب" && "↙ "}
+                      {dir}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </Section>
 

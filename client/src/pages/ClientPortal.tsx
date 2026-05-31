@@ -12,7 +12,7 @@ import {
   CheckCircle2, Building2, Calendar, Download, Phone,
   CreditCard, User,
 } from "lucide-react";
-import { useClients, useProjects, useDocuments, useInvoices } from "@/lib/api";
+import { useClients, useProjects, useDocuments, useInvoices, useProjectBrief } from "@/lib/api";
 
 const CONTRACT_PHASES = [
   "تجهيز الملف", "التصميم المعماري", "التصميم الإنشائي",
@@ -35,6 +35,7 @@ export default function ClientPortal() {
   );
 
   const mainProject = clientProjects[0] || null;
+  const { data: projectBrief } = useProjectBrief(mainProject?.id || "");
 
   return (
     <div className="space-y-5">
@@ -185,6 +186,94 @@ export default function ClientPortal() {
                   <CardContent className="py-10 text-center text-muted-foreground text-sm">
                     <Building2 className="w-8 h-8 mx-auto mb-2 opacity-20" />
                     لا يوجد مشاريع مرتبطة بهذا العميل
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Project Brief / نموذج الطلبات */}
+              {projectBrief && (
+                <Card className="border-0 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <FileText className="w-5 h-5" style={{ color: "oklch(0.72 0.10 60)" }} />
+                      نموذج طلبات المشروع
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 text-sm">
+                      {/* بيانات المالك */}
+                      <div className="p-3 rounded-xl bg-muted/30">
+                        <p className="text-xs font-bold text-muted-foreground mb-2 flex items-center gap-1">
+                          <User className="w-3 h-3" /> بيانات المالك
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <p className="text-[10px] text-muted-foreground">الاسم</p>
+                            <p className="font-medium">{projectBrief.ownerName || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground">التلفون</p>
+                            <p className="font-medium">{projectBrief.ownerPhone || "—"}</p>
+                          </div>
+                        </div>
+                      </div>
+                      {/* بيانات القسيمة */}
+                      <div className="p-3 rounded-xl bg-muted/30">
+                        <p className="text-xs font-bold text-muted-foreground mb-2 flex items-center gap-1">
+                          <Building2 className="w-3 h-3" /> بيانات القسيمة
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <p className="text-[10px] text-muted-foreground">المنطقة</p>
+                            <p className="font-medium text-xs">{projectBrief.area || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground">القطعة</p>
+                            <p className="font-medium text-xs">{projectBrief.block || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground">القسيمة</p>
+                            <p className="font-medium text-xs">{projectBrief.plot || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground">المساحة</p>
+                            <p className="font-medium text-xs">{projectBrief.plotArea ? `${projectBrief.plotArea} م²` : "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground">شكل القسيمة</p>
+                            <p className="font-medium text-xs">{projectBrief.plotShape || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground">اتجاه الشمال</p>
+                            <p className="font-medium text-xs">{projectBrief.northDirection || "—"}</p>
+                          </div>
+                        </div>
+                      </div>
+                      {/* الطابع المعماري */}
+                      {(projectBrief.architecturalStyle || projectBrief.floorsCount > 0) && (
+                        <div className="p-3 rounded-xl bg-muted/30">
+                          <p className="text-xs font-bold text-muted-foreground mb-2">الطابع المعماري</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <p className="text-[10px] text-muted-foreground">الطابع</p>
+                              <p className="font-medium text-xs">{projectBrief.architecturalStyle || "—"}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground">عدد الأدوار</p>
+                              <p className="font-medium text-xs">{projectBrief.floorsCount}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {/* ملاحظات */}
+                      {projectBrief.notes && (
+                        <div className="p-3 rounded-xl bg-amber-50 border border-amber-100">
+                          <p className="text-xs font-bold text-amber-700 mb-1">ملاحظات</p>
+                          <p className="text-xs text-amber-800">{projectBrief.notes}</p>
+                        </div>
+                      )}
+                      <p className="text-[10px] text-muted-foreground text-center">آخر تحديث: {projectBrief.updatedAt}</p>
+                    </div>
                   </CardContent>
                 </Card>
               )}

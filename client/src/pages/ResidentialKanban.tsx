@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
-import { useProject, useUpdateTask, useCreateProjectMeeting, useProjectMeetings, useDocuments } from "@/lib/api";
+import { useProject, useUpdateTask, useCreateProjectMeeting, useProjectMeetings, useDocuments, useProjectBrief } from "@/lib/api";
 import type { Document } from "@/lib/api";
 
 /* ─── Types ─── */
@@ -637,6 +637,8 @@ function PhaseArchitecturalDesignPopup({ phase, project, onClose, onTaskUpdate }
   const [showBriefForm, setShowBriefForm] = useState(false);
   const createMeeting = useCreateProjectMeeting(project.id);
   const { data: meetings = [] } = useProjectMeetings(project.id);
+  // جلب النموذج الموجود مسبقاً من قاعدة البيانات
+  const { data: existingBrief } = useProjectBrief(project.id);
 
   // تصفية محاضر الاجتماعات لتظهر فقط مراجعات الكروكي
   const reviews = meetings
@@ -751,6 +753,24 @@ function PhaseArchitecturalDesignPopup({ phase, project, onClose, onTaskUpdate }
             <ProjectBriefForm
               projectId={project.id}
               onClose={() => setShowBriefForm(false)}
+              initialData={existingBrief ? {
+                ...existingBrief,
+                floorsDetails: typeof existingBrief.floorsDetails === "string"
+                  ? JSON.parse(existingBrief.floorsDetails)
+                  : existingBrief.floorsDetails,
+              } : undefined}
+              projectInfo={{
+                id: project.id,
+                name: project.name,
+                client: project.client,
+                clientId: project.clientId,
+                clientPhone: project.clientPhone,
+                area: project.area,
+                block: project.block,
+                plot: project.plot,
+                type: project.type,
+                serviceType: project.serviceType,
+              }}
             />
           )}
 

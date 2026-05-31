@@ -827,3 +827,34 @@ export function useCreateProjectMeeting(projectId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["project-meetings", projectId] }),
   });
 }
+
+// ── Project Briefs (نموذج طلبات المشروع) ─────────────────────────────────────
+export interface ProjectBrief {
+  id: number;
+  projectId: string;
+  ownerName: string;
+  ownerPhone: string;
+  governorate: string;
+  area: string;
+  block: string;
+  plot: string;
+  autoNumber: string;
+  plotArea: string;
+  plotShape: string;
+  northDirection: string;
+  architecturalStyle: string;
+  floorsCount: number;
+  floorsDetails: string;
+  sketchData: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function useProjectBrief(projectId: string) {
+  return useQuery<ProjectBrief | null>({
+    queryKey: ["project-brief", projectId],
+    queryFn: () => request(`/api/projects/${projectId}/brief`),
+    enabled: !!projectId,
+  });
+}
