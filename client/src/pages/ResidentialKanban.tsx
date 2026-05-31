@@ -39,9 +39,12 @@ const PHASE_COLORS = [
   "oklch(0.60 0.15 280)",  // التصميم المعماري - بنفسجي
   "oklch(0.60 0.12 30)",   // الواجهات والإنشائي - برتقالي
   "oklch(0.55 0.15 150)",  // مخطط البلدية - أخضر
+  "oklch(0.55 0.12 200)",  // التقديم للبلدية - تيل
+  "oklch(0.60 0.12 60)",   // المخططات التفصيلية - ذهبي
+  "oklch(0.55 0.15 320)",  // الإشراف - وردي
 ];
 
-const PHASE_ICONS = [ClipboardList, Building2, Layers, FileText];
+const PHASE_ICONS = [ClipboardList, Building2, Layers, FileText, Upload, Wrench, CheckCircle2];
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.FC<{ className?: string }> }> = {
   done:           { label: "مكتملة",         color: "oklch(0.55 0.15 150)", icon: CheckCircle2 },
@@ -886,13 +889,13 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
 
       {/* ── Kanban Board ── */}
       <div>
-        {/* Phase Headers Row */}
-        <div className="grid grid-cols-4 gap-2 mb-3">
-          {project.phases.slice(0, 4).map((phase, idx) => {
+        {/* Phase Headers Row - all 7 phases */}
+        <div className="grid gap-1.5 mb-3" style={{ gridTemplateColumns: `repeat(${project.phases.length}, minmax(0, 1fr))` }}>
+          {project.phases.map((phase, idx) => {
             const color = PHASE_COLORS[idx % PHASE_COLORS.length];
             const phaseStatus = getPhaseStatus(phase, idx);
             const phaseProgress = getPhaseProgress(phase);
-            const Icon = PHASE_ICONS[idx];
+            const Icon = PHASE_ICONS[idx % PHASE_ICONS.length];
             const isCurrent = phaseStatus === "current";
             const isDone = phaseStatus === "done";
 
@@ -925,9 +928,9 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
           })}
         </div>
 
-        {/* Kanban Cards Row */}
-        <div className="grid grid-cols-4 gap-2">
-          {project.phases.slice(0, 4).map((phase, idx) => {
+        {/* Kanban Cards Row - all 7 phases */}
+        <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${project.phases.length}, minmax(0, 1fr))` }}>
+          {project.phases.map((phase, idx) => {
             const color = PHASE_COLORS[idx % PHASE_COLORS.length];
             const phaseStatus = getPhaseStatus(phase, idx);
             const phaseProgress = getPhaseProgress(phase);
@@ -1012,28 +1015,7 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
         </div>
       </div>
 
-      {/* ── Extra phases (if more than 4) ── */}
-      {project.phases.length > 4 && (
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground font-medium">مراحل إضافية</p>
-          <div className="grid grid-cols-2 gap-2">
-            {project.phases.slice(4).map((phase, idx) => {
-              const realIdx = idx + 4;
-              const color = PHASE_COLORS[realIdx % PHASE_COLORS.length];
-              const phaseProgress = getPhaseProgress(phase);
-              return (
-                <div key={realIdx} className="p-3 rounded-xl border bg-muted/10">
-                  <p className="text-xs font-medium">{phase.title}</p>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <Progress value={phaseProgress} className="flex-1 h-1" />
-                    <span className="text-[10px]" style={{ fontFamily: "'Space Grotesk'" }}>{phaseProgress}%</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* All phases shown in the grid above - no extra section needed */}
     </div>
   );
 }
