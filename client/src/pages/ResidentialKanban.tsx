@@ -13,7 +13,7 @@ import {
   Clock, X, Plus, Calendar, FileText, Banknote, Wrench,
   Building2, Layers, ChevronRight, ClipboardList, MessageSquare,
   Phone, Pencil, Check, AlertCircle, Zap, Upload,
-  Eye, Download, File, Image as ImageIcon, ExternalLink
+  Eye, Download, File, Image as ImageIcon, ExternalLink, Trash2
 } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
@@ -78,18 +78,31 @@ function getFileType(doc: { name: string; mimeType?: string; fileExtension?: str
 }
 
 // Component: قائمة الملفات المرفوعة مسبقاً لقسم معين
-function UploadedFilesList({ docs, newlyUploaded }: {
+function UploadedFilesList({ docs, onDeleted }: {
   docs: Document[];
-  newlyUploaded?: string[];
+  onDeleted?: () => void;
 }) {
   const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
+  const [confirmDeleteDoc, setConfirmDeleteDoc] = useState<Document | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const allDocs = [
-    ...docs,
-    // الملفات المرفوعة حديثاً في هذه الجلسة (تظهر فوراً قبل إعادة الجلب)
-  ];
+  if (docs.length === 0) return null;
 
-  if (allDocs.length === 0 && (!newlyUploaded || newlyUploaded.length === 0)) return null;
+  const handleDelete = async () => {
+    if (!confirmDeleteDoc) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/documents/${confirmDeleteDoc.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("فشل الحذف");
+      toast.success(`تم حذف “${confirmDeleteDoc.name}” بنجاح`);
+      setConfirmDeleteDoc(null);
+      onDeleted?.();
+    } catch {
+      toast.error("حدث خطأ أثناء الحذف");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <>
@@ -132,18 +145,70 @@ function UploadedFilesList({ docs, newlyUploaded }: {
         </div>
       )}
 
+      {/* نافذة تأكيد الحذف */}
+      {confirmDeleteDoc && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          dir="rtl"
+          onClick={e => { if (e.target === e.currentTarget) setConfirmDeleteDoc(null); }}
+        >
+          <div className="absolute inset-0 bg-black/60" onClick={() => setConfirmDeleteDoc(null)} />
+          <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-sm p-5 border">
+            {/* أيقونة تحذير */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-foreground">تأكيد الحذف</h3>
+                <p className="text-xs text-muted-foreground">هذه العملية لا يمكن التراجع عنها</p>
+              </div>
+            </div>
+            {/* اسم الملف */}
+            <div className="bg-muted/40 rounded-lg px-3 py-2.5 mb-4 border">
+              <p className="text-xs font-medium truncate text-foreground">{confirmDeleteDoc.name}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{confirmDeleteDoc.category}</p>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              سيتم حذف هذا الملف نهائياً ولن يظهر في المستندات بعد ذلك.
+            </p>
+            {/* أزرار التأكيد */}
+            <div className="flex gap-2">
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 h-9 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-1.5"
+              >
+                {deleting ? (
+                  <><Clock className="w-3.5 h-3.5 animate-spin" /> جاري الحذف...</>
+                ) : (
+                  <>حذف الملف</>
+                )}
+              </button>
+              <button
+                onClick={() => setConfirmDeleteDoc(null)}
+                disabled={deleting}
+                className="flex-1 h-9 rounded-lg text-xs font-semibold border hover:bg-muted/40 transition-colors"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-lg border bg-muted/20 overflow-hidden">
         <div className="px-3 py-2 border-b bg-muted/30">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-            الملفات المرفوعة ({allDocs.length})
+            الملفات المرفوعة ({docs.length})
           </p>
         </div>
         <div className="divide-y">
-          {allDocs.map(doc => {
+          {docs.map(doc => {
             const ft = getFileType(doc);
             const FileIcon = ft === "image" ? ImageIcon : ft === "pdf" ? FileText : File;
             return (
-              <div key={doc.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted/20 transition-colors">
+              <div key={doc.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted/20 transition-colors group">
                 <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 bg-muted/40">
                   <FileIcon className="w-3.5 h-3.5 text-muted-foreground" />
                 </div>
@@ -169,6 +234,13 @@ function UploadedFilesList({ docs, newlyUploaded }: {
                   >
                     <Download className="w-3 h-3 text-muted-foreground" />
                   </a>
+                  <button
+                    onClick={() => setConfirmDeleteDoc(doc)}
+                    className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-50 transition-colors"
+                    title="حذف"
+                  >
+                    <Trash2 className="w-3 h-3 text-muted-foreground hover:text-red-500" />
+                  </button>
                 </div>
               </div>
             );
@@ -340,7 +412,7 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
                   <FileUploadButton label="خريطة الموقع العام" category="خريطة موقع" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("docs", d)} />
                   <FileUploadButton label="أخرى" category="وثيقة أخرى" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("docs", d)} />
                 </div>
-                <UploadedFilesList docs={docsDocs} key={refreshKey} />
+                <UploadedFilesList docs={docsDocs} key={refreshKey} onDeleted={() => { refetchDocs(); setRefreshKey(k => k + 1); }} />
                 {/* مهام الوثائق من قاعدة البيانات */}
                 {phase.tasks.filter(t =>
                   t.name.includes("بطاقات") || t.name.includes("سند") || t.name.includes("ملكية") ||
@@ -399,7 +471,7 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
                   <FileUploadButton label="فحص التربة" category="فحص تربة" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
                   <FileUploadButton label="كتاب الكهرباء" category="كتاب كهرباء" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
                 </div>
-                <UploadedFilesList docs={techDocs} key={refreshKey + 100} />
+                <UploadedFilesList docs={techDocs} key={refreshKey + 100} onDeleted={() => { refetchDocs(); setRefreshKey(k => k + 1); }} />
                 {/* مهام الفحوصات من قاعدة البيانات */}
                 {techTasks.map(task => (
                   <div key={task.id} className="flex items-center justify-between py-1.5 border-t">
@@ -454,7 +526,7 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
                 <div className="flex flex-wrap gap-2">
                   <FileUploadButton label="رفع نماذج البلدية" category="نماذج بلدية" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("forms", d)} />
                 </div>
-                <UploadedFilesList docs={formsDocs} key={refreshKey + 200} />
+                <UploadedFilesList docs={formsDocs} key={refreshKey + 200} onDeleted={() => { refetchDocs(); setRefreshKey(k => k + 1); }} />
                 {/* مهام النماذج من قاعدة البيانات */}
                 {formTasks.map(task => (
                   <div key={task.id} className="flex items-center justify-between py-1.5 border-t">

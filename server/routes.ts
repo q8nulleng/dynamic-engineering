@@ -816,6 +816,19 @@ apiRouter.get("/api/documents/:docId/view", async (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
+// DELETE document
+apiRouter.delete("/api/documents/:docId", async (req, res) => {
+  try {
+    const db = getDb();
+    const docId = parseInt(req.params.docId);
+    if (isNaN(docId)) return res.status(400).json({ error: "Invalid document ID" });
+    const [doc] = await db.select().from(documents).where(eq(documents.id, docId));
+    if (!doc) return res.status(404).json({ error: "Document not found" });
+    await db.delete(documents).where(eq(documents.id, docId));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
 // ── Reports charts ────────────────────────────────────────────────────────
 apiRouter.get("/api/reports/charts", async (_req, res) => {
   try {
