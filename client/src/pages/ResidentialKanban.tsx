@@ -60,19 +60,66 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ─── Phase 1: تجهيز الملف ─── */
+// Upload button component for file sections
+function FileUploadButton({ label, category, projectId, clientId, onUploaded }: {
+  label: string; category: string; projectId: string; clientId?: string;
+  onUploaded?: (doc: { name: string; url: string }) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("name", label + " - " + file.name);
+      formData.append("category", category);
+      if (projectId) formData.append("projectId", projectId);
+      if (clientId) formData.append("clientId", clientId);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("فشل الرفع");
+      const doc = await res.json();
+      toast.success(`تم رفع ${label} بنجاح ✓`);
+      onUploaded?.(doc);
+    } catch {
+      toast.error("حدث خطأ أثناء الرفع");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <>
+      <input ref={inputRef} type="file" className="hidden" onChange={handleUpload}
+        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" />
+      <button
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-dashed transition-colors hover:bg-muted/30 disabled:opacity-50"
+      >
+        {uploading ? (
+          <><Clock className="w-3 h-3 animate-spin" /> جاري الرفع...</>
+        ) : (
+          <><Upload className="w-3 h-3" /> {label}</>
+        )}
+      </button>
+    </>
+  );
+}
+
 function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
   phase: Phase; project: ProjectData; onClose: () => void;
   onTaskUpdate: (taskId: number, status: Task["status"]) => void;
 }) {
   const color = PHASE_COLORS[0];
-  const [expandedGroup, setExpandedGroup] = useState<string | null>("payment");
+  const [expandedGroup, setExpandedGroup] = useState<string | null>("docs");
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, string[]>>({});
 
-  const getTask = (name: string) => phase.tasks.find(t => t.name.includes(name));
   const paymentTask = phase.tasks.find(t => t.name.includes("تحصيل") || t.name.includes("دفعة"));
-  const docTasks = phase.tasks.filter(t =>
-    t.name.includes("بطاقات") || t.name.includes("سند") || t.name.includes("ملكية") ||
-    t.name.includes("خريطة") || t.name.includes("موقع")
-  );
   const techTasks = phase.tasks.filter(t =>
     t.name.includes("كهرباء") || t.name.includes("تربة") || t.name.includes("فحص")
   );
@@ -82,6 +129,10 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
 
   const doneCount = phase.tasks.filter(t => t.status === "done").length;
   const progress = phase.tasks.length > 0 ? Math.round((doneCount / phase.tasks.length) * 100) : 0;
+
+  const handleFileUploaded = (group: string, doc: { name: string }) => {
+    setUploadedFiles(prev => ({ ...prev, [group]: [...(prev[group] || []), doc.name] }));
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" dir="rtl" onClick={onClose}>
@@ -116,7 +167,209 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
         {/* Content */}
         <div className="overflow-y-auto flex-1 p-4 space-y-3">
 
-          {/* ── تحصيل الدفعة الأولى (في الأعلى دائماً) ── */}
+          {/* ══ 1. جمع الوثائق ══ */}
+          <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: `color-mix(in oklch, ${color} 35%, transparent)` }}>
+            <div
+              className="flex items-center justify-between px-3 py-2.5 cursor-pointer"
+              style={{ backgroundColor: `color-mix(in oklch, ${color} 8%, white)` }}
+              onClick={() => setExpandedGroup(expandedGroup === "docs" ? null : "docs")}
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: color }}>
+                  <FileText className="w-3.5 h-3.5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold" style={{ color: `color-mix(in oklch, ${color} 80%, black)` }}>جمع الوثائق</p>
+                  <p className="text-[10px] text-muted-foreground">البطاقة المدنية، الوثيقة، خريطة الموقع</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {uploadedFiles["docs"]?.length > 0 && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `color-mix(in oklch, ${color} 15%, white)`, color }}>
+                    {uploadedFiles["docs"].length} ملف
+                  </span>
+                )}
+                <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedGroup === "docs" ? "rotate-90" : ""}`} />
+              </div>
+            </div>
+            {expandedGroup === "docs" && (
+              <div className="px-3 pb-4 pt-3 space-y-3 border-t">
+                <p className="text-[11px] text-muted-foreground">ارفع الملفات المطلوبة — ستظهر تلقائياً في المستندات</p>
+                <div className="flex flex-wrap gap-2">
+                  <FileUploadButton label="البطاقة المدنية للملاك" category="بطاقة مدنية" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("docs", d)} />
+                  <FileUploadButton label="الوثيقة" category="وثيقة ملكية" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("docs", d)} />
+                  <FileUploadButton label="خريطة الموقع العام" category="خريطة موقع" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("docs", d)} />
+                  <FileUploadButton label="أخرى" category="وثيقة أخرى" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("docs", d)} />
+                </div>
+                {uploadedFiles["docs"]?.length > 0 && (
+                  <div className="space-y-1 pt-1">
+                    <p className="text-[10px] font-medium text-muted-foreground">الملفات المرفوعة:</p>
+                    {uploadedFiles["docs"].map((name, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-[11px]">
+                        <CheckCircle2 className="w-3 h-3 text-green-500" />
+                        <span className="truncate">{name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* مهام الوثائق من قاعدة البيانات */}
+                {phase.tasks.filter(t =>
+                  t.name.includes("بطاقات") || t.name.includes("سند") || t.name.includes("ملكية") ||
+                  t.name.includes("خريطة") || t.name.includes("موقع") || t.name.includes("تجميع مستندات") || t.name.includes("وثائق")
+                ).map(task => (
+                  <div key={task.id} className="flex items-center justify-between py-1.5 border-t">
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0"
+                        style={{
+                          borderColor: task.status === "done" ? "oklch(0.55 0.15 150)" : "hsl(var(--border))",
+                          backgroundColor: task.status === "done" ? "oklch(0.55 0.15 150)" : "transparent",
+                        }}
+                        onClick={() => onTaskUpdate(task.id, task.status === "done" ? "pending" : "done")}
+                      >
+                        {task.status === "done" && <Check className="w-2.5 h-2.5 text-white" />}
+                      </button>
+                      <span className={`text-xs ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>{task.name}</span>
+                    </div>
+                    <TaskStatusBadge status={task.status} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ══ 2. الفحوصات التقنية ══ */}
+          <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: `color-mix(in oklch, oklch(0.60 0.12 30) 35%, transparent)` }}>
+            <div
+              className="flex items-center justify-between px-3 py-2.5 cursor-pointer"
+              style={{ backgroundColor: `color-mix(in oklch, oklch(0.60 0.12 30) 8%, white)` }}
+              onClick={() => setExpandedGroup(expandedGroup === "tech" ? null : "tech")}
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: "oklch(0.60 0.12 30)" }}>
+                  <Zap className="w-3.5 h-3.5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold" style={{ color: "oklch(0.45 0.10 30)" }}>الفحوصات التقنية</p>
+                  <p className="text-[10px] text-muted-foreground">فحص التربة وكتاب الكهرباء</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {uploadedFiles["tech"]?.length > 0 && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "color-mix(in oklch, oklch(0.60 0.12 30) 15%, white)", color: "oklch(0.45 0.10 30)" }}>
+                    {uploadedFiles["tech"].length} ملف
+                  </span>
+                )}
+                <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedGroup === "tech" ? "rotate-90" : ""}`} />
+              </div>
+            </div>
+            {expandedGroup === "tech" && (
+              <div className="px-3 pb-4 pt-3 space-y-3 border-t">
+                <p className="text-[11px] text-muted-foreground">ارفع نتائج الفحوصات — ستظهر في المستندات</p>
+                <div className="flex flex-wrap gap-2">
+                  <FileUploadButton label="فحص التربة" category="فحص تربة" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
+                  <FileUploadButton label="كتاب الكهرباء" category="كتاب كهرباء" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
+                </div>
+                {uploadedFiles["tech"]?.length > 0 && (
+                  <div className="space-y-1 pt-1">
+                    <p className="text-[10px] font-medium text-muted-foreground">الملفات المرفوعة:</p>
+                    {uploadedFiles["tech"].map((name, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-[11px]">
+                        <CheckCircle2 className="w-3 h-3 text-green-500" />
+                        <span className="truncate">{name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* مهام الفحوصات من قاعدة البيانات */}
+                {techTasks.map(task => (
+                  <div key={task.id} className="flex items-center justify-between py-1.5 border-t">
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0"
+                        style={{
+                          borderColor: task.status === "done" ? "oklch(0.55 0.15 150)" : "hsl(var(--border))",
+                          backgroundColor: task.status === "done" ? "oklch(0.55 0.15 150)" : "transparent",
+                        }}
+                        onClick={() => onTaskUpdate(task.id, task.status === "done" ? "pending" : "done")}
+                      >
+                        {task.status === "done" && <Check className="w-2.5 h-2.5 text-white" />}
+                      </button>
+                      <span className={`text-xs ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>{task.name}</span>
+                    </div>
+                    <TaskStatusBadge status={task.status} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ══ 3. تعبئة نماذج البلدية ══ */}
+          <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: `color-mix(in oklch, oklch(0.55 0.15 150) 35%, transparent)` }}>
+            <div
+              className="flex items-center justify-between px-3 py-2.5 cursor-pointer"
+              style={{ backgroundColor: `color-mix(in oklch, oklch(0.55 0.15 150) 8%, white)` }}
+              onClick={() => setExpandedGroup(expandedGroup === "forms" ? null : "forms")}
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: "oklch(0.55 0.15 150)" }}>
+                  <ClipboardList className="w-3.5 h-3.5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold" style={{ color: "oklch(0.40 0.12 150)" }}>تعبئة نماذج البلدية</p>
+                  <p className="text-[10px] text-muted-foreground">النماذج والتعهدات الرسمية</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {uploadedFiles["forms"]?.length > 0 && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "color-mix(in oklch, oklch(0.55 0.15 150) 15%, white)", color: "oklch(0.40 0.12 150)" }}>
+                    {uploadedFiles["forms"].length} ملف
+                  </span>
+                )}
+                <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedGroup === "forms" ? "rotate-90" : ""}`} />
+              </div>
+            </div>
+            {expandedGroup === "forms" && (
+              <div className="px-3 pb-4 pt-3 space-y-3 border-t">
+                <p className="text-[11px] text-muted-foreground">ارفع النماذج بعد تعبئتها — ستظهر في المستندات</p>
+                <div className="flex flex-wrap gap-2">
+                  <FileUploadButton label="رفع نماذج البلدية" category="نماذج بلدية" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("forms", d)} />
+                </div>
+                {uploadedFiles["forms"]?.length > 0 && (
+                  <div className="space-y-1 pt-1">
+                    <p className="text-[10px] font-medium text-muted-foreground">الملفات المرفوعة:</p>
+                    {uploadedFiles["forms"].map((name, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-[11px]">
+                        <CheckCircle2 className="w-3 h-3 text-green-500" />
+                        <span className="truncate">{name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* مهام النماذج من قاعدة البيانات */}
+                {formTasks.map(task => (
+                  <div key={task.id} className="flex items-center justify-between py-1.5 border-t">
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0"
+                        style={{
+                          borderColor: task.status === "done" ? "oklch(0.55 0.15 150)" : "hsl(var(--border))",
+                          backgroundColor: task.status === "done" ? "oklch(0.55 0.15 150)" : "transparent",
+                        }}
+                        onClick={() => onTaskUpdate(task.id, task.status === "done" ? "pending" : "done")}
+                      >
+                        {task.status === "done" && <Check className="w-2.5 h-2.5 text-white" />}
+                      </button>
+                      <span className={`text-xs ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>{task.name}</span>
+                    </div>
+                    <TaskStatusBadge status={task.status} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ══ تحصيل الدفعة الأولى (في الأسفل) ══ */}
           {paymentTask && (
             <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: `color-mix(in oklch, oklch(0.55 0.15 60) 40%, transparent)` }}>
               <div
@@ -156,53 +409,13 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
             </div>
           )}
 
-          {/* ── الأوراق الرسمية (بطاقات + سند + خريطة) ── */}
-          {docTasks.length > 0 && (
-            <TaskGroup
-              title="الأوراق الرسمية"
-              subtitle="بطاقات مدنية، سند الملكية، خريطة الموقع"
-              icon={<FileText className="w-3.5 h-3.5 text-white" />}
-              color="oklch(0.55 0.15 250)"
-              tasks={docTasks}
-              expanded={expandedGroup === "docs"}
-              onToggle={() => setExpandedGroup(expandedGroup === "docs" ? null : "docs")}
-              onTaskUpdate={onTaskUpdate}
-            />
-          )}
-
-          {/* ── الفحوصات التقنية (كهرباء + تربة) ── */}
-          {techTasks.length > 0 && (
-            <TaskGroup
-              title="الفحوصات التقنية"
-              subtitle="طلب إمكانية الكهرباء وفحص التربة"
-              icon={<Zap className="w-3.5 h-3.5 text-white" />}
-              color="oklch(0.60 0.12 30)"
-              tasks={techTasks}
-              expanded={expandedGroup === "tech"}
-              onToggle={() => setExpandedGroup(expandedGroup === "tech" ? null : "tech")}
-              onTaskUpdate={onTaskUpdate}
-            />
-          )}
-
-          {/* ── نماذج البلدية ── */}
-          {formTasks.length > 0 && (
-            <TaskGroup
-              title="نماذج البلدية"
-              subtitle="تعبئة النماذج والتعهدات"
-              icon={<ClipboardList className="w-3.5 h-3.5 text-white" />}
-              color="oklch(0.55 0.15 150)"
-              tasks={formTasks}
-              expanded={expandedGroup === "forms"}
-              onToggle={() => setExpandedGroup(expandedGroup === "forms" ? null : "forms")}
-              onTaskUpdate={onTaskUpdate}
-            />
-          )}
-
-          {/* ── المهام الأخرى ── */}
+          {/* ── المهام الأخرى (ما لم يُصنَّف) ── */}
           {phase.tasks.filter(t =>
-            !paymentTask || t.id !== paymentTask.id
-          ).filter(t =>
-            !docTasks.find(d => d.id === t.id) &&
+            (!paymentTask || t.id !== paymentTask.id) &&
+            !phase.tasks.filter(t2 =>
+              t2.name.includes("بطاقات") || t2.name.includes("سند") || t2.name.includes("ملكية") ||
+              t2.name.includes("خريطة") || t2.name.includes("موقع") || t2.name.includes("تجميع مستندات") || t2.name.includes("وثائق")
+            ).find(d => d.id === t.id) &&
             !techTasks.find(d => d.id === t.id) &&
             !formTasks.find(d => d.id === t.id)
           ).length > 0 && (
@@ -213,7 +426,10 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
               color="oklch(0.60 0.00 0)"
               tasks={phase.tasks.filter(t =>
                 (!paymentTask || t.id !== paymentTask.id) &&
-                !docTasks.find(d => d.id === t.id) &&
+                !phase.tasks.filter(t2 =>
+                  t2.name.includes("بطاقات") || t2.name.includes("سند") || t2.name.includes("ملكية") ||
+                  t2.name.includes("خريطة") || t2.name.includes("موقع") || t2.name.includes("تجميع مستندات") || t2.name.includes("وثائق")
+                ).find(d => d.id === t.id) &&
                 !techTasks.find(d => d.id === t.id) &&
                 !formTasks.find(d => d.id === t.id)
               )}

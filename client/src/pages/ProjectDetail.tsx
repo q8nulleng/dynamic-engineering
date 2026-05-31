@@ -497,7 +497,12 @@ export default function ProjectDetail() {
     if (task.name === "تصميم الكروكي") {
       setSketchPanelColor(color);
       setShowSketchPanel(true);
-    } else if (task.name === "تجميع المستندات") {
+    } else if (
+      task.name === "تجميع المستندات" ||
+      task.name.includes("تجميع مستندات") ||
+      task.name.includes("جمع الوثائق") ||
+      phase.title === "تجهيز الملف"
+    ) {
       setShowDocsPanel(true);
     } else if (task.name.includes("العقد وتحصيل") || task.name.includes("تحصيل الدفعة")) {
       setShowContractPanel(true);
@@ -524,7 +529,7 @@ export default function ProjectDetail() {
         />
       )}
       {showSketchPanel && <SketchTaskPanel phaseColor={sketchPanelColor} onClose={() => setShowSketchPanel(false)} />}
-      {showDocsPanel && <DocumentsTaskPanel open={showDocsPanel} onClose={() => setShowDocsPanel(false)} taskName="تجميع المستندات" projectName={project.name} />}
+      {showDocsPanel && <DocumentsTaskPanel open={showDocsPanel} onClose={() => setShowDocsPanel(false)} taskName="تجهيز الملف" projectName={project.name} clientName={project.client} clientPhone={project.clientPhone} clientId={project.clientId} projectId={project.id} />}
       {showContractPanel && <ContractPaymentPanel open={showContractPanel} onClose={() => setShowContractPanel(false)} projectName={project.name} />}
       {showFormsPanel && <FormsTaskPanel open={showFormsPanel} onClose={() => setShowFormsPanel(false)} projectName={project.name} serviceType={project.serviceType} clientId={project.clientId} />}
       {showSupervisionPanel && <SupervisionTaskPanel open={showSupervisionPanel} onClose={() => setShowSupervisionPanel(false)} projectName={project.name} clientName={project.client} />}
