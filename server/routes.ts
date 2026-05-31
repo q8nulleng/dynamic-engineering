@@ -180,6 +180,51 @@ apiRouter.post("/api/projects", async (req, res) => {
           { title: "الإشراف",             subtitle: "الإشراف على التنفيذ" },
         ];
       } else if (projectType === "سكن خاص") {
+        // تطبيق خطة العمل الكاملة (7 مراحل، 36 مهمة) من قاعدة البيانات
+        const serviceType = projectData.serviceType || "";
+        if (serviceType === "بناء جديد") {
+          // ابحث عن خطة العمل المحفوظة للسكن الخاص - بناء جديد
+          const [workPlan] = await db.select().from(workPlans)
+            .where(eq(workPlans.projectType, "سكن خاص"));
+          if (workPlan) {
+            const planPhases = await db.select().from(workPlanPhases)
+              .where(eq(workPlanPhases.workPlanId, workPlan.id))
+              .orderBy(workPlanPhases.order);
+            for (let i = 0; i < planPhases.length; i++) {
+              const ph = planPhases[i];
+              await db.insert(phases).values({
+                projectId: id,
+                order: i,
+                title: ph.title,
+                subtitle: ph.subtitle || "",
+              });
+              // MySQL autoincrement - get the last inserted phase for this project at this order
+              const [newPhase] = await db.select().from(phases)
+                .where(eq(phases.projectId, id))
+                .orderBy(desc(phases.id))
+                .limit(1);
+              const planTasks = await db.select().from(workPlanTasks)
+                .where(eq(workPlanTasks.workPlanPhaseId, ph.id))
+                .orderBy(workPlanTasks.order);
+              for (let j = 0; j < planTasks.length; j++) {
+                const t = planTasks[j];
+                await db.insert(tasks).values({
+                  phaseId: newPhase.id,
+                  name: t.name,
+                  status: j === 0 ? "in_progress" : "pending",
+                  assignee: t.assignee || "سكرتير",
+                  estimatedDays: t.estimatedDays || 1,
+                  autoCreated: 1,
+                  order: j,
+                });
+              }
+            }
+            // Skip the default phase creation below
+            const [project] = await db.select().from(projects).where(eq(projects.id, id));
+            return res.status(201).json({ ...project, clientId, contractId });
+          }
+        }
+        // Fallback: مراحل افتراضية
         phaseDefs = [
           { title: "تجهيز الملف",          subtitle: "جمع الوثائق والملفات" },
           { title: "التصميم المعماري",      subtitle: "الكروكي والواجهات" },
@@ -1096,8 +1141,50 @@ apiRouter.put("/api/work-plans/:id", async (req, res) => {
   try {
     const db = getDb();
     const id = parseInt(req.params.id);
-    const { phases: _phases, ...planData } = req.body;
-    await db.update(workPlans).set(planData).where(eq(workPlans.id, id));
+    const { phases: phasesData, ...planData } = req.body;
+
+    // Update plan metadata
+    await db.update(workPlans).set({
+      name: planData.name,
+      projectType: planData.projectType,
+      serviceType: planData.serviceType,
+      description: planData.description,
+    }).where(eq(workPlans.id, id));
+
+    // If phases are provided, replace all phases and tasks
+    if (Array.isArray(phasesData)) {
+      // Delete existing tasks and phases
+      const existingPhases = await db.select().from(workPlanPhases).where(eq(workPlanPhases.workPlanId, id));
+      for (const ph of existingPhases) {
+        await db.delete(workPlanTasks).where(eq(workPlanTasks.workPlanPhaseId, ph.id));
+      }
+      await db.delete(workPlanPhases).where(eq(workPlanPhases.workPlanId, id));
+
+      // Insert new phases and tasks
+      for (let i = 0; i < phasesData.length; i++) {
+        const ph = phasesData[i];
+        const [newPhase] = await db.insert(workPlanPhases).values({
+          workPlanId: id,
+          title: ph.title || '',
+          subtitle: ph.subtitle || '',
+          order: i,
+        }).returning();
+        if (Array.isArray(ph.tasks)) {
+          for (let j = 0; j < ph.tasks.length; j++) {
+            const t = ph.tasks[j];
+            await db.insert(workPlanTasks).values({
+              workPlanPhaseId: newPhase.id,
+              name: t.name || '',
+              assignee: t.assignee || '',
+              estimatedDays: t.estimatedDays || 1,
+              description: t.description || '',
+              order: j,
+            });
+          }
+        }
+      }
+    }
+
     const [row] = await db.select().from(workPlans).where(eq(workPlans.id, id));
     res.json(row);
   } catch (e: any) { res.status(500).json({ error: e.message }); }

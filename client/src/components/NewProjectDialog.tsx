@@ -1,9 +1,9 @@
-/*
+/**
  * NewProjectDialog - نموذج إضافة مشروع جديد
  * خطوات: التصنيف الرئيسي → التصنيف الفرعي → ربط العميل → بيانات المشروع
- * الجديد: خطوة ربط العميل (اختيار عميل موجود أو إنشاء جديد)
+ * التحسينات: رقم هاتف كويتي (8 أرقام) + اسم تلقائي + محافظة/منطقة
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,10 +12,13 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   Home, Factory, TrendingUp, Store,
   Building2, Wrench, PlusSquare, Layers, Trash2, Eye,
   ChevronRight, ChevronLeft, User, MapPin, FileText, Check,
-  Search, Users, Phone, UserPlus, UserCheck, Star
+  Search, Phone, UserPlus, UserCheck,
 } from "lucide-react";
 import type { Client } from "@/pages/Clients";
 import { useClients } from "@/lib/api";
@@ -37,11 +40,42 @@ const SUB_CATS = [
   { key: "إشراف",        label: "إشراف",        icon: Eye,        desc: "إشراف هندسي على التنفيذ" },
 ];
 
-const KUWAIT_AREAS = [
-  "العاصمة", "حولي", "الفروانية", "الأحمدي", "الجهراء", "مبارك الكبير",
-  "السالمية", "الرميثية", "البيان", "الزهراء", "الفحيحيل", "الشويخ",
-  "الصليبية", "الجابرية", "بيان", "الرقة", "العارضية", "صباح الأحمد",
-];
+// محافظات ومناطق الكويت
+const KUWAIT_GOVERNORATES: Record<string, string[]> = {
+  "محافظة العاصمة": [
+    "شرق", "مرقاب", "قبلة", "الميناء", "الديرة", "الوطية",
+    "الشامية", "الروضة", "الخالدية", "النزهة",
+    "كيفان", "الفيحاء", "اليرموك", "المنصورية", "الغرب",
+    "ضاحية عبدالله السالم", "بنيد القار", "الدعية", "العديلية",
+    "الدسمة", "الصليبيخات", "الشويخ الصناعي", "السرة",
+    "أم الجسم", "البنيان", "فيلكا", "أخرى",
+  ],
+  "محافظة حولي": [
+    "السالمية", "حولي", "الرميثية", "بيان", "مشرف",
+    "الجابرية", "الزهراء", "الشعب", "القادسية",
+    "سلوى", "الرقة", "العقيلة", "البدع", "ميدان حولي", "الشهداء", "أخرى",
+  ],
+  "محافظة الفروانية": [
+    "خيطان", "الفروانية", "الرقعي", "العارضية", "أبو فطيرة",
+    "ضاحية صباح السالم", "الأندلس", "الرابية", "إشبيلية",
+    "الضجيج", "جليب الشيوخ", "عبدالله المبارك", "الفردوس",
+    "الصليبية", "الحساوية", "أخرى",
+  ],
+  "محافظة مبارك الكبير": [
+    "العدان", "المنقف", "الري", "صباح السالم",
+    "أبو الحصانية", "القصور", "مبارك الكبير", "الفنيطيس", "الصباحية", "أخرى",
+  ],
+  "محافظة الأحمدي": [
+    "الفنطاس", "أبو حليفة", "الأحمدي", "العيون", "هدية",
+    "الظهر", "علي صباح السالم", "المقوع", "ضاحية جابر العلي",
+    "الرقة", "الوفرة", "الزور", "الخيران", "المنطقة الصناعية", "أخرى",
+  ],
+  "محافظة الجهراء": [
+    "الجهراء", "المطلاع", "تيماء", "النعيم", "القيروان",
+    "كاظمة", "السبية", "أم العيش", "الواحة", "الناعم",
+    "أمغرة", "القصر", "الوفرة الزراعية", "أخرى",
+  ],
+};
 
 const typeLabels: Record<string, string> = {
   individual: "فرد",
@@ -69,22 +103,55 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
   const [clientSearch, setClientSearch] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
 
-  const [form, setForm] = useState({
-    name: "", client: "", area: "", phone: "", notes: "",
-  });
+  // بيانات الخطوة 4
+  const [clientName, setClientName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [governorate, setGovernorate] = useState("");
+  const [area, setArea] = useState("");
+  const [customArea, setCustomArea] = useState("");
+  const [notes, setNotes] = useState("");
+  const [projectNameOverride, setProjectNameOverride] = useState("");
 
   const selectedMain = MAIN_CATS.find(c => c.key === mainCat);
   const accentColor  = selectedMain?.color || "oklch(0.30 0.05 250)";
 
+  const governorateAreas = governorate ? (KUWAIT_GOVERNORATES[governorate] || []) : [];
+
+  // الاسم التلقائي للمشروع
+  const selectedClient = allClients.find(c => c.id === selectedClientId);
+  const effectiveArea = area === "أخرى" ? customArea : area;
+  const autoName = [clientName || (selectedClient?.name ?? ""), mainCat, subCat, effectiveArea]
+    .filter(Boolean).join(" - ");
+
+  // تحديث اسم العميل عند اختيار عميل موجود
+
+  useEffect(() => {
+    if (selectedClient) {
+      setClientName(selectedClient.name);
+      setPhone(selectedClient.phone || "");
+      // استخراج المنطقة من العميل
+      const clientArea = selectedClient.area || "";
+      // ابحث عن المحافظة التي تحتوي على هذه المنطقة
+      for (const [gov, areas] of Object.entries(KUWAIT_GOVERNORATES)) {
+        if (areas.includes(clientArea)) {
+          setGovernorate(gov);
+          setArea(clientArea);
+          break;
+        }
+      }
+      if (!area) setArea(clientArea);
+    }
+  }, [selectedClientId]);
+
   const reset = () => {
     setStep(1); setMainCat(""); setSubCat("");
     setClientMode("existing"); setClientSearch(""); setSelectedClientId(null);
-    setForm({ name: "", client: "", area: "", phone: "", notes: "" });
+    setClientName(""); setPhone(""); setGovernorate(""); setArea("");
+    setCustomArea(""); setNotes(""); setProjectNameOverride("");
   };
 
   const handleClose = () => { reset(); onClose(); };
 
-  // تصفية العملاء حسب البحث ونوع المشروع
   const filteredClients = allClients.filter(c => {
     const matchSearch = !clientSearch ||
       c.name.includes(clientSearch) ||
@@ -93,32 +160,30 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
     return matchSearch;
   });
 
-  const selectedClient = allClients.find(c => c.id === selectedClientId);
-
-  // عند اختيار عميل موجود: تعبئة بيانات النموذج تلقائياً
   const handleSelectClient = (client: Client) => {
     setSelectedClientId(client.id);
-    setForm(f => ({
-      ...f,
-      client: client.name,
-      area: client.area,
-      phone: client.phone,
-    }));
   };
 
   const handleSubmit = () => {
-    if (!form.name || !form.client || !form.area) return;
+    const finalArea = area === "أخرى" ? customArea : area;
+    const finalName = projectNameOverride.trim() || autoName;
+    if (!finalName || !clientName || !finalArea) return;
     onAdd({
-      ...form,
+      name: finalName,
+      client: clientName,
       type: mainCat,
       serviceType: subCat,
+      area: finalArea,
+      phone,
+      notes,
       clientId: selectedClientId || undefined,
     });
     handleClose();
   };
 
-  const isStep3Valid = clientMode === "existing" ? !!selectedClientId : (form.client.trim().length > 0);
-  const isFormValid = form.name.trim() && form.client.trim() && form.area.trim();
+  const isStep3Valid = clientMode === "existing" ? !!selectedClientId : (clientName.trim().length > 0);
+  const finalArea = area === "أخرى" ? customArea : area;
+  const isFormValid = (projectNameOverride.trim() || autoName.trim()) && clientName.trim() && finalArea.trim();
 
   const stepLabels = ["التصنيف الرئيسي", "نوع الخدمة", "ربط العميل", "بيانات المشروع"];
 
@@ -133,7 +198,7 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
           </DialogTitle>
         </DialogHeader>
 
-        {/* ─── شريط الخطوات (4 خطوات) ─── */}
+        {/* ─── شريط الخطوات ─── */}
         <div className="flex items-center gap-0.5 mb-2">
           {[1, 2, 3, 4].map(s => (
             <div key={s} className="flex items-center gap-0.5 flex-1">
@@ -224,7 +289,6 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
         {/* ─── الخطوة 3: ربط العميل ─── */}
         {step === 3 && (
           <div className="space-y-3 py-2">
-            {/* اختيار الوضع */}
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setClientMode("existing")}
@@ -252,7 +316,6 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
               </button>
             </div>
 
-            {/* اختيار عميل موجود */}
             {clientMode === "existing" && (
               <div className="space-y-2">
                 <div className="relative">
@@ -264,7 +327,6 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
                     className="text-xs pr-9"
                   />
                 </div>
-
                 <div className="space-y-1.5 max-h-52 overflow-y-auto">
                   {filteredClients.length === 0 ? (
                     <p className="text-center text-xs text-muted-foreground py-4">لا توجد نتائج</p>
@@ -281,11 +343,8 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
                             backgroundColor: isSelected ? `color-mix(in oklch, ${accentColor} 8%, white)` : "transparent",
                           }}
                         >
-                          {/* Avatar */}
-                          <div
-                            className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                            style={{ backgroundColor: accentColor }}
-                          >
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                            style={{ backgroundColor: accentColor }}>
                             {client.name.charAt(0)}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -299,12 +358,9 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
                               </span>
                             </div>
                           </div>
-                          <div className="flex flex-col items-end gap-1 shrink-0">
-                            <Badge className="text-[9px] px-1.5 py-0 bg-muted text-muted-foreground border-0">
-                              {typeLabels[client.type]}
-                            </Badge>
-                            <span className="text-[9px] text-muted-foreground">{client.projectType}</span>
-                          </div>
+                          <Badge className="text-[9px] px-1.5 py-0 bg-muted text-muted-foreground border-0 shrink-0">
+                            {typeLabels[client.type] || client.type}
+                          </Badge>
                           {isSelected && (
                             <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: accentColor }}>
                               <Check className="w-3 h-3 text-white" />
@@ -315,8 +371,6 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
                     })
                   )}
                 </div>
-
-                {/* ملخص العميل المختار */}
                 {selectedClient && (
                   <div className="p-3 rounded-xl border border-green-200 bg-green-50">
                     <p className="text-[10px] font-semibold text-green-700 mb-1.5 flex items-center gap-1">
@@ -327,22 +381,13 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
                       <span className="text-muted-foreground">الاسم:</span>
                       <span className="font-medium">{selectedClient.name}</span>
                       <span className="text-muted-foreground">المنطقة:</span>
-                      <span className="font-medium">{selectedClient.area} ق{selectedClient.block}/قس{selectedClient.plot}</span>
-                      <span className="text-muted-foreground">المساحة:</span>
-                      <span className="font-medium">{selectedClient.parcelArea} م²</span>
-                      {selectedClient.civilId && (
-                        <>
-                          <span className="text-muted-foreground">الرقم المدني:</span>
-                          <span className="font-medium" dir="ltr">{selectedClient.civilId}</span>
-                        </>
-                      )}
+                      <span className="font-medium">{selectedClient.area}</span>
                     </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* عميل جديد */}
             {clientMode === "new" && (
               <div className="space-y-2.5">
                 <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
@@ -358,20 +403,22 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
                   </Label>
                   <Input
                     placeholder="الاسم الكامل للعميل"
-                    value={form.client}
-                    onChange={e => setForm(f => ({ ...f, client: e.target.value }))}
+                    value={clientName}
+                    onChange={e => setClientName(e.target.value)}
                     className="text-sm"
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold">رقم الهاتف</Label>
                   <Input
-                    placeholder="05XXXXXXXX"
-                    value={form.phone}
-                    onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                    placeholder="XXXXXXXX"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value.replace(/\D/g, "").slice(0, 8))}
                     className="text-sm"
                     dir="ltr"
+                    maxLength={8}
                   />
+                  <p className="text-[10px] text-muted-foreground">رقم الهاتف الكويتي (8 أرقام)</p>
                 </div>
               </div>
             )}
@@ -381,7 +428,7 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
         {/* ─── الخطوة 4: بيانات المشروع ─── */}
         {step === 4 && (
           <div className="space-y-3 py-2">
-            {/* ملخص العميل المرتبط */}
+            {/* ملخص العميل */}
             {selectedClient && (
               <div className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/30 border border-border/50">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: accentColor }}>
@@ -395,21 +442,27 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
               </div>
             )}
 
-            {/* اسم المشروع */}
+            {/* اسم المشروع التلقائي */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5" style={{ color: accentColor }} />
                 اسم المشروع <span className="text-red-500">*</span>
               </Label>
+              {autoName && !projectNameOverride && (
+                <div className="px-3 py-2 rounded-lg bg-primary/5 border border-primary/20 text-sm font-medium text-primary">
+                  {autoName}
+                  <span className="text-[10px] text-muted-foreground mr-2">(تلقائي)</span>
+                </div>
+              )}
               <Input
-                placeholder={`${mainCat} - ${subCat} - ${form.area || "المنطقة"}`}
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="تعديل الاسم التلقائي (اختياري)"
+                value={projectNameOverride}
+                onChange={e => setProjectNameOverride(e.target.value)}
                 className="text-sm"
               />
             </div>
 
-            {/* اسم العميل (إذا لم يُختر من القائمة) */}
+            {/* اسم العميل إذا لم يُختر من القائمة */}
             {!selectedClient && (
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold flex items-center gap-1.5">
@@ -418,41 +471,71 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
                 </Label>
                 <Input
                   placeholder="الاسم الكامل للعميل"
-                  value={form.client}
-                  onChange={e => setForm(f => ({ ...f, client: e.target.value }))}
+                  value={clientName}
+                  onChange={e => setClientName(e.target.value)}
                   className="text-sm"
                 />
               </div>
             )}
 
-            {/* المنطقة */}
-            <div className="space-y-1.5">
+            {/* المحافظة ثم المنطقة */}
+            <div className="space-y-2">
               <Label className="text-xs font-semibold flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5" style={{ color: accentColor }} />
-                المنطقة / الموقع <span className="text-red-500">*</span>
+                المحافظة / المنطقة <span className="text-red-500">*</span>
               </Label>
-              <div className="flex flex-wrap gap-1.5">
-                {KUWAIT_AREAS.map(area => (
-                  <button
-                    key={area}
-                    onClick={() => setForm(f => ({ ...f, area }))}
-                    className="px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all"
-                    style={{
-                      backgroundColor: form.area === area ? `color-mix(in oklch, ${accentColor} 12%, white)` : "transparent",
-                      borderColor: form.area === area ? `color-mix(in oklch, ${accentColor} 50%, transparent)` : "hsl(var(--border))",
-                      color: form.area === area ? accentColor : "hsl(var(--muted-foreground))",
-                    }}
-                  >
-                    {area}
-                  </button>
-                ))}
-              </div>
-              <Input
-                placeholder="أو اكتب الموقع يدوياً..."
-                value={form.area}
-                onChange={e => setForm(f => ({ ...f, area: e.target.value }))}
-                className="text-sm mt-1"
-              />
+              {/* اختيار المحافظة */}
+              <Select value={governorate} onValueChange={v => { setGovernorate(v); setArea(""); setCustomArea(""); }}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="اختر المحافظة..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(KUWAIT_GOVERNORATES).map(gov => (
+                    <SelectItem key={gov} value={gov}>{gov}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* اختيار المنطقة بعد المحافظة */}
+              {governorate && (
+                <div className="flex flex-wrap gap-1.5">
+                  {governorateAreas.map(a => (
+                    <button
+                      key={a}
+                      onClick={() => { setArea(a); if (a !== "أخرى") setCustomArea(""); }}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all"
+                      style={{
+                        backgroundColor: area === a ? `color-mix(in oklch, ${accentColor} 12%, white)` : "transparent",
+                        borderColor: area === a ? `color-mix(in oklch, ${accentColor} 50%, transparent)` : "hsl(var(--border))",
+                        color: area === a ? accentColor : "hsl(var(--muted-foreground))",
+                      }}
+                    >
+                      {a}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* حقل نصي عند اختيار "أخرى" */}
+              {area === "أخرى" && (
+                <Input
+                  placeholder="اكتب اسم المنطقة..."
+                  value={customArea}
+                  onChange={e => setCustomArea(e.target.value)}
+                  className="text-sm"
+                  autoFocus
+                />
+              )}
+
+              {/* أو كتابة يدوية مباشرة */}
+              {!governorate && (
+                <Input
+                  placeholder="أو اكتب المنطقة يدوياً..."
+                  value={area}
+                  onChange={e => setArea(e.target.value)}
+                  className="text-sm"
+                />
+              )}
             </div>
 
             {/* ملاحظات */}
@@ -460,8 +543,8 @@ export default function NewProjectDialog({ open, onClose, onAdd }: Props) {
               <Label className="text-xs font-semibold text-muted-foreground">ملاحظات (اختياري)</Label>
               <textarea
                 placeholder="أي ملاحظات إضافية عن المشروع..."
-                value={form.notes}
-                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
                 className="w-full text-sm border rounded-lg px-3 py-2 resize-none bg-transparent focus:outline-none focus:ring-1 focus:ring-primary"
                 rows={2}
               />
