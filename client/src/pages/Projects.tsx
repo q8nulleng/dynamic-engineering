@@ -1,4 +1,4 @@
-/*
+/**
  * Projects - صفحة كروت المشاريع الرئيسية
  * تبويبات رئيسية: الكل | سكن خاص | صناعي | استثماري | تجاري
  * تبويبات فرعية: بناء جديد | تعديل | إضافة | تعديل وإضافة | هدم | إشراف
@@ -8,14 +8,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import {
   Plus, Users, MapPin, Link2, ChevronLeft, Briefcase,
   Home, Factory, TrendingUp, Store,
-  Building2, Wrench, PlusSquare, Layers, Trash2, Eye
+  Building2, Wrench, PlusSquare, Layers, Trash2, Eye,
+  StickyNote, X, MessageSquare
 } from "lucide-react";
 import { Link } from "wouter";
 import NewProjectDialog from "@/components/NewProjectDialog";
 import { toast } from "sonner";
 import { useProjects, useCreateProject } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
 
 const PROJECT_STATUSES = [
   { key: "all",    label: "الكل",     color: "oklch(0.50 0.00 0)" },
@@ -58,10 +64,20 @@ const SUB_CATS = [
 export default function Projects() {
   const { data: allProjectsData = [], isLoading } = useProjects();
   const createProject = useCreateProject();
+  const queryClient = useQueryClient();
   const [mainTab,      setMainTab]      = useState("all");
   const [subTab,       setSubTab]       = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showNewProject, setShowNewProject] = useState(false);
+
+  // حذف المشروع
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // ملاحظات المشروع
+  const [notesTarget, setNotesTarget] = useState<{ id: string; name: string; notes: string } | null>(null);
+  const [notesText, setNotesText] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
 
   const allProjects = allProjectsData;
 
@@ -91,6 +107,44 @@ export default function Projects() {
   /* عداد كل حالة */
   const statusCount = (key: string) =>
     key === "all" ? bySub.length : bySub.filter(p => (p.status || "جديد") === key).length;
+
+  /* حذف المشروع */
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/projects/${deleteTarget.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("فشل الحذف");
+      toast.success(`تم حذف المشروع: ${deleteTarget.name}`);
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setDeleteTarget(null);
+    } catch {
+      toast.error("حدث خطأ أثناء الحذف");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  /* حفظ الملاحظات */
+  const handleSaveNotes = async () => {
+    if (!notesTarget) return;
+    setSavingNotes(true);
+    try {
+      const res = await fetch(`/api/projects/${notesTarget.id}/notes`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: notesText }),
+      });
+      if (!res.ok) throw new Error("فشل الحفظ");
+      toast.success("تم حفظ الملاحظات");
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setNotesTarget(null);
+    } catch {
+      toast.error("حدث خطأ أثناء حفظ الملاحظات");
+    } finally {
+      setSavingNotes(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -251,97 +305,254 @@ export default function Projects() {
             const catInfo = MAIN_CATS.find(c => c.key === project.type) || MAIN_CATS[0];
             const CatIcon = catInfo.icon;
             const statusInfo = PROJECT_STATUSES.find(s => s.key === (project.status || "جديد")) || PROJECT_STATUSES[1];
+            const hasNotes = !!(project as any).notes;
 
             return (
-              <Link key={project.id} href={`/projects/${project.id}`}>
-                <div className="p-4 rounded-xl border bg-background hover:shadow-md transition-all cursor-pointer group">
-                  {/* Top Row */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-bold leading-tight group-hover:text-primary transition-colors">{project.name}</h3>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <Link2 className="w-3 h-3 text-muted-foreground" />
-                        <span className="text-[10px] text-muted-foreground" style={{ fontFamily: "'Space Grotesk'" }}>{project.quotation}</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-1 shrink-0 items-center">
-                      <span
-                        className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                        style={{
-                          backgroundColor: `color-mix(in oklch, ${statusInfo.color} 12%, white)`,
-                          color: statusInfo.color,
-                        }}
-                      >
-                        {statusInfo.label}
-                      </span>
-                      <div
-                        className="w-7 h-7 rounded-lg flex items-center justify-center"
-                        style={{ backgroundColor: `color-mix(in oklch, ${catInfo.color} 12%, white)` }}
-                      >
-                        <CatIcon className="w-3.5 h-3.5" style={{ color: catInfo.color }} />
-                      </div>
-                      <Badge variant="secondary" className="text-[10px]">{project.serviceType}</Badge>
-                    </div>
-                  </div>
+              <div key={project.id} className="relative group">
+                {/* ─── أزرار الإجراءات السريعة (تظهر عند hover) ─── */}
+                <div className="absolute top-2 left-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* زر الملاحظات */}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setNotesTarget({ id: project.id, name: project.name, notes: (project as any).notes || "" });
+                      setNotesText((project as any).notes || "");
+                    }}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-all shadow-sm"
+                    style={{
+                      backgroundColor: hasNotes ? "oklch(0.55 0.15 60)" : "white",
+                      border: `1px solid ${hasNotes ? "oklch(0.55 0.15 60)" : "hsl(var(--border))"}`,
+                      color: hasNotes ? "white" : "hsl(var(--muted-foreground))",
+                    }}
+                    title="ملاحظات المشروع"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                  </button>
 
-                  {/* Client + Location */}
-                  <div className="space-y-1.5 mb-3">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Users className="w-3 h-3 shrink-0" />
-                      <span className="truncate">{project.client}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <MapPin className="w-3 h-3 shrink-0" />
-                      <span className="truncate">{project.area}</span>
-                    </div>
-                  </div>
-
-                  {/* Current Phase */}
-                  <div className="flex items-center gap-2 mb-3 px-2 py-1.5 rounded-md"
-                    style={{ backgroundColor: `color-mix(in oklch, ${stage.color} 8%, white)` }}>
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: stage.color }} />
-                    <span className="text-[11px] font-medium" style={{ color: stage.color }}>{currentPhaseName}</span>
-                    <span className="text-[10px] text-muted-foreground mr-auto">{stage.text}</span>
-                  </div>
-
-                  {/* Progress */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[11px] text-muted-foreground">
-                        المهام: <span style={{ fontFamily: "'Space Grotesk'" }}>{doneTasks}/{totalTasks}</span>
-                      </span>
-                      <span className="text-sm font-bold" style={{ fontFamily: "'Space Grotesk'", color: stage.color }}>
-                        {project.progress}%
-                      </span>
-                    </div>
-                    <Progress value={project.progress} className="h-1.5" />
-                  </div>
-
-                  {/* Footer */}
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t">
-                    <div className="flex gap-1.5">
-                      {projectPhases.map((_, pi) => {
-                        const p = projectPhases[pi];
-                        const done = (p.tasks || []).filter(t => t.status === "done").length;
-                        const pp = (p.tasks || []).length > 0 ? (done / (p.tasks || []).length) * 100 : 0;
-                        return (
-                          <div key={pi} className="w-5 h-1.5 rounded-full overflow-hidden bg-gray-100">
-                            <div className="h-full rounded-full transition-all" style={{
-                              width: `${pp}%`,
-                              backgroundColor: pi === project.currentPhase ? stage.color : "oklch(0.55 0.15 150)",
-                            }} />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <ChevronLeft className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </div>
+                  {/* زر الحذف */}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDeleteTarget({ id: project.id, name: project.name });
+                    }}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center bg-white border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 hover:border-red-400 transition-all shadow-sm"
+                    title="حذف المشروع"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-              </Link>
+
+                {/* ─── مؤشر الملاحظات (دائم) ─── */}
+                {hasNotes && (
+                  <div className="absolute top-2 left-2 z-10 group-hover:opacity-0 transition-opacity">
+                    <div
+                      className="w-5 h-5 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: "oklch(0.55 0.15 60)", color: "white" }}
+                      title="يوجد ملاحظات"
+                    >
+                      <StickyNote className="w-2.5 h-2.5" />
+                    </div>
+                  </div>
+                )}
+
+                <Link href={`/projects/${project.id}`}>
+                  <div className="p-4 rounded-xl border bg-background hover:shadow-md transition-all cursor-pointer">
+                    {/* Top Row */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 min-w-0 pr-8">
+                        <h3 className="text-sm font-bold leading-tight group-hover:text-primary transition-colors">{project.name}</h3>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <Link2 className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-[10px] text-muted-foreground" style={{ fontFamily: "'Space Grotesk'" }}>{project.quotation}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-1 shrink-0 items-center">
+                        <span
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                          style={{
+                            backgroundColor: `color-mix(in oklch, ${statusInfo.color} 12%, white)`,
+                            color: statusInfo.color,
+                          }}
+                        >
+                          {statusInfo.label}
+                        </span>
+                        <div
+                          className="w-7 h-7 rounded-lg flex items-center justify-center"
+                          style={{ backgroundColor: `color-mix(in oklch, ${catInfo.color} 12%, white)` }}
+                        >
+                          <CatIcon className="w-3.5 h-3.5" style={{ color: catInfo.color }} />
+                        </div>
+                        <Badge variant="secondary" className="text-[10px]">{project.serviceType}</Badge>
+                      </div>
+                    </div>
+
+                    {/* Client + Location */}
+                    <div className="space-y-1.5 mb-3">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Users className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{project.client}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <MapPin className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{project.area}</span>
+                      </div>
+                    </div>
+
+                    {/* ملاحظة مختصرة (إذا وُجدت) */}
+                    {hasNotes && (
+                      <div
+                        className="mb-3 px-2 py-1.5 rounded-md text-[10px] text-muted-foreground line-clamp-1 border"
+                        style={{ backgroundColor: "oklch(0.98 0.02 60)", borderColor: "oklch(0.90 0.05 60)" }}
+                      >
+                        <StickyNote className="w-2.5 h-2.5 inline ml-1 text-amber-500" />
+                        {(project as any).notes}
+                      </div>
+                    )}
+
+                    {/* Current Phase */}
+                    <div className="flex items-center gap-2 mb-3 px-2 py-1.5 rounded-md"
+                      style={{ backgroundColor: `color-mix(in oklch, ${stage.color} 8%, white)` }}>
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: stage.color }} />
+                      <span className="text-[11px] font-medium" style={{ color: stage.color }}>{currentPhaseName}</span>
+                      <span className="text-[10px] text-muted-foreground mr-auto">{stage.text}</span>
+                    </div>
+
+                    {/* Progress */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[11px] text-muted-foreground">
+                          المهام: <span style={{ fontFamily: "'Space Grotesk'" }}>{doneTasks}/{totalTasks}</span>
+                        </span>
+                        <span className="text-sm font-bold" style={{ fontFamily: "'Space Grotesk'", color: stage.color }}>
+                          {project.progress}%
+                        </span>
+                      </div>
+                      <Progress value={project.progress} className="h-1.5" />
+                    </div>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                      <div className="flex gap-1.5">
+                        {projectPhases.map((_, pi) => {
+                          const p = projectPhases[pi];
+                          const done = (p.tasks || []).filter(t => t.status === "done").length;
+                          const pp = (p.tasks || []).length > 0 ? (done / (p.tasks || []).length) * 100 : 0;
+                          return (
+                            <div key={pi} className="w-5 h-1.5 rounded-full overflow-hidden bg-gray-100">
+                              <div className="h-full rounded-full transition-all" style={{
+                                width: `${pp}%`,
+                                backgroundColor: pi === project.currentPhase ? stage.color : "oklch(0.55 0.15 150)",
+                              }} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <ChevronLeft className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                  </div>
+                </Link>
+              </div>
             );
           })}
         </div>
       )}
+
+      {/* ─── Dialog حذف المشروع ─── */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent className="max-w-sm" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              حذف المشروع
+            </DialogTitle>
+            <DialogDescription>
+              هل أنت متأكد من حذف المشروع؟
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-sm font-medium text-red-700">
+              {deleteTarget?.name}
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">
+              سيتم حذف المشروع وجميع مراحله ومهامه بشكل نهائي. هذه العملية لا يمكن التراجع عنها.
+            </p>
+          </div>
+          <DialogFooter className="flex gap-2 flex-row-reverse">
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex-1"
+            >
+              {deleting ? "جاري الحذف..." : "تأكيد الحذف"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              className="flex-1"
+            >
+              إلغاء
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Dialog ملاحظات المشروع ─── */}
+      <Dialog open={!!notesTarget} onOpenChange={(open) => !open && setNotesTarget(null)}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-amber-500" />
+              ملاحظات المشروع
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              {notesTarget?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Textarea
+              value={notesText}
+              onChange={(e) => setNotesText(e.target.value)}
+              placeholder="أضف ملاحظاتك هنا... (مثال: العميل يريد تعديل الواجهة، موعد التسليم 15/7)"
+              className="min-h-[120px] text-sm resize-none"
+              dir="rtl"
+            />
+            <p className="text-[10px] text-muted-foreground mt-2">
+              الملاحظات تظهر مختصرة على كرت المشروع وتُحفظ في قاعدة البيانات.
+            </p>
+          </div>
+          <DialogFooter className="flex gap-2 flex-row-reverse">
+            <Button
+              onClick={handleSaveNotes}
+              disabled={savingNotes}
+              className="flex-1"
+              style={{ backgroundColor: "oklch(0.55 0.15 60)" }}
+            >
+              {savingNotes ? "جاري الحفظ..." : "حفظ الملاحظات"}
+            </Button>
+            {notesText && (
+              <Button
+                variant="outline"
+                onClick={() => setNotesText("")}
+                className="shrink-0"
+                title="مسح الملاحظات"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => setNotesTarget(null)}
+              className="flex-1"
+            >
+              إلغاء
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <NewProjectDialog
         open={showNewProject}
         onClose={() => setShowNewProject(false)}

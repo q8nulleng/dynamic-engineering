@@ -322,6 +322,16 @@ apiRouter.delete("/api/projects/:id", async (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
+// تحديث ملاحظات المشروع
+apiRouter.patch("/api/projects/:id/notes", async (req, res) => {
+  try {
+    const db = getDb();
+    const { notes } = req.body;
+    await db.update(projects).set({ notes: notes ?? "" }).where(eq(projects.id, req.params.id));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
 // ── Tasks ─────────────────────────────────────────────────────────────────
 apiRouter.get("/api/tasks", async (_req, res) => {
   try {
