@@ -407,10 +407,8 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
               <div className="px-3 pb-4 pt-3 space-y-3 border-t">
                 <p className="text-[11px] text-muted-foreground">ارفع الملفات المطلوبة — ستظهر تلقائياً في المستندات</p>
                 <div className="flex flex-wrap gap-2">
-                  <FileUploadButton label="البطاقة المدنية للملاك" category="بطاقة مدنية" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("docs", d)} />
-                  <FileUploadButton label="الوثيقة" category="وثيقة ملكية" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("docs", d)} />
-                  <FileUploadButton label="خريطة الموقع العام" category="خريطة موقع" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("docs", d)} />
-                  <FileUploadButton label="أخرى" category="وثيقة أخرى" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("docs", d)} />
+                  <FileUploadButton label="رفع وثيقة" category="وثائق المشروع" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("docs", d)} />
+
                 </div>
                 <UploadedFilesList docs={docsDocs} key={refreshKey} onDeleted={() => { refetchDocs(); setRefreshKey(k => k + 1); }} />
                 {/* مهام الوثائق من قاعدة البيانات */}
@@ -468,8 +466,7 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
               <div className="px-3 pb-4 pt-3 space-y-3 border-t">
                 <p className="text-[11px] text-muted-foreground">ارفع نتائج الفحوصات — ستظهر في المستندات</p>
                 <div className="flex flex-wrap gap-2">
-                  <FileUploadButton label="فحص التربة" category="فحص تربة" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
-                  <FileUploadButton label="كتاب الكهرباء" category="كتاب كهرباء" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
+                  <FileUploadButton label="رفع ملف فحوصات" category="فحوصات تقنية" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
                 </div>
                 <UploadedFilesList docs={techDocs} key={refreshKey + 100} onDeleted={() => { refetchDocs(); setRefreshKey(k => k + 1); }} />
                 {/* مهام الفحوصات من قاعدة البيانات */}
@@ -584,6 +581,9 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
                       onClick={() => onTaskUpdate(paymentTask.id, "in_progress")}>
                       <Clock className="w-3 h-3 ml-1" /> قيد المتابعة
                     </Button>
+                  </div>
+                  <div className="pt-2 border-t mt-2">
+                    <FileUploadButton label="رفع إيصال" category="إيصال دفعة" projectId={project.id} clientId={project.clientId} onUploaded={() => { toast.success("تم رفع الإيصال — سيظهر في المستندات ✓"); }} />
                   </div>
                 </div>
               )}
@@ -854,6 +854,14 @@ function PhaseArchitecturalDesignPopup({ phase, project, onClose, onTaskUpdate }
             </div>
           )}
 
+          {/* ── رفع ملفات التصميم ── */}
+          <div className="rounded-xl border-2 border-dashed overflow-hidden" style={{ borderColor: `color-mix(in oklch, ${color} 30%, transparent)` }}>
+            <div className="px-3 py-3 flex items-center gap-2">
+              <FileUploadButton label="رفع ملف" category="تصميم معماري" projectId={project.id} clientId={project.clientId} onUploaded={() => { toast.success("تم رفع الملف — سيظهر في المستندات ✓"); }} />
+              <span className="text-[10px] text-muted-foreground">ارفع أي ملف مرتبط بالتصميم — سيظهر في المستندات</span>
+            </div>
+          </div>
+
           {/* ── اعتماد التصميم ── */}
           {approvalTask && (
             <div className="rounded-xl border overflow-hidden bg-green-50/50">
@@ -1014,6 +1022,14 @@ function PhaseFacadeStructuralPopup({ phase, project, onClose, onTaskUpdate }: {
             إضافة مراجعة وتعديل
           </button>
 
+          {/* ── رفع ملفات الواجهات والإنشائي ── */}
+          <div className="rounded-xl border-2 border-dashed overflow-hidden" style={{ borderColor: `color-mix(in oklch, ${color} 30%, transparent)` }}>
+            <div className="px-3 py-3 flex items-center gap-2">
+              <FileUploadButton label="رفع ملف" category="واجهات وإنشائي" projectId={project.id} clientId={project.clientId} onUploaded={() => { toast.success("تم رفع الملف — سيظهر في المستندات ✓"); }} />
+              <span className="text-[10px] text-muted-foreground">ارفع أي ملف مرتبط بالواجهات أو الإنشائي — سيظهر في المستندات</span>
+            </div>
+          </div>
+
           {/* المهام الأخرى */}
           {otherTasks.length > 0 && (
             <TaskGroup title="مهام أخرى" subtitle="" icon={<Wrench className="w-3.5 h-3.5 text-white" />}
@@ -1102,6 +1118,14 @@ function PhaseMunicipalityPopup({ phase, project, onClose, onTaskUpdate }: {
               onToggle={() => setExpandedSection(expandedSection === "approval" ? null : "approval")}
               onTaskUpdate={onTaskUpdate} />
           )}
+
+          {/* ── رفع ملفات مخطط البلدية ── */}
+          <div className="rounded-xl border-2 border-dashed overflow-hidden" style={{ borderColor: `color-mix(in oklch, ${color} 30%, transparent)` }}>
+            <div className="px-3 py-3 flex items-center gap-2">
+              <FileUploadButton label="رفع ملف" category="مخطط بلدية" projectId={project.id} clientId={project.clientId} onUploaded={() => { toast.success("تم رفع الملف — سيظهر في المستندات ✓"); }} />
+              <span className="text-[10px] text-muted-foreground">ارفع أي ملف مرتبط بمخطط البلدية — سيظهر في المستندات</span>
+            </div>
+          </div>
 
           {otherTasks.length > 0 && (
             <TaskGroup title="مهام أخرى" subtitle="" icon={<Wrench className="w-3.5 h-3.5 text-white" />}
