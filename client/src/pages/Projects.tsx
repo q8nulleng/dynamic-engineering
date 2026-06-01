@@ -311,7 +311,7 @@ export default function Projects() {
             return (
               <div key={project.id} className="relative group">
                 {/* ─── أزرار الإجراءات السريعة (تظهر عند hover) ─── */}
-                <div className="absolute top-2 left-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-2 left-2 z-10 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                   {/* زر الملاحظات */}
                   <button
                     onClick={(e) => {
