@@ -260,6 +260,15 @@ export const projectBriefs = mysqlTable("project_briefs", {
   updatedAt: varchar("updated_at", { length: 32 }).default(""),
 });
 
+// ── Phase Meta (حالة المراحل الفرعية) ──────────────────────────────────────────
+export const phaseMeta = mysqlTable("phase_meta", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: varchar("project_id", { length: 64 }).notNull(),
+  phaseKey: varchar("phase_key", { length: 64 }).notNull(),
+  data: text("data").default("{}"),
+  updatedAt: varchar("updated_at", { length: 32 }).default(""),
+});
+
 // ── Project Meetings (جلسات التصميم) ──────────────────────────────────────────
 export const projectMeetings = mysqlTable("project_meetings", {
   id: int("id").autoincrement().primaryKey(),

@@ -858,3 +858,26 @@ export function useProjectBrief(projectId: string) {
     enabled: !!projectId,
   });
 }
+
+// ── Phase Meta (حالة المراحل الفرعية) ─────────────────────────────────────────
+export function usePhaseMeta(projectId: string, phaseKey: string) {
+  return useQuery<{ data: Record<string, any> } | null>({
+    queryKey: ["phase-meta", projectId, phaseKey],
+    queryFn: () => request(`/api/projects/${projectId}/phase-meta/${phaseKey}`),
+    enabled: !!projectId && !!phaseKey,
+  });
+}
+
+export function useUpdatePhaseMeta(projectId: string, phaseKey: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Record<string, any>) =>
+      request(`/api/projects/${projectId}/phase-meta/${phaseKey}`, {
+        method: "PUT",
+        body: JSON.stringify({ data }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["phase-meta", projectId, phaseKey] });
+    },
+  });
+}

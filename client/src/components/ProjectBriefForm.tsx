@@ -35,7 +35,9 @@ interface BriefData {
   plot: string;
   autoNumber: string;
   plotArea: string;
+  plotDimensions: string;
   plotShape: string;
+  plotFacing: string;
   northDirection: string;
   architecturalStyle: string;
   floorsCount: number;
@@ -203,8 +205,9 @@ async function exportToPDF(brief: BriefData, sketchDataUrl: string, projectInfo?
   <div class="field"><div class="label">القسيمة</div><div class="value">${brief.plot || "—"}</div></div>
   <div class="field"><div class="label">الرقم الآلي</div><div class="value">${brief.autoNumber || "—"}</div></div>
   <div class="field"><div class="label">مساحة الأرض</div><div class="value">${brief.plotArea || "—"} م²</div></div>
+  <div class="field"><div class="label">أبعاد القسيمة</div><div class="value">${(brief as any).plotDimensions || "—"}</div></div>
   <div class="field"><div class="label">شكل القسيمة</div><div class="value">${brief.plotShape || "—"}</div></div>
-  <div class="field"><div class="label">اتجاه الشمال</div><div class="value">${brief.northDirection || "—"}</div></div>
+  <div class="field"><div class="label">واجهة القسيمة</div><div class="value">${(brief as any).plotFacing || "—"}</div></div>
 </div>
 
 <h2>🏛️ الطابع المعماري</h2>
@@ -271,7 +274,9 @@ export default function ProjectBriefForm({
       governorate: initialData?.governorate || "",
       autoNumber: initialData?.autoNumber || "",
       plotArea: initialData?.plotArea || "",
+      plotDimensions: initialData?.plotDimensions || "",
       plotShape: initialData?.plotShape || "",
+      plotFacing: initialData?.plotFacing || "",
       northDirection: initialData?.northDirection || "",
       architecturalStyle: initialData?.architecturalStyle || "",
       floorsCount: initialData?.floorsCount || 3,
@@ -369,7 +374,7 @@ export default function ProjectBriefForm({
         `نموذج طلبات المشروع — ${projectInfo?.name || projectId}`,
         `المالك: ${brief.ownerName}`,
         `المنطقة: ${brief.area} | القطعة: ${brief.block} | القسيمة: ${brief.plot}`,
-        `شكل القسيمة: ${brief.plotShape} | اتجاه الشمال: ${brief.northDirection}`,
+        `شكل القسيمة: ${brief.plotShape} | واجهة القسيمة: ${brief.plotFacing}`,
         `الطابع: ${brief.architecturalStyle} | الأدوار: ${brief.floorsCount}`,
       ].filter(Boolean).join("\n");
 
@@ -502,58 +507,11 @@ export default function ProjectBriefForm({
               <Field label="القسيمة" value={brief.plot} onChange={v => setBrief(p => ({ ...p, plot: v }))} />
               <Field label="الرقم الآلي" value={brief.autoNumber} onChange={v => setBrief(p => ({ ...p, autoNumber: v }))} />
               <Field label="مساحة الأرض (م²)" value={brief.plotArea} onChange={v => setBrief(p => ({ ...p, plotArea: v }))} />
-              {/* شكل القسيمة مع أيقونات توضيحية */}
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">شكل القسيمة</label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {SHAPES.map(shape => (
-                    <button
-                      key={shape}
-                      type="button"
-                      onClick={() => setBrief(p => ({ ...p, plotShape: shape }))}
-                      className={`px-2 py-1.5 text-xs rounded-lg border-2 font-medium transition-all ${
-                        brief.plotShape === shape
-                          ? "border-amber-500 bg-amber-50 text-amber-800"
-                          : "border-border bg-background hover:border-amber-300 hover:bg-amber-50/50"
-                      }`}
-                    >
-                      {shape === "زاوية" && "⌐ "}
-                      {shape === "سد" && "▬ "}
-                      {shape === "بطن وظهر" && "⬡ "}
-                      {shape === "ثلاث جهات" && "⊏ "}
-                      {shape}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {/* اتجاه الشمال */}
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">اتجاه الشمال</label>
-                <div className="grid grid-cols-2 gap-1">
-                  {DIRECTIONS.map(dir => (
-                    <button
-                      key={dir}
-                      type="button"
-                      onClick={() => setBrief(p => ({ ...p, northDirection: dir }))}
-                      className={`px-2 py-1 text-xs rounded-md border transition-all ${
-                        brief.northDirection === dir
-                          ? "border-blue-500 bg-blue-50 text-blue-800 font-semibold"
-                          : "border-border hover:border-blue-300"
-                      }`}
-                    >
-                      {dir === "شمال" && "↑ "}
-                      {dir === "جنوب" && "↓ "}
-                      {dir === "شرق" && "→ "}
-                      {dir === "غرب" && "← "}
-                      {dir === "شمال شرق" && "↗ "}
-                      {dir === "شمال غرب" && "↖ "}
-                      {dir === "جنوب شرق" && "↘ "}
-                      {dir === "جنوب غرب" && "↙ "}
-                      {dir}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <Field label="أبعاد القسيمة (طول × عرض)" value={brief.plotDimensions} onChange={v => setBrief(p => ({ ...p, plotDimensions: v }))} />
+              {/* شكل القسيمة - فراغ نصي */}
+              <Field label="شكل القسيمة" value={brief.plotShape} onChange={v => setBrief(p => ({ ...p, plotShape: v }))} />
+              {/* واجهة القسيمة */}
+              <Field label="واجهة القسيمة" value={brief.plotFacing} onChange={v => setBrief(p => ({ ...p, plotFacing: v }))} />
             </div>
           </Section>
 

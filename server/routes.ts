@@ -11,7 +11,7 @@ import { getDb } from "./db/mysql.js";
 import {
   clients, projects, phases, tasks, quotations, contracts,
   invoices, invoiceLines, documents, crmLeads, contractTemplates, appointments,
-  workPlans, workPlanPhases, workPlanTasks, projectBriefs, projectMeetings
+  workPlans, workPlanPhases, workPlanTasks, projectBriefs, projectMeetings, phaseMeta
 } from "../drizzle/schema.js";
 import { nanoid } from "nanoid";
 import { storagePut } from "./storage.js";
@@ -1555,6 +1555,44 @@ apiRouter.post("/api/tasks/:taskId/complete-and-trigger", async (req, res) => {
       progress,
       message: `تم الانتقال إلى مرحلة: ${nextPhase.title}`,
     });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Phase Meta API (حالة المراحل الفرعية)
+// ══════════════════════════════════════════════════════════════════════════════
+apiRouter.get("/api/projects/:projectId/phase-meta/:phaseKey", async (req, res) => {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(phaseMeta)
+      .where(eq(phaseMeta.projectId, req.params.projectId));
+    const found = rows.find((r: any) => r.phaseKey === req.params.phaseKey);
+    res.json(found ? { ...found, data: JSON.parse(found.data || "{}") } : null);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.put("/api/projects/:projectId/phase-meta/:phaseKey", async (req, res) => {
+  try {
+    const db = getDb();
+    const { data } = req.body;
+    const now = new Date().toISOString().split("T")[0];
+    const rows = await db.select().from(phaseMeta)
+      .where(eq(phaseMeta.projectId, req.params.projectId));
+    const existing = rows.find((r: any) => r.phaseKey === req.params.phaseKey);
+    if (existing) {
+      await db.update(phaseMeta)
+        .set({ data: JSON.stringify(data), updatedAt: now })
+        .where(eq(phaseMeta.id, existing.id));
+    } else {
+      await db.insert(phaseMeta).values({
+        projectId: req.params.projectId,
+        phaseKey: req.params.phaseKey,
+        data: JSON.stringify(data),
+        updatedAt: now,
+      });
+    }
+    res.json({ success: true, data });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 

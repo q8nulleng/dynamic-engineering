@@ -44,7 +44,7 @@ const navItems = [
   { path: "/payments", label: "الدفعات", icon: CreditCard },
   { path: "/quotations", label: "عروض الأسعار", icon: FileText, badge: 2 },
   { path: "/contracts", label: "العقود الهندسية", icon: FileSignature, badge: 1 },
-  { path: "/client-portal", label: "بوابة العميل", icon: Globe },
+  { path: "/client-portal", label: "حفظ في بوابة العميل", icon: Globe },
   { path: "/work-plans", label: "خطط العمل", icon: ClipboardList },
   { path: "/reports", label: "التقارير", icon: BarChart3 },
 ];

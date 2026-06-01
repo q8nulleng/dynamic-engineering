@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
-import { useProject, useUpdateTask, useCreateProjectMeeting, useProjectMeetings, useDocuments, useProjectBrief } from "@/lib/api";
+import { useProject, useUpdateTask, useCreateProjectMeeting, useProjectMeetings, useDocuments, useProjectBrief, usePhaseMeta, useUpdatePhaseMeta } from "@/lib/api";
 import type { Document } from "@/lib/api";
 
 /* ─── Types ─── */
@@ -897,11 +897,29 @@ function PhaseFacadeStructuralPopup({ phase, project, onClose, onTaskUpdate }: {
   onTaskUpdate: (taskId: number, status: Task["status"]) => void;
 }) {
   const color = PHASE_COLORS[2];
-  const [expandedSection, setExpandedSection] = useState<string | null>("facade");
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [reviews, setReviews] = useState<{ id: number; title: string; done: boolean }[]>([
     { id: 1, title: "مراجعة الواجهات الأولى", done: false },
   ]);
-  const [showAddReview, setShowAddReview] = useState(false);
+  const [bypassLock, setBypassLock] = useState(false);
+
+  const { data: metaRow } = usePhaseMeta(project.id, "facade_structural");
+  const updateMeta = useUpdatePhaseMeta(project.id, "facade_structural");
+  const meta: Record<string, any> = metaRow?.data || {};
+
+  // ── حالة المراحل الفرعية ──
+  // structuralDone: تم رفع ملف الإنشائي (DWG)
+  // facadeDone: تم اعتماد الواجهات من العميل
+  const structuralDone = meta.structuralDone === true;
+  const facadeDone = meta.facadeDone === true;
+  const structuralFile = meta.structuralFile || null; // اسم الملف المرفوع
+
+  const setStructuralDone = (val: boolean, fileName?: string) => {
+    updateMeta.mutate({ ...meta, structuralDone: val, structuralFile: fileName || meta.structuralFile });
+  };
+  const setFacadeDone = (val: boolean) => {
+    updateMeta.mutate({ ...meta, facadeDone: val });
+  };
 
   const facadeTasks = phase.tasks.filter(t => t.name.includes("واجهة") || t.name.includes("معماري") || t.name.includes("ثلاثي") || t.name.includes("3D"));
   const structuralTasks = phase.tasks.filter(t => t.name.includes("إنشائ") || t.name.includes("أعمدة") || t.name.includes("حديد") || t.name.includes("خرسان"));
@@ -911,9 +929,11 @@ function PhaseFacadeStructuralPopup({ phase, project, onClose, onTaskUpdate }: {
     !structuralTasks.find(x => x.id === t.id) &&
     !mepTasks.find(x => x.id === t.id)
   );
-
   const doneCount = phase.tasks.filter(t => t.status === "done").length;
   const progress = phase.tasks.length > 0 ? Math.round((doneCount / phase.tasks.length) * 100) : 0;
+
+  // ── تحديد المرحلة الفرعية النشطة ──
+  const activeSubStep = !structuralDone ? "structural" : !facadeDone ? "facade" : "municipality";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" dir="rtl" onClick={onClose}>
@@ -943,28 +963,284 @@ function PhaseFacadeStructuralPopup({ phase, project, onClose, onTaskUpdate }: {
             <Progress value={progress} className="flex-1 h-1.5" />
             <span className="text-xs font-bold shrink-0" style={{ color, fontFamily: "'Space Grotesk'" }}>{doneCount}/{phase.tasks.length}</span>
           </div>
+          {/* Sub-pipeline indicator */}
+          <div className="flex items-center gap-1 mt-2.5">
+            {[
+              { key: "structural", label: "① الإنشائي", done: structuralDone },
+              { key: "facade", label: "② الواجهات", done: facadeDone },
+              { key: "municipality", label: "③ البلدية", done: false },
+            ].map((step, idx) => {
+              const isActive = activeSubStep === step.key;
+              const isPast = step.done;
+              return (
+                <React.Fragment key={step.key}>
+                  <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium transition-all ${
+                    isPast ? "bg-green-100 text-green-700" :
+                    isActive ? "text-white" : "bg-muted text-muted-foreground opacity-50"
+                  }`} style={isActive ? { backgroundColor: color } : {}}>
+                    {isPast ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
+                    {step.label}
+                  </div>
+                  {idx < 2 && <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" style={{ transform: "scaleX(-1)" }} />}
+                </React.Fragment>
+              );
+            })}
+          </div>
         </div>
 
         {/* Content */}
         <div className="overflow-y-auto flex-1 p-4 space-y-3">
-          {/* الواجهات المعمارية */}
-          {facadeTasks.length > 0 && (
-            <TaskGroup title="الواجهات المعمارية" subtitle="تصميم الواجهات والمنظور ثلاثي الأبعاد"
-              icon={<Building2 className="w-3.5 h-3.5 text-white" />} color={color}
-              tasks={facadeTasks} expanded={expandedSection === "facade"}
-              onToggle={() => setExpandedSection(expandedSection === "facade" ? null : "facade")}
-              onTaskUpdate={onTaskUpdate} />
-          )}
 
-          {/* التصميم الإنشائي */}
+          {/* ── المرحلة الفرعية ①: التصميم الإنشائي ── */}
+          <div className={`rounded-xl border-2 overflow-hidden transition-all ${
+            structuralDone ? "border-green-200 bg-green-50/30" :
+            activeSubStep === "structural" ? "border-orange-300" : "border-muted opacity-60"
+          }`}>
+            <div className="px-3 py-2.5 flex items-center justify-between cursor-pointer hover:bg-muted/10"
+              onClick={() => setExpandedSection(expandedSection === "structural-card" ? null : "structural-card")}>
+              <div className="flex items-center gap-2">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${structuralDone ? "bg-green-500" : "bg-orange-500"}`}>
+                  {structuralDone ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <Building2 className="w-3.5 h-3.5 text-white" />}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">① التصميم الإنشائي</p>
+                  <p className="text-[10px] text-muted-foreground">سستم الأعمدة والقواعد والسملات</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {structuralDone
+                  ? <span className="text-[10px] text-green-600 font-medium flex items-center gap-0.5"><CheckCircle2 className="w-3 h-3" /> مكتمل</span>
+                  : <span className="text-[10px] font-medium" style={{ color }}>جارٍ</span>}
+                <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedSection === "structural-card" ? "rotate-90" : ""}`} />
+              </div>
+            </div>
+            {expandedSection === "structural-card" && (
+              <div className="px-3 pb-3 pt-2 border-t space-y-3">
+                {/* إشعار المهندس الإنشائي */}
+                {!structuralDone && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-2.5">
+                    <p className="text-xs font-medium text-orange-800 mb-1">🔔 تنبيه المهندس الإنشائي</p>
+                    <p className="text-[10px] text-orange-700 mb-2">عند رفع الملف المعماري المعتمد، سيصل إشعار تلقائي للمهندس الإنشائي لبدء تصميم سستم الأعمدة.</p>
+                    <Button size="sm" variant="outline" className="h-7 text-[10px] border-orange-300 text-orange-700"
+                      onClick={() => {
+                        toast.success("تم إرسال إشعار للمهندس الإنشائي ✓");
+                        fetch("/api/send-email", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            to: "structural@office.com",
+                            subject: `مشروع ${project.name} — يرجى البدء بتصميم سستم الأعمدة`,
+                            body: `تم اعتماد التصميم المعماري لمشروع ${project.name}. يرجى البدء بتصميم سستم الأعمدة والقواعد والسملات.`,
+                            projectId: project.id,
+                            type: "structural_notify",
+                          }),
+                        });
+                      }}>
+                      <Phone className="w-3 h-3 ml-1" /> إرسال إشعار للمهندس الإنشائي
+                    </Button>
+                  </div>
+                )}
+                {/* رفع ملف الإنشائي DWG */}
+                <div>
+                  <p className="text-[10px] text-muted-foreground mb-1.5">ارفع ملف التصميم الإنشائي (DWG)</p>
+                  {structuralFile && (
+                    <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg p-2 mb-2">
+                      <File className="w-4 h-4 text-green-600 shrink-0" />
+                      <span className="text-xs text-green-700 flex-1 truncate">{structuralFile}</span>
+                      <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                    </div>
+                  )}
+                  <FileUploadButton
+                    label={structuralFile ? "استبدال الملف" : "رفع ملف الإنشائي (DWG)"}
+                    category="تصميم إنشائي"
+                    projectId={project.id}
+                    clientId={project.clientId}
+                    onUploaded={(doc) => {
+                      setStructuralDone(true, doc?.name || "ملف الإنشائي");
+                      toast.success("تم رفع ملف الإنشائي ✓ — سيصل إشعار لرسام الواجهات");
+                      fetch("/api/send-email", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          to: "facade@office.com",
+                          subject: `مشروع ${project.name} — جاهز لتصميم الواجهات`,
+                          body: `تم إنجاز التصميم الإنشائي لمشروع ${project.name}. يرجى البدء بتصميم الواجهات.`,
+                          projectId: project.id,
+                          type: "facade_notify",
+                        }),
+                      });
+                    }}
+                  />
+                </div>
+                {/* قفل مرن */}
+                {!structuralDone && (
+                  <div className="flex items-center gap-2 pt-1 border-t">
+                    <input type="checkbox" id="bypass-structural" checked={bypassLock}
+                      onChange={e => setBypassLock(e.target.checked)} className="w-3 h-3" />
+                    <label htmlFor="bypass-structural" className="text-[10px] text-muted-foreground cursor-pointer">
+                      تجاوز القفل (للمدير فقط) — الانتقال للواجهات بدون رفع ملف
+                    </label>
+                  </div>
+                )}
+                {bypassLock && !structuralDone && (
+                  <Button size="sm" className="w-full h-8 text-xs" variant="outline"
+                    onClick={() => { setStructuralDone(true); setBypassLock(false); toast.warning("تم تجاوز القفل — الإنشائي مكتمل"); }}>
+                    تأكيد التجاوز والانتقال للواجهات
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── المرحلة الفرعية ②: تصميم الواجهات ── */}
+          <div className={`rounded-xl border-2 overflow-hidden transition-all ${
+            facadeDone ? "border-green-200 bg-green-50/30" :
+            activeSubStep === "facade" ? "" : "border-muted opacity-60"
+          }`} style={activeSubStep === "facade" && !facadeDone ? { borderColor: color } : {}}>
+            {/* قفل إذا لم يكتمل الإنشائي */}
+            {!structuralDone && !bypassLock && (
+              <div className="px-3 py-2.5 flex items-center gap-2 bg-muted/20">
+                <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center">
+                  <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">② تصميم الواجهات</p>
+                  <p className="text-[10px] text-muted-foreground">🔒 ينشط بعد إنجاز التصميم الإنشائي</p>
+                </div>
+              </div>
+            )}
+            {(structuralDone || bypassLock) && (
+              <>
+                <div className="px-3 py-2.5 flex items-center justify-between cursor-pointer hover:bg-muted/10"
+                  onClick={() => setExpandedSection(expandedSection === "facade-card" ? null : "facade-card")}>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${facadeDone ? "bg-green-500" : ""}`} style={!facadeDone ? { backgroundColor: color } : {}}>
+                      {facadeDone ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <Pencil className="w-3.5 h-3.5 text-white" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold">② تصميم الواجهات</p>
+                      <p className="text-[10px] text-muted-foreground">الواجهات المعمارية والمنظور ثلاثي الأبعاد</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {facadeDone
+                      ? <span className="text-[10px] text-green-600 font-medium flex items-center gap-0.5"><CheckCircle2 className="w-3 h-3" /> معتمد</span>
+                      : <span className="text-[10px] font-medium" style={{ color }}>جارٍ</span>}
+                    <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedSection === "facade-card" ? "rotate-90" : ""}`} />
+                  </div>
+                </div>
+                {expandedSection === "facade-card" && (
+                  <div className="px-3 pb-3 pt-2 border-t space-y-3">
+                    {/* مهام الواجهات */}
+                    {facadeTasks.length > 0 && (
+                      <TaskGroup title="مهام الواجهات" subtitle=""
+                        icon={<Building2 className="w-3.5 h-3.5 text-white" />} color={color}
+                        tasks={facadeTasks} expanded={expandedSection === ("facade-tasks" as string)}
+                        onToggle={() => setExpandedSection((expandedSection as string) === "facade-tasks" ? null : "facade-tasks")}
+                        onTaskUpdate={onTaskUpdate} />
+                    )}
+                    {/* مراجعات الواجهات */}
+                    {reviews.map((review, idx) => (
+                      <div key={review.id} className="rounded-lg border overflow-hidden">
+                        <div className="flex items-center justify-between px-2.5 py-2 cursor-pointer hover:bg-muted/10"
+                          onClick={() => setExpandedSection(expandedSection === `rev-${idx}` ? "facade-card" : `rev-${idx}`)}>
+                          <p className="text-xs font-medium">{review.title}</p>
+                          {review.done
+                            ? <span className="text-[10px] text-green-600 flex items-center gap-0.5"><CheckCircle2 className="w-3 h-3" /> مكتمل</span>
+                            : <span className="text-[10px] text-muted-foreground">لم تبدأ</span>}
+                        </div>
+                        {expandedSection === `rev-${idx}` && (
+                          <div className="px-2.5 pb-2.5 pt-2 space-y-2 border-t">
+                            <textarea className="w-full text-xs border rounded-lg p-2 resize-none bg-background" rows={2} placeholder="ملاحظات التعديلات..." />
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px]" onClick={() => toast.info("تحديد موعد")}>
+                                <Calendar className="w-3 h-3 ml-1" /> موعد لاحق
+                              </Button>
+                              <Button size="sm" className="flex-1 h-7 text-[10px] text-white" style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
+                                onClick={() => { setReviews(p => p.map((r, i) => i === idx ? { ...r, done: true } : r)); toast.success("تم ✓"); }}>
+                                <Check className="w-3 h-3 ml-1" /> إغلاق
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    <button className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed text-xs font-medium hover:bg-muted/10"
+                      style={{ borderColor: `color-mix(in oklch, ${color} 40%, transparent)`, color }}
+                      onClick={() => { setReviews(p => [...p, { id: p.length + 1, title: `مراجعة وتعديل ${p.length + 1}`, done: false }]); }}>
+                      <Plus className="w-3.5 h-3.5" /> إضافة مراجعة
+                    </button>
+                    {/* رفع ملف الواجهات */}
+                    <FileUploadButton label="رفع ملف الواجهات (DWG)" category="واجهات معمارية"
+                      projectId={project.id} clientId={project.clientId}
+                      onUploaded={() => toast.success("تم رفع ملف الواجهات ✓")} />
+                    {/* اعتماد العميل */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
+                      <p className="text-xs font-medium text-blue-800 mb-1">🔗 اعتماد العميل عبر البوابة</p>
+                      <p className="text-[10px] text-blue-700 mb-2">بعد إرسال الواجهات للعميل، انتظر اعتماده عبر بوابة العميل، ثم أكد الاعتماد هنا.</p>
+                      {!facadeDone ? (
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] border-blue-300 text-blue-700"
+                            onClick={() => { toast.info("تم إرسال رابط الاعتماد للعميل ✓"); }}>
+                            <Link2 className="w-3 h-3 ml-1" /> إرسال للعميل
+                          </Button>
+                          <Button size="sm" className="flex-1 h-7 text-[10px] text-white bg-green-600 hover:bg-green-700"
+                            onClick={() => {
+                              setFacadeDone(true);
+                              toast.success("تم اعتماد الواجهات ✓ — المشروع جاهز للانتقال لمرحلة البلدية");
+                            }}>
+                            <CheckCircle2 className="w-3 h-3 ml-1" /> تأكيد الاعتماد
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-green-700">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span className="text-xs font-medium">تم اعتماد الواجهات من العميل</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* ── المرحلة الفرعية ③: الانتقال للبلدية ── */}
+          <div className={`rounded-xl border-2 overflow-hidden transition-all ${
+            facadeDone ? "border-green-300 bg-green-50/50" : "border-muted opacity-50"
+          }`}>
+            <div className="px-3 py-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${facadeDone ? "bg-green-500" : "bg-muted"}`}>
+                  {facadeDone ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />}
+                </div>
+                <div>
+                  <p className={`text-sm font-semibold ${facadeDone ? "" : "text-muted-foreground"}`}>③ الانتقال لمرحلة البلدية</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {facadeDone ? "✅ جاهز — يمكن الانتقال للبلدية" : "🔒 ينشط بعد اعتماد العميل للواجهات"}
+                  </p>
+                </div>
+              </div>
+              {facadeDone && (
+                <Button size="sm" className="h-7 text-[10px] text-white" style={{ backgroundColor: color }}
+                  onClick={() => {
+                    toast.success("تم الانتقال لمرحلة مخطط البلدية ✓");
+                    onClose();
+                  }}>
+                  انتقال للبلدية
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* مهام الإنشائي (إن وجدت في قاعدة البيانات) */}
           {structuralTasks.length > 0 && (
-            <TaskGroup title="التصميم الإنشائي" subtitle="حسابات الأعمدة والجسور والأساسات"
-              icon={<Wrench className="w-3.5 h-3.5 text-white" />} color="oklch(0.55 0.15 250)"
-              tasks={structuralTasks} expanded={expandedSection === "structural"}
-              onToggle={() => setExpandedSection(expandedSection === "structural" ? null : "structural")}
+            <TaskGroup title="مهام التصميم الإنشائي" subtitle="من خطة العمل"
+              icon={<Building2 className="w-3.5 h-3.5 text-white" />} color="oklch(0.55 0.15 30)"
+              tasks={structuralTasks} expanded={expandedSection === "structural-tasks"}
+              onToggle={() => setExpandedSection(expandedSection === "structural-tasks" ? null : "structural-tasks")}
               onTaskUpdate={onTaskUpdate} />
           )}
-
           {/* الأنظمة الميكانيكية والكهربائية */}
           {mepTasks.length > 0 && (
             <TaskGroup title="الأنظمة الميكانيكية والكهربائية" subtitle="MEP - كهرباء وصحي وميكانيك"
@@ -973,63 +1249,6 @@ function PhaseFacadeStructuralPopup({ phase, project, onClose, onTaskUpdate }: {
               onToggle={() => setExpandedSection(expandedSection === "mep" ? null : "mep")}
               onTaskUpdate={onTaskUpdate} />
           )}
-
-          {/* مراجعات الواجهات */}
-          {reviews.map((review, idx) => (
-            <div key={review.id} className="rounded-xl border overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-2.5 cursor-pointer hover:bg-muted/20"
-                onClick={() => setExpandedSection(expandedSection === `rev-${idx}` ? null : `rev-${idx}`)}>
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center">
-                    <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm font-medium">{review.title}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {review.done
-                    ? <span className="text-[10px] text-green-600 flex items-center gap-0.5"><CheckCircle2 className="w-3 h-3" /> مكتمل</span>
-                    : <span className="text-[10px] text-muted-foreground">لم تبدأ</span>}
-                  <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedSection === `rev-${idx}` ? "rotate-90" : ""}`} />
-                </div>
-              </div>
-              {expandedSection === `rev-${idx}` && (
-                <div className="px-3 pb-3 pt-2 space-y-2 border-t">
-                  <textarea className="w-full text-xs border rounded-lg p-2 resize-none bg-background" rows={2} placeholder="ملاحظات التعديلات..." />
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => toast.info("تحديد موعد")}>
-                      <Calendar className="w-3 h-3 ml-1" /> موعد لاحق
-                    </Button>
-                    <Button size="sm" className="flex-1 h-8 text-xs text-white" style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
-                      onClick={() => { setReviews(p => p.map((r, i) => i === idx ? { ...r, done: true } : r)); toast.success("تم ✓"); }}>
-                      <Check className="w-3 h-3 ml-1" /> إغلاق
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-
-          {/* زر إضافة مراجعة */}
-          <button
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed text-sm font-medium transition-colors hover:bg-muted/20"
-            style={{ borderColor: `color-mix(in oklch, ${color} 40%, transparent)`, color }}
-            onClick={() => {
-              setReviews(p => [...p, { id: p.length + 1, title: `مراجعة وتعديل ${p.length + 1}`, done: false }]);
-              toast.success("تمت إضافة مراجعة جديدة");
-            }}
-          >
-            <Plus className="w-4 h-4" />
-            إضافة مراجعة وتعديل
-          </button>
-
-          {/* ── رفع ملفات الواجهات والإنشائي ── */}
-          <div className="rounded-xl border-2 border-dashed overflow-hidden" style={{ borderColor: `color-mix(in oklch, ${color} 30%, transparent)` }}>
-            <div className="px-3 py-3 flex items-center gap-2">
-              <FileUploadButton label="رفع ملف" category="واجهات وإنشائي" projectId={project.id} clientId={project.clientId} onUploaded={() => { toast.success("تم رفع الملف — سيظهر في المستندات ✓"); }} />
-              <span className="text-[10px] text-muted-foreground">ارفع أي ملف مرتبط بالواجهات أو الإنشائي — سيظهر في المستندات</span>
-            </div>
-          </div>
-
           {/* المهام الأخرى */}
           {otherTasks.length > 0 && (
             <TaskGroup title="مهام أخرى" subtitle="" icon={<Wrench className="w-3.5 h-3.5 text-white" />}
@@ -1042,7 +1261,6 @@ function PhaseFacadeStructuralPopup({ phase, project, onClose, onTaskUpdate }: {
     </div>
   );
 }
-
 /* ─── Phase 4: مخطط البلدية ─── */
 function PhaseMunicipalityPopup({ phase, project, onClose, onTaskUpdate }: {
   phase: Phase; project: ProjectData; onClose: () => void;
@@ -1264,7 +1482,8 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
 
   const getPhaseStatus = (phase: Phase, idx: number) => {
     const prog = getPhaseProgress(phase);
-    if (prog === 100) return "done";
+    // المرحلة تعتبر مكتملة فقط إذا كانت تحتوي على مهام ونسبتها 100%
+    if (prog === 100 && phase.tasks.length > 0) return "done";
     if (idx === project.currentPhase) return "current";
     if (idx < project.currentPhase) return "past";
     return "upcoming";
