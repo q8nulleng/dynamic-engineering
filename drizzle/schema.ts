@@ -326,3 +326,34 @@ export const contractTemplates = mysqlTable("contract_templates", {
   createdAt: varchar("created_at", { length: 32 }).notNull(),
   isDefault: tinyint("is_default").default(0),
 });
+
+// ── Employees / Staff Accounts ─────────────────────────────────────────────────
+export const employees = mysqlTable("employees", {
+  id: int("id").autoincrement().primaryKey(),
+  name: text("name").notNull(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: mysqlEnum("emp_role", [
+    "admin",
+    "accountant",
+    "architect",
+    "secretary",
+    "structural",
+    "draftsman",
+    "facade_designer",
+  ]).notNull().default("draftsman"),
+  specialty: varchar("specialty", { length: 128 }).default(""),
+  isActive: tinyint("is_active").notNull().default(1),
+  lastLogin: timestamp("last_login"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type Employee = typeof employees.$inferSelect;
+export type InsertEmployee = typeof employees.$inferInsert;
+
+export const employeeSessions = mysqlTable("employee_sessions", {
+  id: varchar("id", { length: 128 }).primaryKey(),
+  employeeId: int("employee_id").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

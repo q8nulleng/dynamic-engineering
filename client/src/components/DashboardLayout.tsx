@@ -28,12 +28,14 @@ import {
   Target,
   CalendarDays,
   ClipboardList,
+  UserCog,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useEmployee, canAccessPath, getRoleLabel, type EmployeeRole } from "@/hooks/useEmployee";
 
-const navItems = [
+const allNavItems = [
   { path: "/", label: "لوحة التحكم", icon: LayoutDashboard },
   { path: "/crm", label: "CRM", icon: Target },
   { path: "/appointments", label: "المواعيد", icon: CalendarDays },
@@ -47,7 +49,11 @@ const navItems = [
   { path: "/client-portal", label: "حفظ في بوابة العميل", icon: Globe },
   { path: "/work-plans", label: "خطط العمل", icon: ClipboardList },
   { path: "/reports", label: "التقارير", icon: BarChart3 },
+  { path: "/employees", label: "إدارة الموظفين", icon: UserCog, adminOnly: true },
 ];
+
+// الصفحات التي تحتاج صلاحية مالية
+const FINANCE_PATHS = ["/payments"];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -55,6 +61,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const { employee, logout } = useEmployee();
 
   const { data: allTasks = [] } = useAllTasks();
   const { data: allInvoices = [] } = useInvoices();
@@ -75,6 +82,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ...pendingReview.map((t) => ({ id: `r${t.id}`, dot: "bg-amber-500", text: `بانتظار مراجعة: ${t.name}`, sub: t.projectName })),
     ...overdueInvoices.map((i) => ({ id: `i${i.id}`, dot: "bg-orange-500", text: `فاتورة متأخرة: ${i.invoiceNumber || i.id}`, sub: i.client })),
   ];
+
+  // فلترة عناصر القائمة حسب الصلاحيات
+  const navItems = allNavItems.filter(item => {
+    if (!employee) return true; // المدير الرئيسي (Manus auth) يرى كل شيء
+    const role = employee.role as EmployeeRole;
+    // صفحة إدارة الموظفين للمدير فقط
+    if ((item as any).adminOnly && role !== "admin") return false;
+    // صفحات المالية
+    if (FINANCE_PATHS.includes(item.path)) {
+      const perms = { admin: true, accountant: true, architect: false, secretary: false, structural: false, draftsman: false, facade_designer: false };
+      return perms[role] ?? false;
+    }
+    return canAccessPath(role, item.path);
+  });
+
+  // اسم المستخدم الحالي
+  const currentName = employee ? employee.name : "نولينج";
+  const currentRole = employee ? getRoleLabel(employee.role as EmployeeRole) : "مدير النظام";
+  const currentInitial = currentName.charAt(0);
+
+  const handleLogout = async () => {
+    if (employee) {
+      await logout();
+      window.location.href = "/employee-login";
+    }
+  };
 
   return (
     <div className="flex min-h-screen" dir="rtl">
@@ -129,13 +162,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {!collapsed && (
                     <>
                       <span className="text-sm flex-1">{item.label}</span>
-                      {((item.path === "/clients" ? clients.length : item.badge) || 0) > 0 && (
+                      {((item.path === "/clients" ? clients.length : (item as any).badge) || 0) > 0 && (
                         <Badge
                           variant="secondary"
                           className="text-xs px-1.5 py-0 h-5"
                           style={{ backgroundColor: "oklch(0.72 0.10 60)", color: "white" }}
                         >
-                          {item.path === "/clients" ? clients.length : item.badge}
+                          {item.path === "/clients" ? clients.length : (item as any).badge}
                         </Badge>
                       )}
                     </>
@@ -152,13 +185,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex items-center gap-3 px-3 py-2">
               <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
                 style={{ backgroundColor: "oklch(0.72 0.10 60)" }}>
-                ن
+                {currentInitial}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-medium truncate">نولينج</p>
-                <p className="text-white/40 text-xs truncate">مدير النظام</p>
+                <p className="text-white text-sm font-medium truncate">{currentName}</p>
+                <p className="text-white/40 text-xs truncate">{currentRole}</p>
               </div>
+              {employee && (
+                <button onClick={handleLogout} title="تسجيل الخروج"
+                  className="text-white/40 hover:text-white/80 transition-colors">
+                  <LogOut className="w-4 h-4" />
+                </button>
+              )}
             </div>
+          )}
+          {collapsed && employee && (
+            <button onClick={handleLogout} title="تسجيل الخروج"
+              className="text-white/40 hover:text-white/80 transition-colors mx-auto block">
+              <LogOut className="w-4 h-4" />
+            </button>
           )}
         </div>
 
@@ -186,9 +231,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Button>
             <div>
               <h2 className="text-lg font-bold" style={{ color: "oklch(0.22 0.04 250)" }}>
-                {navItems.find((n) => n.path === location)?.label ||
+                {allNavItems.find((n) => n.path === location)?.label ||
                 (location.startsWith("/clients/") ? "ملف العميل" :
                 location.startsWith("/projects/") ? "تفاصيل المشروع" :
+                location === "/employee-login" ? "تسجيل الدخول" :
                 "لوحة التحكم")}
               </h2>
             </div>

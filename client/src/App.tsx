@@ -4,6 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { EmployeeProvider } from "./hooks/useEmployee";
 import Dashboard from "./pages/Dashboard";
 import CRM from "./pages/CRM";
 import Quotations from "./pages/Quotations";
@@ -20,11 +21,14 @@ import ClientDetail from "./pages/ClientDetail";
 import Appointments from "./pages/Appointments";
 import WorkPlans from "./pages/WorkPlans";
 import ClientDocuments from "./pages/ClientDocuments";
+import EmployeeLogin from "./pages/EmployeeLogin";
+import EmployeesAdmin from "./pages/EmployeesAdmin";
 import DashboardLayout from "./components/DashboardLayout";
+
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
+      <Route path="/employee-login" component={EmployeeLogin} />
       <Route path="/" component={Dashboard} />
       <Route path="/crm" component={CRM} />
       <Route path="/quotations" component={Quotations} />
@@ -41,8 +45,24 @@ function Router() {
       <Route path="/contracts" component={Contracts} />
       <Route path="/appointments" component={Appointments} />
       <Route path="/work-plans" component={WorkPlans} />
+      <Route path="/employees" component={EmployeesAdmin} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function AppContent() {
+  return (
+    <Switch>
+      {/* صفحة تسجيل دخول الموظفين بدون DashboardLayout */}
+      <Route path="/employee-login" component={EmployeeLogin} />
+      {/* باقي الصفحات مع DashboardLayout */}
+      <Route>
+        <DashboardLayout>
+          <Router />
+        </DashboardLayout>
+      </Route>
     </Switch>
   );
 }
@@ -51,15 +71,14 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light" switchable={true}>
-        <TooltipProvider>
-          <Toaster position="bottom-center" richColors duration={4000} />
-          <DashboardLayout>
-            <Router />
-          </DashboardLayout>
-        </TooltipProvider>
+        <EmployeeProvider>
+          <TooltipProvider>
+            <Toaster position="bottom-center" richColors duration={4000} />
+            <AppContent />
+          </TooltipProvider>
+        </EmployeeProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );
 }
-
 export default App;

@@ -11,7 +11,8 @@ import { getDb } from "./db/mysql.js";
 import {
   clients, projects, phases, tasks, quotations, contracts,
   invoices, invoiceLines, documents, crmLeads, contractTemplates, appointments,
-  workPlans, workPlanPhases, workPlanTasks, projectBriefs, projectMeetings, phaseMeta
+  workPlans, workPlanPhases, workPlanTasks, projectBriefs, projectMeetings, phaseMeta,
+  employees, employeeSessions
 } from "../drizzle/schema.js";
 import { nanoid } from "nanoid";
 import { storagePut } from "./storage.js";
@@ -1696,5 +1697,155 @@ apiRouter.post("/api/tasks/:taskId/approve", async (req, res) => {
     }
     
     res.json({ approved: true, triggered: triggeredTasks });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+
+// ── Employees API ──────────────────────────────────────────────────────────────
+import crypto from "crypto";
+
+function hashPassword(password: string): string {
+  return crypto.createHash("sha256").update(password + "dynamic_salt_2026").digest("hex");
+}
+
+function generateSessionId(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+// تسجيل دخول الموظف
+apiRouter.post("/api/employees/login", async (req, res) => {
+  try {
+    const db = getDb();
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: "البريد وكلمة المرور مطلوبان" });
+
+    const [emp] = await db.select().from(employees).where(eq(employees.email, email.toLowerCase().trim()));
+    if (!emp) return res.status(401).json({ error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" });
+    if (!emp.isActive) return res.status(403).json({ error: "الحساب موقوف، تواصل مع المدير" });
+
+    const hash = hashPassword(password);
+    if (hash !== emp.passwordHash) return res.status(401).json({ error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" });
+
+    // إنشاء جلسة
+    const sessionId = generateSessionId();
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 يوم
+    await db.insert(employeeSessions).values({ id: sessionId, employeeId: emp.id, expiresAt });
+
+    // تحديث آخر تسجيل دخول
+    await db.update(employees).set({ lastLogin: new Date() }).where(eq(employees.id, emp.id));
+
+    // إرسال cookie
+    res.cookie("emp_session", sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    const { passwordHash: _, ...empData } = emp;
+    res.json({ success: true, employee: empData });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// الحصول على بيانات الموظف الحالي
+apiRouter.get("/api/employees/me", async (req, res) => {
+  try {
+    const db = getDb();
+    const sessionId = req.cookies?.emp_session;
+    if (!sessionId) return res.status(401).json({ error: "غير مسجل دخول" });
+
+    const [session] = await db.select().from(employeeSessions).where(eq(employeeSessions.id, sessionId));
+    if (!session || session.expiresAt < new Date()) {
+      return res.status(401).json({ error: "انتهت صلاحية الجلسة" });
+    }
+
+    const [emp] = await db.select().from(employees).where(eq(employees.id, session.employeeId));
+    if (!emp || !emp.isActive) return res.status(401).json({ error: "الحساب غير موجود أو موقوف" });
+
+    const { passwordHash: _, ...empData } = emp;
+    res.json(empData);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// تسجيل خروج الموظف
+apiRouter.post("/api/employees/logout", async (req, res) => {
+  try {
+    const db = getDb();
+    const sessionId = req.cookies?.emp_session;
+    if (sessionId) {
+      await db.delete(employeeSessions).where(eq(employeeSessions.id, sessionId));
+    }
+    res.clearCookie("emp_session");
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// قائمة الموظفين (للمدير فقط)
+apiRouter.get("/api/employees", async (req, res) => {
+  try {
+    const db = getDb();
+    const rows = await db.select({
+      id: employees.id,
+      name: employees.name,
+      email: employees.email,
+      role: employees.role,
+      specialty: employees.specialty,
+      isActive: employees.isActive,
+      lastLogin: employees.lastLogin,
+      createdAt: employees.createdAt,
+    }).from(employees).orderBy(employees.createdAt);
+    res.json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// إضافة موظف جديد
+apiRouter.post("/api/employees", async (req, res) => {
+  try {
+    const db = getDb();
+    const { name, email, password, role, specialty } = req.body;
+    if (!name || !email || !password) return res.status(400).json({ error: "الاسم والبريد وكلمة المرور مطلوبة" });
+
+    const passwordHash = hashPassword(password);
+    await db.insert(employees).values({
+      name,
+      email: email.toLowerCase().trim(),
+      passwordHash,
+      role: role || "draftsman",
+      specialty: specialty || "",
+      isActive: 1,
+    });
+    const [newEmp] = await db.select({
+      id: employees.id, name: employees.name, email: employees.email,
+      role: employees.role, specialty: employees.specialty, isActive: employees.isActive,
+    }).from(employees).where(eq(employees.email, email.toLowerCase().trim()));
+    res.status(201).json(newEmp);
+  } catch (e: any) {
+    if (e.message?.includes("Duplicate")) return res.status(409).json({ error: "البريد الإلكتروني مستخدم بالفعل" });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// تعديل موظف
+apiRouter.put("/api/employees/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    const { password, ...data } = req.body;
+    const updateData: any = { ...data };
+    if (password) updateData.passwordHash = hashPassword(password);
+    await db.update(employees).set(updateData).where(eq(employees.id, parseInt(req.params.id)));
+    const [row] = await db.select({
+      id: employees.id, name: employees.name, email: employees.email,
+      role: employees.role, specialty: employees.specialty, isActive: employees.isActive,
+    }).from(employees).where(eq(employees.id, parseInt(req.params.id)));
+    res.json(row);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// حذف موظف
+apiRouter.delete("/api/employees/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    await db.delete(employees).where(eq(employees.id, parseInt(req.params.id)));
+    res.json({ success: true });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
