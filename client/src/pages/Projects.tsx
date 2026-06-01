@@ -17,7 +17,7 @@ import {
   Building2, Wrench, PlusSquare, Layers, Trash2, Eye,
   StickyNote, X, MessageSquare
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import NewProjectDialog from "@/components/NewProjectDialog";
 import { toast } from "sonner";
 import { useProjects, useCreateProject } from "@/lib/api";
@@ -65,6 +65,7 @@ export default function Projects() {
   const { data: allProjectsData = [], isLoading } = useProjects();
   const createProject = useCreateProject();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [mainTab,      setMainTab]      = useState("all");
   const [subTab,       setSubTab]       = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -357,8 +358,10 @@ export default function Projects() {
                   </div>
                 )}
 
-                <Link href={`/projects/${project.id}`}>
-                  <div className="p-4 rounded-xl border bg-background hover:shadow-md transition-all cursor-pointer">
+                <div
+                  onClick={() => navigate(`/projects/${project.id}`)}
+                  className="p-4 rounded-xl border bg-background hover:shadow-md transition-all cursor-pointer"
+                >
                     {/* Top Row */}
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0 pr-8">
@@ -467,8 +470,7 @@ export default function Projects() {
                       </div>
                       <ChevronLeft className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                     </div>
-                  </div>
-                </Link>
+                </div>
               </div>
             );
           })}
