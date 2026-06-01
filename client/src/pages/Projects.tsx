@@ -403,11 +403,27 @@ export default function Projects() {
                     {/* ملاحظة مختصرة (إذا وُجدت) */}
                     {hasNotes && (
                       <div
-                        className="mb-3 px-2 py-1.5 rounded-md text-[10px] text-muted-foreground line-clamp-1 border"
+                        className="mb-3 px-2 py-1.5 rounded-md text-[10px] border space-y-1"
                         style={{ backgroundColor: "oklch(0.98 0.02 60)", borderColor: "oklch(0.90 0.05 60)" }}
                       >
-                        <StickyNote className="w-2.5 h-2.5 inline ml-1 text-amber-500" />
-                        {(project as any).notes}
+                        <div className="flex items-start gap-1 text-muted-foreground">
+                          <StickyNote className="w-2.5 h-2.5 shrink-0 mt-0.5 text-amber-500" />
+                          <span className="line-clamp-1">{(project as any).notes}</span>
+                        </div>
+                        {(project as any).notesUpdatedAt && (
+                          <div className="flex items-center gap-1 text-[9px]" style={{ color: "oklch(0.65 0.08 60)" }}>
+                            <span>آخر تعديل:</span>
+                            <span style={{ fontFamily: "'Space Grotesk'" }}>
+                              {new Date((project as any).notesUpdatedAt).toLocaleDateString("ar-KW", {
+                                year: "numeric", month: "short", day: "numeric"
+                              })}
+                              {" — "}
+                              {new Date((project as any).notesUpdatedAt).toLocaleTimeString("ar-KW", {
+                                hour: "2-digit", minute: "2-digit"
+                              })}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
 

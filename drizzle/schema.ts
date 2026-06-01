@@ -96,6 +96,7 @@ export const projects = mysqlTable("projects", {
   leadId: varchar("lead_id", { length: 64 }).default(""),
   status: varchar("status", { length: 32 }).default("جديد"),
   notes: text("notes").default(""),
+  notesUpdatedAt: bigint("notes_updated_at", { mode: "number" }),
 });
 
 export const contracts = mysqlTable("contracts", {
