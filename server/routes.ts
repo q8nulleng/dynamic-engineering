@@ -1983,7 +1983,21 @@ apiRouter.post("/api/projects/:projectId/supervision", async (req, res) => {
 apiRouter.put("/api/supervision/:id", async (req, res) => {
   try {
     const db = getDb();
-    await db.update(supervisionVisits).set(req.body).where(eq(supervisionVisits.id, parseInt(req.params.id)));
+    // Build safe update object - only include known fields
+    const body = req.body;
+    const updateData: Record<string, any> = {};
+    if (body.checklistData !== undefined) updateData.checklistData = body.checklistData;
+    if (body.itemNotes !== undefined) updateData.itemNotes = body.itemNotes;
+    if (body.engineerName !== undefined) updateData.engineerName = body.engineerName;
+    if (body.contractorName !== undefined) updateData.contractorName = body.contractorName;
+    if (body.contractorPhone !== undefined) updateData.contractorPhone = body.contractorPhone;
+    if (body.licenseNumber !== undefined) updateData.licenseNumber = body.licenseNumber;
+    if (body.generalNotes !== undefined) updateData.generalNotes = body.generalNotes;
+    if (body.photoUrls !== undefined) updateData.photoUrls = body.photoUrls;
+    if (body.stageKey !== undefined) updateData.stageKey = body.stageKey;
+    if (body.visitStatus !== undefined) updateData.visitStatus = body.visitStatus;
+    if (body.pdfUrl !== undefined) updateData.pdfUrl = body.pdfUrl;
+    await db.update(supervisionVisits).set(updateData).where(eq(supervisionVisits.id, parseInt(req.params.id)));
     const [row] = await db.select().from(supervisionVisits).where(eq(supervisionVisits.id, parseInt(req.params.id)));
     res.json(row);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -2000,7 +2014,7 @@ apiRouter.delete("/api/supervision/:id", async (req, res) => {
 
 
 // PDF Report for Supervision Visit
-apiRouter.post("/api/supervision/visits/:id/pdf", async (req, res) => {
+apiRouter.get("/api/supervision/visits/:id/pdf", async (req, res) => {
   try {
     const db = getDb();
     const [visit] = await db.select().from(supervisionVisits).where(eq(supervisionVisits.id, parseInt(req.params.id)));

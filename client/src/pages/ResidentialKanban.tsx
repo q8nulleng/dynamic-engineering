@@ -13,7 +13,7 @@ import {
   Clock, X, Plus, Calendar, FileText, Banknote, Wrench,
   Building2, Layers, ChevronRight, ClipboardList, MessageSquare,
   Phone, Pencil, Check, AlertCircle, Zap, Upload,
-  Eye, Download, File, Image as ImageIcon, ExternalLink, Trash2
+  Eye, Download, File, Image as ImageIcon, ExternalLink, Trash2, Edit2
 } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
@@ -2351,10 +2351,36 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
               </div>
               <div className="flex items-center gap-2">
                 {stageCompleted && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
-                    style={{ background: "oklch(0.55 0.15 150 / 0.15)", color: "oklch(0.45 0.15 150)" }}>
-                    مكتملة
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                      style={{ background: "oklch(0.55 0.15 150 / 0.15)", color: "oklch(0.45 0.15 150)" }}>
+                      ✓ مكتملة
+                    </span>
+                    <button
+                      onClick={() => {
+                        const completedVisit = stageVisits.find(v => v.visitStatus === "completed" || v.visitStatus === "approved");
+                        if (completedVisit) {
+                          updateVisit.mutate({ id: completedVisit.id!, visitStatus: "in_progress" }, {
+                            onSuccess: () => {
+                              refetchVisits();
+                              setActiveVisit({ ...completedVisit, visitStatus: "in_progress" });
+                              try { const parsed: Record<string, ItemStatus> = JSON.parse(completedVisit.checklistData || "{}"); setChecklistState(parsed); } catch {}
+                              try { const parsedNotes: Record<string, string> = JSON.parse(completedVisit.itemNotes || "{}"); setItemNotes(parsedNotes); } catch {}
+                              setEngineerName(completedVisit.engineerName || autoEngineer);
+                              setContractorName(completedVisit.contractorName || "");
+                              setContractorPhone(completedVisit.contractorPhone || "");
+                              setLicenseNumber(completedVisit.licenseNumber || autoLicense);
+                              setVisitNotes(completedVisit.generalNotes || "");
+                              toast.success("تم فتح الزيارة للتعديل");
+                            }
+                          });
+                        }
+                      }}
+                      className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg font-semibold border hover:bg-muted/30"
+                    >
+                      <Edit2 className="w-3 h-3" /> تعديل
+                    </button>
+                  </div>
                 )}
                 {stageInProgress && !activeVisit && (
                   <button
@@ -2759,6 +2785,8 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
   const { data: projectData, isLoading } = useProject(projectId);
   const updateTask = useUpdateTask(projectId);
   const [activePopup, setActivePopup] = useState<number | null>(null);
+  // جلب زيارات الإشراف لحساب تقدم مرحلة الإشراف من الخارج
+  const { data: supervisionVisitsData = [] } = useSupervisionVisits(projectId);
 
   const project = projectData as ProjectData | undefined;
 
@@ -2788,14 +2816,30 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
   const totalTasks = project.phases.reduce((s, p) => s + p.tasks.length, 0);
   const doneTasks = project.phases.reduce((s, p) => s + p.tasks.filter(t => t.status === "done").length, 0);
 
-  const getPhaseProgress = (phase: Phase) => {
+  const getPhaseProgress = (phase: Phase, idx?: number) => {
+    // مرحلة الإشراف (رقم 6): تعتمد على عدد مراحل الإشراف المكتملة فعلياً
+    if (idx === 6) {
+      const completedStages = supervisionVisitsData.filter(
+        v => v.visitStatus === "completed" || v.visitStatus === "approved"
+      ).map(v => v.stageKey).filter((k, i, arr) => arr.indexOf(k) === i).length;
+      const totalStages = 18; // عدد مراحل الإشراف
+      return Math.round((completedStages / totalStages) * 100);
+    }
     const total = phase.tasks.length;
     const done = phase.tasks.filter(t => t.status === "done").length;
     return total > 0 ? Math.round((done / total) * 100) : 0;
   };
 
   const getPhaseStatus = (phase: Phase, idx: number) => {
-    const prog = getPhaseProgress(phase);
+    const prog = getPhaseProgress(phase, idx);
+    // مرحلة الإشراف: مكتملة إذا كانت نسبتها 100%
+    if (idx === 6) {
+      if (prog === 100) return "done";
+      if (prog > 0) return "current";
+      if (idx === project.currentPhase) return "current";
+      if (idx < project.currentPhase) return "past";
+      return "upcoming";
+    }
     // المرحلة تعتبر مكتملة فقط إذا كانت تحتوي على مهام ونسبتها 100%
     if (prog === 100 && phase.tasks.length > 0) return "done";
     if (idx === project.currentPhase) return "current";
@@ -2882,7 +2926,7 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
           {project.phases.map((phase, idx) => {
             const color = PHASE_COLORS[idx % PHASE_COLORS.length];
             const phaseStatus = getPhaseStatus(phase, idx);
-            const phaseProgress = getPhaseProgress(phase);
+            const phaseProgress = getPhaseProgress(phase, idx);
             const Icon = PHASE_ICONS[idx % PHASE_ICONS.length];
             const isCurrent = phaseStatus === "current";
             const isDone = phaseStatus === "done";
@@ -2921,12 +2965,19 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
           {project.phases.map((phase, idx) => {
             const color = PHASE_COLORS[idx % PHASE_COLORS.length];
             const phaseStatus = getPhaseStatus(phase, idx);
-            const phaseProgress = getPhaseProgress(phase);
+            const phaseProgress = getPhaseProgress(phase, idx);
             const isCurrent = phaseStatus === "current";
             const isDone = phaseStatus === "done";
             const isUpcoming = phaseStatus === "upcoming";
-            const doneCount = phase.tasks.filter(t => t.status === "done").length;
-            const inProgressCount = phase.tasks.filter(t => t.status === "in_progress").length;
+            // مرحلة الإشراف: استخدام بيانات الزيارات
+            const isSupervisionPhase = idx === 6;
+            const supervisionDone = isSupervisionPhase
+              ? supervisionVisitsData.filter(v => v.visitStatus === "completed" || v.visitStatus === "approved").map(v => v.stageKey).filter((k, i, arr) => arr.indexOf(k) === i).length
+              : phase.tasks.filter(t => t.status === "done").length;
+            const supervisionTotal = isSupervisionPhase ? 18 : phase.tasks.length;
+            const doneCount = isSupervisionPhase ? supervisionDone : phase.tasks.filter(t => t.status === "done").length;
+            const totalCount = isSupervisionPhase ? supervisionTotal : phase.tasks.length;
+            const inProgressCount = isSupervisionPhase ? 0 : phase.tasks.filter(t => t.status === "in_progress").length;
 
             return (
               <button
@@ -2982,7 +3033,7 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
                   <div className="flex items-center justify-between text-[10px]">
                     <span className="text-muted-foreground">مكتملة</span>
                     <span className="font-bold" style={{ fontFamily: "'Space Grotesk'", color: isDone ? "oklch(0.45 0.12 150)" : color }}>
-                      {doneCount}/{phase.tasks.length}
+                      {doneCount}/{totalCount}{isSupervisionPhase ? " مرحلة" : ""}
                     </span>
                   </div>
                   {inProgressCount > 0 && (
