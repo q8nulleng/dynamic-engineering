@@ -1773,125 +1773,304 @@ function PhaseDetailedDrawingsPopup({ phase, project, onClose, onTaskUpdate }: {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   Phase 7: الإشراف
+   Phase 7: الإشراف الهندسي
    ═══════════════════════════════════════════════════════════════════ */
+
+// مراحل الإشراف - dropdown
 const SUPERVISION_STAGES = [
-  { key: "excavation",       label: "الحفر واستلام المنسوب والحدود" },
-  { key: "elevator_pit",     label: "بير المصعد والجور المجاري" },
-  { key: "basement_slab",    label: "اللبشة (في حالة السرداب)" },
-  { key: "foundations",      label: "القواعد (بدون السرداب)" },
-  { key: "basement_walls",   label: "حوائط السرداب" },
-  { key: "col_necks",        label: "رقاب الأعمدة (بدون السرداب)" },
-  { key: "beams",            label: "الشناجات" },
-  { key: "reinforced_floor", label: "الأرضية المسلحة" },
-  { key: "basement_cols",    label: "أعمدة السرداب" },
-  { key: "basement_roof",    label: "سقف السرداب" },
-  { key: "ground_cols",      label: "أعمدة الأرضي" },
-  { key: "ground_roof",      label: "سقف الأرضي" },
-  { key: "first_cols",       label: "أعمدة الأول" },
-  { key: "first_roof",       label: "سقف الأول" },
-  { key: "second_cols",      label: "أعمدة الثاني" },
-  { key: "second_roof",      label: "سقف الثاني" },
-  { key: "service_cols",     label: "أعمدة سطح الخدمات" },
-  { key: "service_roof",     label: "سقف سطح الخدمات" },
+  { key: "excavation",       label: "الحفر واستلام المنسوب والحدود",    group: "أعمال التأسيس" },
+  { key: "elevator_pit",     label: "بير المصعد والجور المجاري",         group: "أعمال التأسيس" },
+  { key: "foundations",      label: "القواعد",                           group: "أعمال التأسيس" },
+  { key: "basement_slab",    label: "اللبشة (السرداب)",                  group: "أعمال التأسيس" },
+  { key: "col_necks",        label: "رقاب الأعمدة",                      group: "أعمال التأسيس" },
+  { key: "basement_walls",   label: "حوائط السرداب",                     group: "أعمال التأسيس" },
+  { key: "reinforced_floor", label: "الأرضية المسلحة (Slab on Grade)",   group: "أعمال التأسيس" },
+  { key: "beams",            label: "الشناجات",                          group: "أعمال الهيكل" },
+  { key: "basement_cols",    label: "أعمدة السرداب",                     group: "أعمال الهيكل" },
+  { key: "basement_roof",    label: "سقف السرداب",                       group: "أعمال الهيكل" },
+  { key: "ground_cols",      label: "أعمدة الأرضي",                      group: "أعمال الهيكل" },
+  { key: "ground_roof",      label: "سقف الأرضي",                        group: "أعمال الهيكل" },
+  { key: "first_cols",       label: "أعمدة الأول",                       group: "أعمال الهيكل" },
+  { key: "first_roof",       label: "سقف الأول",                         group: "أعمال الهيكل" },
+  { key: "second_cols",      label: "أعمدة الثاني",                      group: "أعمال الهيكل" },
+  { key: "second_roof",      label: "سقف الثاني",                        group: "أعمال الهيكل" },
+  { key: "service_cols",     label: "أعمدة سطح الخدمات",                group: "أعمال الهيكل" },
+  { key: "service_roof",     label: "سقف سطح الخدمات",                  group: "أعمال الهيكل" },
 ];
 
-// بنود الجك ليست حسب مرحلة الإشراف
-const CHECKLIST_ITEMS: Record<string, { section: string; items: string[] }[]> = {
+// حالات بنود الجك ليست
+type ItemStatus = "pending" | "accepted" | "rejected" | "accepted_with_notes";
+const ITEM_STATUS_CONFIG: Record<ItemStatus, { label: string; color: string; bg: string; short: string }> = {
+  pending:             { label: "لم يُفحص",               color: "#9ca3af", bg: "#f3f4f6", short: "—" },
+  accepted:            { label: "مقبول",                   color: "#16a34a", bg: "#dcfce7", short: "✓" },
+  rejected:            { label: "مرفوض",                   color: "#dc2626", bg: "#fee2e2", short: "✗" },
+  accepted_with_notes: { label: "مقبول بعد استيفاء الملاحظات", color: "#d97706", bg: "#fef3c7", short: "⚠" },
+};
+
+// جك ليست مخصصة لكل مرحلة
+// الصحي والكهرباء فقط في: الشناجات، الأسقف، والبروزات
+const STAGE_CHECKLIST: Record<string, { section: string; items: string[]; hasMEP?: boolean }[]> = {
+  excavation: [
+    { section: "الحفر والمنسوب", items: [
+      "التأكد من أماكن الحفر وحدودها حسب المخطط",
+      "التحقق من منسوب الحفر المطلوب",
+      "التأكد من استواء قاع الحفر",
+      "التحقق من عدم وجود تربة ضعيفة أو طينية",
+      "التأكد من حدود القسيمة والأكسات",
+    ]},
+  ],
+  elevator_pit: [
+    { section: "بير المصعد والجور", items: [
+      "التأكد من أبعاد بير المصعد حسب المخطط",
+      "التحقق من منسوب قاع البير",
+      "التأكد من أماكن جور المجاري وأبعادها",
+      "التحقق من منسوب جور المجاري",
+      "التأكد من التسليح حسب المخطط الإنشائي",
+    ]},
+  ],
   foundations: [
-    { section: "بنود استلام القواعد المنفصلة", items: [
-      "التأكد من أماكن القواعد وعددها",
-      "استكمال مقاسات القواعد حسب المخطط المعتمد",
-      "التأكد من مقاسات القواعد حسب المخطط (سواء في المتر أو الحد الصريح للقاعدة كاملة)",
-      "يجب أن تكون نهايات التسليح السفلي بزاوية 1 سواء في الاتجاه الطولي أو القصير",
-      "التأكد من الشبكة السفلية والعلوية إذا كانت مرتبة بشكل جيد في المخطط",
-      "أن تكون الشبكة السفلية والعلوية مرتبة بزاوية 90 ولا يوجد حديد تسليح بدون تربيط",
-      "يجب أن تكون نهايات التسليح العلوي بزاوية 1 سواء في الاتجاه الطولي أو القصير",
-      "التأكد من كفايات رقب الأعمدة داخل القاعدة",
+    { section: "أبعاد ومواضع القواعد", items: [
+      "التأكد من أماكن القواعد وعددها حسب المخطط",
+      "التحقق من مقاسات القواعد (طول × عرض × عمق)",
+      "التأكد من أكسات القواعد بالنسبة للحدود",
+    ]},
+    { section: "تسليح القواعد", items: [
+      "الشبكة السفلية: الأقطار والمسافات حسب المخطط",
+      "الشبكة العلوية: الأقطار والمسافات حسب المخطط",
+      "نهايات التسليح بزاوية 90° في الاتجاهين",
+      "التربيط بين الشبكتين منتظم ولا يوجد حديد بدون ربط",
+      "كفايات رقاب الأعمدة داخل القاعدة بالطول المطلوب",
+      "الغطاء الخرساني (Cover) لا يقل عن 7.5 سم",
     ]},
   ],
   basement_slab: [
-    { section: "بنود استلام اللبشة", items: [
-      "التأكد من مقاسات القواعد وأماكنها",
+    { section: "اللبشة المسلحة", items: [
+      "التأكد من مقاسات اللبشة وأماكن القواعد",
       "تحديد مشرب اللبشة حسب المخطط",
-      "أن تكون الشبكة العلوية مستوية بشكل جيد ولا يوجد فجوات في الارتفاعات",
-      "أن تكون الشبكة السفلية والعلوية مرتبة بشكل جيد",
+      "الشبكة السفلية مستوية وبالأقطار المطلوبة",
+      "الشبكة العلوية مستوية وبالأقطار المطلوبة",
+      "الغطاء الخرساني السفلي لا يقل عن 7.5 سم",
+      "كفايات رقاب الأعمدة خارجة بالطول المطلوب",
     ]},
   ],
   col_necks: [
-    { section: "بنود استلام رقاب الأعمدة", items: [
-      "أن تكون أماكن الأعمدة في أماكنها حسب المخطط الإنشائي والتأكد من أكسات الأعمدة",
-      "أن تكون مقاسات الأعمدة قياسية قصص",
-      "أن تكون الرقب كما ذكر في المخطط",
-      "أن تكون الرقب تسليح كما ذكر في المخطط",
-      "أن يتم عقل الكفايات للأعمدة والرقب بالمسافات المطلوبة",
-      "أن يتم عمل الكفايات للأعمدة حسب عدد تسليح الأعمدة والرقب بزاوية 90 داخل القاعدة",
-      "التأكد من ارتفاع رقاب الأعمدة بحديد الصب",
+    { section: "رقاب الأعمدة", items: [
+      "أماكن الأعمدة حسب المخطط الإنشائي والأكسات",
+      "مقاسات الأعمدة حسب المخطط",
+      "تسليح الرقاب (أقطار وعدد) حسب المخطط",
+      "الكفايات بالمسافات المطلوبة ومربوطة بزاوية 90°",
+      "ارتفاع رقاب الأعمدة بحديد الصب صحيح",
+      "أشاير الأعمدة لا تقل عن 75 سم",
     ]},
   ],
   basement_walls: [
-    { section: "بنود استلام حوائط السرداب", items: [
-      "التأكد من وجود قاعدة شريطية أسفل الحوائط",
-      "أن تخرج تسليح المواطن بالعدد المطلوب من القاعدة الشريطية في اللبشة المسلحة",
-      "ألا يقل ارتفاع التسليح عن خروجها من اللبشة المسلحة عن 75 سم",
-      "أن تخرج الأشاير أعلى رقم الحائط لعمل رقم تسليح الحائط",
-      "أن يتم تسليح الحوائط بحديد رأسي وأفقي في الفي المطلوب بالمخطط",
-    ]},
-  ],
-  beams: [
-    { section: "بنود استلام الشناجات الأرضية", items: [
-      "عمل الشناجات الأرضية بالمقاسات المطلوبة بالمخطط حسب طول كل شناج",
-      "التأكيد على تسليح الشناجات العلوي والسفلي",
-      "أن يكون تسليح الشناجات السفلي مرتبطاً بالكفايات كل 1 متر على الأقل الضمان شلكه في مكانه",
-      "التأكد من وجود كفايات بين حديد الشناجات",
-      "التأكد من عدد الكفايات وتربيطها بشكل جيد",
+    { section: "حوائط السرداب", items: [
+      "وجود قاعدة شريطية أسفل الحوائط",
+      "تسليح المواطن بالعدد المطلوب من القاعدة",
+      "ارتفاع التسليح من اللبشة لا يقل عن 75 سم",
+      "أشاير أعلى رقم الحائط لعمل رقم التسليح",
+      "التسليح الرأسي والأفقي بالفي المطلوب",
     ]},
   ],
   reinforced_floor: [
-    { section: "بنود استلام أرضية أرضي (SLAB ON GRADE)", items: [
-      "أن يكون الدفان أسفل البلاطة الأرضية مدكوكاً بشكل جيد",
-      "أن يتم تغطيلون حماية أسفل تسليح البلاطة",
-      "التأكد من تسليح البلاطة الأرضية حسب المخطط وتربيطها بشكل جيد",
+    { section: "أرضية أرضي (Slab on Grade)", items: [
+      "الدفان أسفل البلاطة مدكوك بشكل جيد",
+      "نايلون حماية أسفل التسليح موجود",
+      "تسليح البلاطة حسب المخطط ومربوط جيداً",
+      "الغطاء الخرساني السفلي لا يقل عن 5 سم",
+    ]},
+  ],
+  beams: [
+    { section: "الشناجات الإنشائية", items: [
+      "مقاسات الشناجات (عرض × عمق) حسب المخطط",
+      "التسليح العلوي: الأقطار والعدد حسب المخطط",
+      "التسليح السفلي: الأقطار والعدد حسب المخطط",
+      "الكفايات: العدد والمسافات ومربوطة بزاوية 90°",
+      "التسليح السفلي مربوط بالكفايات كل 1م على الأقل",
+    ], hasMEP: true },
+    { section: "الصحي والكهرباء في الشناجات", items: [
+      "مواضع بايبات الصرف الصحي حسب المخطط",
+      "ميول بايبات الصرف صحيحة (لا تقل عن 1%)",
+      "أقطار بايبات الصرف حسب المخطط الصحي",
+      "مواضع بايبات الكهرباء (Conduit) حسب المخطط",
+      "أقطار بايبات الكهرباء مناسبة للكابلات",
+      "تثبيت البايبات جيداً قبل الصب",
+    ]},
+  ],
+  basement_cols: [
+    { section: "أعمدة السرداب", items: [
+      "تسليح الأعمدة حسب المخطط (أقطار وعدد)",
+      "أشاير الأعمدة لا تقل عن 75 سم",
+      "الكفايات: العدد والمسافات حسب التفصيل",
+      "التكفيف في أول وآخر ثلث من العمود",
+      "الأعمدة المزروعة مربوطة جيداً بزاوية 90°",
+      "قفل الكفايات لا يقل عن 7 سم في الاتجاهين",
+    ]},
+  ],
+  basement_roof: [
+    { section: "سقف السرداب - الإنشائي", items: [
+      "الجسور بالمقاسات المذكورة والتسليح العلوي والسفلي",
+      "التسليح السفلي للجسور مربوط بالكفايات كل 1م",
+      "الشبكات السفلية والعلوية للبلاطة حسب المخطط",
+      "الكفايات ومربوطة جيداً وبالعدد المطلوب",
+      "تفصيلة الكفات (مزدوجة أو فردية) حسب الكاشف",
+      "تسليح البروزات كافٍ حسب المخطط",
+    ], hasMEP: true },
+    { section: "الصحي والكهرباء في السقف", items: [
+      "مواضع بايبات الصرف الصحي حسب المخطط",
+      "ميول بايبات الصرف صحيحة",
+      "مواضع بايبات الكهرباء (Conduit) حسب المخطط",
+      "تثبيت البايبات جيداً قبل الصب",
+    ]},
+    { section: "البروزات", items: [
+      "مطابقة بروزات الواجهات للمخطط المعماري",
+      "أبعاد البروزات ومناسيبها صحيحة",
+      "تسليح البروزات كافٍ",
     ]},
   ],
   ground_cols: [
-    { section: "بنود استلام الأعمدة", items: [
-      "التأكد من تسليح الأعمدة حسب المخطط",
-      "أن تكون أشاير الأعمدة لا تقل عن 75 سم",
-      "أن تكون كفايات الأعمدة متعددة حسب التفصيل",
-      "التكفيف في أول ثلث وآخر ثلث من العمود",
-      "التأكد من أقل الكفايات",
-      "التأكد من مكان المنفيز ومكانه",
-      "التأكد من الأعمدة المزروعة وتربيطها بشكل جيد داخل الجسور الدملة",
-      "أن تكون نهايات حديد تسليح الأعمدة المزروعة بزاوية 90 وبطول مناسب",
-      "لا يقل قفل الكفايات عن 7 سم في الاتجاهين",
+    { section: "أعمدة الأرضي", items: [
+      "تسليح الأعمدة حسب المخطط (أقطار وعدد)",
+      "أشاير الأعمدة لا تقل عن 75 سم",
+      "الكفايات: العدد والمسافات حسب التفصيل",
+      "التكفيف في أول وآخر ثلث من العمود",
+      "الأعمدة المزروعة مربوطة جيداً بزاوية 90°",
+      "قفل الكفايات لا يقل عن 7 سم في الاتجاهين",
     ]},
   ],
   ground_roof: [
-    { section: "بنود استلام الأسقف", items: [
-      "التأكد من تنفيذ الجسور بالمقاسات المذكورة وتسليحها العلوي والسفلي",
-      "التأكد من تسليح الجسور العلوي وعدم تعارضها مع التصميم الإنشائي",
-      "أن يكون تسليح الجسور السفلي مرتبطاً بالكفايات كل 1 متر على الأقل الضمان شلكه في مكانه",
-      "التأكد من تسليح الشبكات السفلية والعلوية",
-      "التأكد من عدد الكفايات وتربيطها بشكل جيد",
-      "التأكد من تفصيلة الكفات كما في الكاشف (مزدوجة أو فردية)",
-      "لا يقل قفل الكفايات عن 7 سم في الاتجاهين",
-      "التأكد من تسليح البلاطات بالبلطات السابقة",
-      "التأكد من تسليح البلاطة الواحدة إذا كانت طولية فقط أم طولية وعرضية والمسافة بين الشبكتين",
-      "أن يستمر تسليح البلاطة الواحدة إلى البلاطة المجاورة بمسافة المحذور أقل من الأمام",
-      "التأكد من طول الشلوف في الزوايا كما هي بالمخطط المحذور أقل علياً من الخلف والأمام",
-      "أن يتم تسليح البروزات بشكل كافٍ لتكتمل الأعمال",
+    { section: "سقف الأرضي - الإنشائي", items: [
+      "الجسور بالمقاسات المذكورة والتسليح العلوي والسفلي",
+      "التسليح السفلي للجسور مربوط بالكفايات كل 1م",
+      "الشبكات السفلية والعلوية للبلاطة حسب المخطط",
+      "الكفايات ومربوطة جيداً وبالعدد المطلوب",
+      "تفصيلة الكفات (مزدوجة أو فردية) حسب الكاشف",
+      "تسليح البلاطة الواحدة طولية وعرضية بالمسافات الصحيحة",
+      "استمرار تسليح البلاطة إلى البلاطة المجاورة بمسافة المحذور",
+    ], hasMEP: true },
+    { section: "الصحي والكهرباء في السقف", items: [
+      "مواضع بايبات الصرف الصحي حسب المخطط",
+      "ميول بايبات الصرف صحيحة",
+      "مواضع بايبات الكهرباء (Conduit) حسب المخطط",
+      "تثبيت البايبات جيداً قبل الصب",
+    ]},
+    { section: "البروزات", items: [
+      "مطابقة بروزات الواجهات للمخطط المعماري",
+      "أبعاد البروزات ومناسيبها صحيحة",
+      "تسليح البروزات كافٍ",
+    ]},
+  ],
+  first_cols: [
+    { section: "أعمدة الأول", items: [
+      "تسليح الأعمدة حسب المخطط (أقطار وعدد)",
+      "أشاير الأعمدة لا تقل عن 75 سم",
+      "الكفايات: العدد والمسافات حسب التفصيل",
+      "التكفيف في أول وآخر ثلث من العمود",
+      "قفل الكفايات لا يقل عن 7 سم في الاتجاهين",
+    ]},
+  ],
+  first_roof: [
+    { section: "سقف الأول - الإنشائي", items: [
+      "الجسور بالمقاسات المذكورة والتسليح العلوي والسفلي",
+      "التسليح السفلي للجسور مربوط بالكفايات كل 1م",
+      "الشبكات السفلية والعلوية للبلاطة حسب المخطط",
+      "الكفايات ومربوطة جيداً وبالعدد المطلوب",
+      "تفصيلة الكفات (مزدوجة أو فردية) حسب الكاشف",
+      "تسليح البلاطة الواحدة بالمسافات الصحيحة",
+    ], hasMEP: true },
+    { section: "الصحي والكهرباء في السقف", items: [
+      "مواضع بايبات الصرف الصحي حسب المخطط",
+      "ميول بايبات الصرف صحيحة",
+      "مواضع بايبات الكهرباء (Conduit) حسب المخطط",
+      "تثبيت البايبات جيداً قبل الصب",
+    ]},
+    { section: "البروزات", items: [
+      "مطابقة بروزات الواجهات للمخطط المعماري",
+      "أبعاد البروزات ومناسيبها صحيحة",
+      "تسليح البروزات كافٍ",
+    ]},
+  ],
+  second_cols: [
+    { section: "أعمدة الثاني", items: [
+      "تسليح الأعمدة حسب المخطط (أقطار وعدد)",
+      "أشاير الأعمدة لا تقل عن 75 سم",
+      "الكفايات: العدد والمسافات حسب التفصيل",
+      "التكفيف في أول وآخر ثلث من العمود",
+      "قفل الكفايات لا يقل عن 7 سم في الاتجاهين",
+    ]},
+  ],
+  second_roof: [
+    { section: "سقف الثاني - الإنشائي", items: [
+      "الجسور بالمقاسات المذكورة والتسليح العلوي والسفلي",
+      "التسليح السفلي للجسور مربوط بالكفايات كل 1م",
+      "الشبكات السفلية والعلوية للبلاطة حسب المخطط",
+      "الكفايات ومربوطة جيداً وبالعدد المطلوب",
+      "تفصيلة الكفات (مزدوجة أو فردية) حسب الكاشف",
+    ], hasMEP: true },
+    { section: "الصحي والكهرباء في السقف", items: [
+      "مواضع بايبات الصرف الصحي حسب المخطط",
+      "ميول بايبات الصرف صحيحة",
+      "مواضع بايبات الكهرباء (Conduit) حسب المخطط",
+      "تثبيت البايبات جيداً قبل الصب",
+    ]},
+    { section: "البروزات", items: [
+      "مطابقة بروزات الواجهات للمخطط المعماري",
+      "أبعاد البروزات ومناسيبها صحيحة",
+      "تسليح البروزات كافٍ",
+    ]},
+  ],
+  service_cols: [
+    { section: "أعمدة سطح الخدمات", items: [
+      "تسليح الأعمدة حسب المخطط (أقطار وعدد)",
+      "أشاير الأعمدة لا تقل عن 75 سم",
+      "الكفايات: العدد والمسافات حسب التفصيل",
+      "قفل الكفايات لا يقل عن 7 سم في الاتجاهين",
+    ]},
+  ],
+  service_roof: [
+    { section: "سقف سطح الخدمات - الإنشائي", items: [
+      "الجسور بالمقاسات المذكورة والتسليح العلوي والسفلي",
+      "الشبكات السفلية والعلوية للبلاطة حسب المخطط",
+      "الكفايات ومربوطة جيداً وبالعدد المطلوب",
+    ], hasMEP: true },
+    { section: "الصحي والكهرباء في السقف", items: [
+      "مواضع بايبات الصرف الصحي حسب المخطط",
+      "ميول بايبات الصرف صحيحة",
+      "مواضع بايبات الكهرباء (Conduit) حسب المخطط",
+      "تثبيت البايبات جيداً قبل الصب",
+    ]},
+    { section: "البروزات", items: [
+      "مطابقة بروزات الواجهات للمخطط المعماري",
+      "أبعاد البروزات ومناسيبها صحيحة",
+      "تسليح البروزات كافٍ",
     ]},
   ],
 };
 
-// الجك ليست الافتراضية لجميع المراحل
-const DEFAULT_CHECKLIST = [
-  { section: "العناصر الإنشائية", items: ["التأكد من مطابقة الأبعاد للمخطط", "التأكد من التسليح حسب المخطط الإنشائي", "التأكد من الكفايات والتربيط"] },
-  { section: "الكهرباء", items: ["التأكد من مواضع البايبات الكهربائية", "التأكد من الأقطار المطلوبة", "التأكد من التثبيت الجيد قبل الصب"] },
-  { section: "بايبات الصحي", items: ["التأكد من مواضع بايبات الصرف", "التأكد من الميول الصحيحة", "التأكد من الأقطار المطلوبة"] },
-  { section: "بروزات الواجهات", items: ["التأكد من مطابقة بروزات الواجهات للمخطط المعماري", "التأكد من الأبعاد والمناسيب"] },
+// الجك ليست الافتراضية للمراحل غير المعرّفة
+const DEFAULT_STAGE_CHECKLIST = [
+  { section: "العناصر الإنشائية", items: [
+    "التأكد من مطابقة الأبعاد للمخطط",
+    "التأكد من التسليح حسب المخطط الإنشائي",
+    "التأكد من الكفايات والتربيط",
+  ]},
 ];
+
+// حساب إحصائيات الجك ليست من checklistData JSON
+function parseChecklistStats(checklistData: string | undefined) {
+  if (!checklistData) return { total: 0, accepted: 0, rejected: 0, withNotes: 0, pending: 0 };
+  try {
+    const data: Record<string, ItemStatus> = JSON.parse(checklistData);
+    const values = Object.values(data);
+    return {
+      total: values.length,
+      accepted: values.filter(v => v === "accepted").length,
+      rejected: values.filter(v => v === "rejected").length,
+      withNotes: values.filter(v => v === "accepted_with_notes").length,
+      pending: values.filter(v => v === "pending" || !v).length,
+    };
+  } catch { return { total: 0, accepted: 0, rejected: 0, withNotes: 0, pending: 0 }; }
+}
 
 function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
   phase: Phase; project: ProjectData; onClose: () => void;
@@ -1902,65 +2081,135 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
   const createVisit = useCreateSupervisionVisit(project.id);
   const updateVisit = useUpdateSupervisionVisit(project.id);
   const { data: allDocs = [], refetch: refetchDocs } = useDocuments({ projectId: project.id });
-  const [selectedStage, setSelectedStage] = useState<string | null>(null);
+
+  // الحالة الرئيسية: اختيار المرحلة من dropdown
+  const [selectedStageKey, setSelectedStageKey] = useState<string>(SUPERVISION_STAGES[0].key);
+  // الزيارة النشطة (جارية)
   const [activeVisit, setActiveVisit] = useState<SupervisionVisit | null>(null);
-  const [showNewVisit, setShowNewVisit] = useState(false);
-  const [newVisitStage, setNewVisitStage] = useState(SUPERVISION_STAGES[0].key);
-  const [newVisitNotes, setNewVisitNotes] = useState("");
-  const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
+  // حالة بنود الجك ليست: Record<"sIdx-iIdx", ItemStatus>
+  const [checklistState, setChecklistState] = useState<Record<string, ItemStatus>>({});
+  // ملاحظات الزيارة
+  const [visitNotes, setVisitNotes] = useState("");
+  const [engineerName, setEngineerName] = useState("");
+  const [contractorName, setContractorName] = useState("");
+  const [licenseNumber, setLicenseNumber] = useState("");
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [showStartForm, setShowStartForm] = useState(false);
 
-  const supervisionDocs = allDocs.filter(d => d.category?.includes("إشراف") || d.category?.includes("زيارة"));
+  // المخططات المعتمدة (مرفوعة مسبقاً من المعماري)
+  const technicalDocs = allDocs.filter(d =>
+    d.category?.includes("ملف فني") ||
+    d.category?.includes("مخطط معتمد") ||
+    d.category?.includes("إشراف")
+  );
 
-  const startNewVisit = () => {
+  // زيارات المرحلة المختارة
+  const stageVisits = visits.filter(v => v.stageKey === selectedStageKey);
+  const stageCompleted = stageVisits.some(v => v.visitStatus === "completed" || v.visitStatus === "approved");
+  const stageInProgress = stageVisits.find(v => v.visitStatus === "in_progress" || v.visitStatus === "draft");
+
+  // بنود الجك ليست للمرحلة المختارة
+  const checklistSections = STAGE_CHECKLIST[selectedStageKey] || DEFAULT_STAGE_CHECKLIST;
+  const totalItems = checklistSections.reduce((sum, s) => sum + s.items.length, 0);
+  const acceptedItems = Object.values(checklistState).filter(v => v === "accepted").length;
+  const rejectedItems = Object.values(checklistState).filter(v => v === "rejected").length;
+  const withNotesItems = Object.values(checklistState).filter(v => v === "accepted_with_notes").length;
+
+  // عند اختيار مرحلة جديدة: تحميل الزيارة الجارية إن وجدت
+  const handleStageChange = (key: string) => {
+    setSelectedStageKey(key);
+    setActiveVisit(null);
+    setChecklistState({});
+    setShowStartForm(false);
+    const inProgress = visits.find(v => v.stageKey === key && (v.visitStatus === "in_progress" || v.visitStatus === "draft"));
+    if (inProgress) {
+      setActiveVisit(inProgress);
+      try {
+        const parsed: Record<string, ItemStatus> = JSON.parse(inProgress.checklistData || "{}");
+        setChecklistState(parsed);
+      } catch {}
+      setEngineerName(inProgress.engineerName || "");
+      setContractorName(inProgress.contractorName || "");
+      setLicenseNumber(inProgress.licenseNumber || "");
+      setVisitNotes(inProgress.generalNotes || "");
+    }
+  };
+
+  // بدء زيارة جديدة
+  const startVisit = () => {
+    const stage = SUPERVISION_STAGES.find(s => s.key === selectedStageKey);
+    // تهيئة الجك ليست بـ pending
+    const initChecklist: Record<string, ItemStatus> = {};
+    checklistSections.forEach((sec, sIdx) => {
+      sec.items.forEach((_, iIdx) => {
+        initChecklist[`${sIdx}-${iIdx}`] = "pending";
+      });
+    });
     createVisit.mutate({
-      constructionStage: SUPERVISION_STAGES.find(s => s.key === newVisitStage)?.label || newVisitStage,
-      stageKey: newVisitStage,
+      constructionStage: stage?.label || selectedStageKey,
+      stageKey: selectedStageKey,
       visitDate: new Date().toISOString().split("T")[0],
-      generalNotes: newVisitNotes,
       visitStatus: "in_progress",
-      checklistData: "{}",
+      engineerName,
+      contractorName,
+      licenseNumber,
+      generalNotes: visitNotes,
+      checklistData: JSON.stringify(initChecklist),
     }, {
       onSuccess: (visit: unknown) => {
-        toast.success("تم إنشاء الزيارة ✓");
-        setActiveVisit(visit as SupervisionVisit);
-        setShowNewVisit(false);
-        setNewVisitNotes("");
-        setChecklistState({});
+        toast.success("تم بدء الزيارة ✓");
+        const v = visit as SupervisionVisit;
+        setActiveVisit(v);
+        setChecklistState(initChecklist);
+        setShowStartForm(false);
       },
     });
   };
 
-  const toggleCheckItem = (sectionIdx: number, itemIdx: number) => {
-    const key = `${sectionIdx}-${itemIdx}`;
-    setChecklistState(prev => ({ ...prev, [key]: !prev[key] }));
+  // تغيير حالة بند في الجك ليست (دوري: pending → accepted → rejected → accepted_with_notes → pending)
+  const cycleItemStatus = (sIdx: number, iIdx: number) => {
+    const key = `${sIdx}-${iIdx}`;
+    const current = checklistState[key] || "pending";
+    const cycle: ItemStatus[] = ["pending", "accepted", "rejected", "accepted_with_notes"];
+    const next = cycle[(cycle.indexOf(current) + 1) % cycle.length];
+    setChecklistState(prev => ({ ...prev, [key]: next }));
   };
 
+  // حفظ الجك ليست
   const saveChecklist = () => {
-    if (!activeVisit) return;
-    updateVisit.mutate({ id: activeVisit.id!, checklistData: JSON.stringify(checklistState) }, {
-      onSuccess: () => toast.success("تم حفظ الجك ليست ✓"),
+    if (!activeVisit?.id) return;
+    updateVisit.mutate({
+      id: activeVisit.id,
+      checklistData: JSON.stringify(checklistState),
+      engineerName,
+      contractorName,
+      licenseNumber,
+      generalNotes: visitNotes,
+    }, {
+      onSuccess: () => toast.success("تم الحفظ ✓"),
     });
   };
 
+  // إنهاء الزيارة وتوليد PDF
   const completeVisit = async () => {
-    if (!activeVisit) return;
+    if (!activeVisit?.id) return;
     setGeneratingPdf(true);
     try {
-      await updateVisit.mutateAsync({ id: activeVisit.id!, visitStatus: "completed", checklistData: JSON.stringify(checklistState) });
-      toast.success("تم إنهاء الزيارة ✓ — جارٍ توليد PDF...");
-      // توليد PDF عبر endpoint
-      const res = await fetch(`/api/supervision/visits/${activeVisit.id}/pdf`, { method: "POST" });
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `تقرير_زيارة_${activeVisit.constructionStage}_${new Date().toLocaleDateString("ar-KW")}.pdf`;
-        a.click();
-        toast.success("تم تحميل تقرير الزيارة ✓");
-      }
+      await updateVisit.mutateAsync({
+        id: activeVisit.id,
+        visitStatus: "completed",
+        checklistData: JSON.stringify(checklistState),
+        engineerName,
+        contractorName,
+        licenseNumber,
+        generalNotes: visitNotes,
+      });
+      toast.success("تم إنهاء الزيارة ✓");
+      // فتح PDF في نافذة جديدة للطباعة
+      const win = window.open(`/api/supervision/visits/${activeVisit.id}/pdf`, "_blank");
+      if (win) setTimeout(() => win.print(), 1000);
       setActiveVisit(null);
+      setChecklistState({});
       refetchVisits();
     } catch {
       toast.error("حدث خطأ أثناء إنهاء الزيارة");
@@ -1969,238 +2218,339 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
     }
   };
 
-  const stageVisits = (stageKey: string) => visits.filter(v => v.stageKey === stageKey || v.constructionStage === (SUPERVISION_STAGES.find(s => s.key === stageKey)?.label || stageKey));
-  const stageCompleted = (stageKey: string) => stageVisits(stageKey).some(v => v.visitStatus === "completed");
-
-  const checklistItems: { section: string; items: string[] }[] = activeVisit
-    ? (CHECKLIST_ITEMS[activeVisit.stageKey ?? activeVisit.constructionStage ?? ""] || DEFAULT_CHECKLIST)
-    : [];
-  const totalItems = checklistItems.reduce((sum: number, s: { section: string; items: string[] }) => sum + s.items.length, 0);
-  const checkedItems = Object.values(checklistState).filter(Boolean).length;
+  // إحصائيات عامة
+  const completedStages = SUPERVISION_STAGES.filter(s =>
+    visits.some(v => v.stageKey === s.key && (v.visitStatus === "completed" || v.visitStatus === "approved"))
+  ).length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" dir="rtl">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-background rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
-        {/* Header */}
+      <div className="relative bg-background rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[92vh]">
+
+        {/* ── Header ── */}
         <div className="p-4 border-b shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: color }}>
-                <ClipboardList className="w-4.5 h-4.5 text-white" />
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: color }}>
+                <ClipboardList className="w-5 h-5 text-white" />
               </div>
               <div>
                 <h3 className="text-base font-bold">الإشراف الهندسي</h3>
                 <p className="text-[11px] text-muted-foreground">
-                  {visits.filter(v => v.visitStatus === "completed").length} زيارة مكتملة من {SUPERVISION_STAGES.length} مرحلة
+                  {completedStages} / {SUPERVISION_STAGES.length} مرحلة مكتملة
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {!activeVisit && (
-                <button
-                  onClick={() => setShowNewVisit(!showNewVisit)}
-                  className="flex items-center gap-1 text-[11px] px-2.5 py-1.5 rounded-lg border font-medium hover:bg-muted/30 transition-colors"
-                >
-                  <Plus className="w-3 h-3" /> زيارة جديدة
-                </button>
-              )}
-              <button onClick={onClose} className="w-7 h-7 rounded-full bg-muted/50 flex items-center justify-center">
-                <X className="w-3.5 h-3.5" />
-              </button>
+            <button onClick={onClose} className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* شريط تقدم المراحل */}
+          <div className="mt-3">
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div className="h-full rounded-full transition-all"
+                style={{ width: `${(completedStages / SUPERVISION_STAGES.length) * 100}%`, background: color }} />
             </div>
           </div>
         </div>
 
-        <div className="overflow-y-auto flex-1 p-4 space-y-3">
-          {/* نموذج زيارة جديدة */}
-          {showNewVisit && !activeVisit && (
-            <div className="rounded-xl border p-3 space-y-2 bg-muted/10">
-              <p className="text-xs font-bold">زيارة إشراف جديدة</p>
-              <select
-                value={newVisitStage}
-                onChange={e => setNewVisitStage(e.target.value)}
-                className="w-full text-xs border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1"
-              >
-                {SUPERVISION_STAGES.map(s => (
-                  <option key={s.key} value={s.key}>
-                    {stageCompleted(s.key) ? "✓ " : ""}{s.label}
-                  </option>
-                ))}
-              </select>
-              <textarea
-                value={newVisitNotes}
-                onChange={e => setNewVisitNotes(e.target.value)}
-                placeholder="ملاحظات الزيارة (اختياري)"
-                rows={2}
-                className="w-full text-xs border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1 resize-none"
-              />
+        <div className="overflow-y-auto flex-1 p-4 space-y-4">
+
+          {/* ── Dropdown اختيار المرحلة ── */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">مرحلة الإشراف</label>
+            <select
+              value={selectedStageKey}
+              onChange={e => handleStageChange(e.target.value)}
+              className="w-full text-sm border rounded-xl px-3 py-2.5 bg-background focus:outline-none focus:ring-2 font-medium"
+              style={{ borderColor: `color-mix(in oklch, ${color} 40%, transparent)` }}
+            >
+              {(() => {
+                const groups = [...new Set(SUPERVISION_STAGES.map(s => s.group))];
+                return groups.map(group => (
+                  <optgroup key={group} label={group}>
+                    {SUPERVISION_STAGES.filter(s => s.group === group).map(s => {
+                      const sv = visits.filter(v => v.stageKey === s.key);
+                      const done = sv.some(v => v.visitStatus === "completed" || v.visitStatus === "approved");
+                      const inProg = sv.some(v => v.visitStatus === "in_progress" || v.visitStatus === "draft");
+                      const prefix = done ? "✓ " : inProg ? "⏳ " : "";
+                      return <option key={s.key} value={s.key}>{prefix}{s.label}</option>;
+                    })}
+                  </optgroup>
+                ));
+              })()}
+            </select>
+          </div>
+
+          {/* ── حالة المرحلة المختارة ── */}
+          <div className="rounded-xl border overflow-hidden">
+            <div className="px-3 py-2.5 flex items-center justify-between border-b"
+              style={{ background: `color-mix(in oklch, ${color} 8%, transparent)` }}>
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                  style={{ background: stageCompleted ? "oklch(0.55 0.15 150)" : stageInProgress ? color : "oklch(0.75 0 0)" }}>
+                  {stageCompleted ? "✓" : stageInProgress ? "⏳" : "○"}
+                </div>
+                <span className="text-sm font-semibold">
+                  {SUPERVISION_STAGES.find(s => s.key === selectedStageKey)?.label}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {stageCompleted && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                    style={{ background: "oklch(0.55 0.15 150 / 0.15)", color: "oklch(0.45 0.15 150)" }}>
+                    مكتملة
+                  </span>
+                )}
+                {stageInProgress && !activeVisit && (
+                  <button
+                    onClick={() => handleStageChange(selectedStageKey)}
+                    className="text-[11px] px-2.5 py-1 rounded-lg font-semibold text-white"
+                    style={{ background: color }}
+                  >
+                    متابعة الزيارة
+                  </button>
+                )}
+                {!stageInProgress && !stageCompleted && !showStartForm && (
+                  <button
+                    onClick={() => setShowStartForm(true)}
+                    className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg font-semibold text-white"
+                    style={{ background: color }}
+                  >
+                    <Plus className="w-3 h-3" /> بدء زيارة
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* إحصائيات الزيارات السابقة للمرحلة */}
+            {stageVisits.length > 0 && (
+              <div className="divide-y">
+                {stageVisits.map(v => {
+                  const stats = parseChecklistStats(v.checklistData);
+                  return (
+                    <div key={v.id} className="px-3 py-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground">زيارة #{v.visitNumber}</span>
+                        <span className="text-[10px] text-muted-foreground">{v.visitDate}</span>
+                        {v.engineerName && <span className="text-[10px] text-muted-foreground">م. {v.engineerName}</span>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {stats.total > 0 && (
+                          <div className="flex gap-1 text-[10px]">
+                            <span style={{ color: "#16a34a" }}>{stats.accepted}✓</span>
+                            <span style={{ color: "#dc2626" }}>{stats.rejected}✗</span>
+                            <span style={{ color: "#d97706" }}>{stats.withNotes}⚠</span>
+                          </div>
+                        )}
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                          style={{
+                            background: v.visitStatus === "completed" ? "oklch(0.55 0.15 150 / 0.15)" : "oklch(0.55 0.15 250 / 0.15)",
+                            color: v.visitStatus === "completed" ? "oklch(0.45 0.15 150)" : "oklch(0.45 0.15 250)"
+                          }}>
+                          {v.visitStatus === "completed" ? "مكتملة" : "جارية"}
+                        </span>
+                        <button
+                          onClick={async () => {
+                            const win = window.open(`/api/supervision/visits/${v.id}/pdf`, "_blank");
+                            if (win) setTimeout(() => win.print(), 1000);
+                          }}
+                          className="text-[10px] flex items-center gap-0.5 px-2 py-0.5 rounded border hover:bg-muted/30"
+                        >
+                          <Download className="w-3 h-3" /> PDF
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ── نموذج بدء زيارة جديدة ── */}
+          {showStartForm && !activeVisit && (
+            <div className="rounded-xl border p-3 space-y-3 bg-muted/10">
+              <p className="text-xs font-bold">بيانات الزيارة</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-muted-foreground mb-1 block">المهندس المشرف</label>
+                  <input value={engineerName} onChange={e => setEngineerName(e.target.value)}
+                    placeholder="اسم المهندس"
+                    className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground mb-1 block">المقاول</label>
+                  <input value={contractorName} onChange={e => setContractorName(e.target.value)}
+                    placeholder="اسم المقاول"
+                    className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground mb-1 block">رقم الرخصة</label>
+                  <input value={licenseNumber} onChange={e => setLicenseNumber(e.target.value)}
+                    placeholder="رقم رخصة البناء"
+                    className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground mb-1 block">ملاحظات</label>
+                  <input value={visitNotes} onChange={e => setVisitNotes(e.target.value)}
+                    placeholder="ملاحظات الزيارة"
+                    className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                </div>
+              </div>
               <div className="flex gap-2">
-                <button
-                  onClick={startNewVisit}
-                  disabled={createVisit.isPending}
-                  className="flex-1 h-8 rounded-lg text-xs font-semibold text-white"
-                  style={{ background: color }}
-                >
-                  بدء الزيارة
+                <button onClick={startVisit} disabled={createVisit.isPending}
+                  className="flex-1 h-9 rounded-lg text-xs font-semibold text-white"
+                  style={{ background: color }}>
+                  {createVisit.isPending ? "جاري..." : "بدء الزيارة والجك ليست"}
                 </button>
-                <button onClick={() => setShowNewVisit(false)} className="flex-1 h-8 rounded-lg text-xs font-semibold border hover:bg-muted/30">إلغاء</button>
+                <button onClick={() => setShowStartForm(false)}
+                  className="flex-1 h-9 rounded-lg text-xs font-semibold border hover:bg-muted/30">
+                  إلغاء
+                </button>
               </div>
             </div>
           )}
 
-          {/* الجك ليست للزيارة النشطة */}
+          {/* ── الجك ليست للزيارة النشطة ── */}
           {activeVisit && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold">{activeVisit.constructionStage}</p>
-                  <p className="text-[10px] text-muted-foreground">{checkedItems}/{totalItems} بند مكتمل</p>
+              {/* شريط التقدم والإحصائيات */}
+              <div className="rounded-xl border p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold">قائمة التدقيق</p>
+                  <div className="flex gap-3 text-[11px]">
+                    <span style={{ color: "#16a34a" }} className="font-semibold">{acceptedItems} مقبول</span>
+                    <span style={{ color: "#dc2626" }} className="font-semibold">{rejectedItems} مرفوض</span>
+                    <span style={{ color: "#d97706" }} className="font-semibold">{withNotesItems} بملاحظات</span>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={saveChecklist} className="text-[11px] px-2.5 py-1.5 rounded-lg border font-medium hover:bg-muted/30">
-                    حفظ
-                  </button>
-                  <button
-                    onClick={completeVisit}
-                    disabled={generatingPdf}
-                    className="flex items-center gap-1 text-[11px] px-2.5 py-1.5 rounded-lg font-semibold text-white"
-                    style={{ background: "oklch(0.55 0.15 150)" }}
-                  >
-                    {generatingPdf ? <><Clock className="w-3 h-3 animate-spin" /> جارٍ...</> : <><CheckCircle2 className="w-3 h-3" /> إنهاء وتوليد PDF</>}
-                  </button>
+                <div className="h-2 rounded-full bg-muted overflow-hidden flex gap-0.5">
+                  <div className="h-full transition-all" style={{ width: `${totalItems > 0 ? (acceptedItems / totalItems) * 100 : 0}%`, background: "#16a34a" }} />
+                  <div className="h-full transition-all" style={{ width: `${totalItems > 0 ? (withNotesItems / totalItems) * 100 : 0}%`, background: "#d97706" }} />
+                  <div className="h-full transition-all" style={{ width: `${totalItems > 0 ? (rejectedItems / totalItems) * 100 : 0}%`, background: "#dc2626" }} />
                 </div>
+                <p className="text-[10px] text-muted-foreground text-center">
+                  اضغط على كل بند لتغيير حالته: مقبول ✓ / مرفوض ✗ / مقبول بعد ملاحظات ⚠
+                </p>
               </div>
-              {/* شريط التقدم */}
-              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${totalItems > 0 ? (checkedItems / totalItems) * 100 : 0}%`, background: color }} />
-              </div>
+
               {/* بنود الجك ليست */}
-              {checklistItems.map((section: { section: string; items: string[] }, sIdx: number) => (
+              {checklistSections.map((section, sIdx) => (
                 <div key={sIdx} className="rounded-xl border overflow-hidden">
-                  <div className="px-3 py-2 border-b" style={{ background: `color-mix(in oklch, ${color} 8%, transparent)` }}>
-                    <p className="text-[11px] font-bold">{section.section}</p>
+                  <div className="px-3 py-2 border-b flex items-center gap-2"
+                    style={{ background: `color-mix(in oklch, ${color} 8%, transparent)` }}>
+                    <p className="text-[11px] font-bold flex-1">{section.section}</p>
+                    <span className="text-[10px] text-muted-foreground">
+                      {section.items.filter((_, iIdx) => checklistState[`${sIdx}-${iIdx}`] === "accepted").length}/{section.items.length}
+                    </span>
                   </div>
                   <div className="divide-y">
-                    {section.items.map((item: string, iIdx: number) => {
+                    {section.items.map((item, iIdx) => {
                       const key = `${sIdx}-${iIdx}`;
-                      const checked = checklistState[key] || false;
+                      const status: ItemStatus = checklistState[key] || "pending";
+                      const cfg = ITEM_STATUS_CONFIG[status];
                       return (
                         <button
                           key={iIdx}
-                          onClick={() => toggleCheckItem(sIdx, iIdx)}
-                          className="w-full flex items-start gap-2.5 px-3 py-2 text-right hover:bg-muted/20 transition-colors"
+                          onClick={() => cycleItemStatus(sIdx, iIdx)}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-right hover:bg-muted/10 transition-colors"
                         >
-                          <div className="w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors"
-                            style={{ borderColor: checked ? color : undefined, background: checked ? color : undefined }}>
-                            {checked && <Check className="w-2.5 h-2.5 text-white" />}
+                          {/* مؤشر الحالة */}
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm font-bold transition-all"
+                            style={{ background: cfg.bg, color: cfg.color, border: `1.5px solid ${cfg.color}` }}>
+                            {cfg.short}
                           </div>
-                          <p className="text-[11px] leading-relaxed text-right">{item}</p>
+                          <p className="text-[11px] leading-relaxed text-right flex-1">{item}</p>
+                          {/* شارة الحالة */}
+                          {status !== "pending" && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-medium"
+                              style={{ background: cfg.bg, color: cfg.color }}>
+                              {cfg.label}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
                   </div>
                 </div>
               ))}
+
+              {/* بيانات الزيارة (قابلة للتعديل) */}
+              <div className="rounded-xl border p-3 space-y-2">
+                <p className="text-xs font-bold">بيانات الزيارة</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={engineerName} onChange={e => setEngineerName(e.target.value)}
+                    placeholder="المهندس المشرف"
+                    className="text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                  <input value={contractorName} onChange={e => setContractorName(e.target.value)}
+                    placeholder="المقاول"
+                    className="text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                  <input value={licenseNumber} onChange={e => setLicenseNumber(e.target.value)}
+                    placeholder="رقم الرخصة"
+                    className="text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                  <input value={visitNotes} onChange={e => setVisitNotes(e.target.value)}
+                    placeholder="ملاحظات"
+                    className="text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                </div>
+              </div>
+
               {/* رفع صور الزيارة */}
               <div className="rounded-xl border-2 border-dashed p-3 space-y-2">
                 <p className="text-xs font-bold">صور الزيارة</p>
-                <FileUploadButton
-                  label="رفع صورة"
-                  category="إشراف - صور زيارة"
-                  projectId={project.id}
-                  clientId={project.clientId}
-                  onUploaded={() => refetchDocs()}
-                />
+                <FileUploadButton label="رفع صورة" category="إشراف - صور زيارة"
+                  projectId={project.id} clientId={project.clientId} onUploaded={() => refetchDocs()} />
+              </div>
+
+              {/* أزرار الحفظ والإنهاء */}
+              <div className="flex gap-2 sticky bottom-0 bg-background pt-2 pb-1">
+                <button onClick={saveChecklist} disabled={updateVisit.isPending}
+                  className="flex-1 h-10 rounded-xl text-sm font-semibold border hover:bg-muted/30 transition-colors">
+                  حفظ التقدم
+                </button>
+                <button onClick={completeVisit} disabled={generatingPdf}
+                  className="flex-1 h-10 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2"
+                  style={{ background: "oklch(0.55 0.15 150)" }}>
+                  {generatingPdf
+                    ? <><Clock className="w-4 h-4 animate-spin" /> جارٍ...</>
+                    : <><CheckCircle2 className="w-4 h-4" /> إنهاء وطباعة التقرير</>
+                  }
+                </button>
               </div>
             </div>
           )}
 
-          {/* قائمة المراحل والزيارات السابقة */}
-          {!activeVisit && (
-            <div className="space-y-2">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">مراحل الإشراف</p>
-              {SUPERVISION_STAGES.map(stage => {
-                const sv = stageVisits(stage.key);
-                const completed = stageCompleted(stage.key);
-                return (
-                  <div key={stage.key} className="rounded-xl border overflow-hidden">
-                    <button
-                      onClick={() => setSelectedStage(selectedStage === stage.key ? null : stage.key)}
-                      className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-muted/20 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full flex items-center justify-center"
-                          style={{ background: completed ? "oklch(0.55 0.15 150)" : "oklch(0.85 0.00 0)" }}>
-                          {completed ? <Check className="w-3 h-3 text-white" /> : <Circle className="w-3 h-3 text-muted-foreground" />}
-                        </div>
-                        <p className="text-xs font-medium">{stage.label}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {sv.length > 0 && <span className="text-[10px] text-muted-foreground">{sv.length} زيارة</span>}
-                        <ChevronRight className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${selectedStage === stage.key ? "rotate-90" : ""}`} />
-                      </div>
-                    </button>
-                    {selectedStage === stage.key && sv.length > 0 && (
-                      <div className="border-t divide-y bg-muted/10">
-                        {sv.map(visit => (
-                          <div key={visit.id} className="px-3 py-2 flex items-center justify-between">
-                            <div>
-                              <p className="text-[11px] font-medium">{visit.visitDate}</p>
-                              {visit.visitNotes && <p className="text-[10px] text-muted-foreground truncate max-w-[200px]">{visit.visitNotes}</p>}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                                style={{ background: visit.visitStatus === "completed" ? "oklch(0.55 0.15 150 / 0.15)" : "oklch(0.55 0.15 250 / 0.15)", color: visit.visitStatus === "completed" ? "oklch(0.45 0.15 150)" : "oklch(0.45 0.15 250)" }}>
-                                {visit.visitStatus === "completed" ? "مكتملة" : "جارية"}
-                              </span>
-                              {visit.visitStatus === "completed" && (
-                                <button
-                                  onClick={async () => {
-                                    const res = await fetch(`/api/supervision/visits/${visit.id}/pdf`, { method: "POST" });
-                                    if (res.ok) {
-                                      const blob = await res.blob();
-                                      const url = URL.createObjectURL(blob);
-                                      const a = document.createElement("a");
-                                      a.href = url;
-                                      a.download = `تقرير_${visit.constructionStage}.pdf`;
-                                      a.click();
-                                    }
-                                  }}
-                                  className="text-[10px] flex items-center gap-0.5 text-blue-600 hover:underline"
-                                >
-                                  <Download className="w-3 h-3" /> PDF
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+          {/* ── الملف الفني (المخططات المعتمدة) ── */}
+          <div className="rounded-xl border overflow-hidden">
+            <div className="px-3 py-2.5 border-b flex items-center justify-between"
+              style={{ background: "oklch(0.97 0 0)" }}>
+              <div>
+                <p className="text-xs font-bold">الملف الفني المعتمد</p>
+                <p className="text-[10px] text-muted-foreground">المخططات يرفعها المهندس المعماري بعد المراجعة</p>
+              </div>
+              <div className="flex gap-1.5">
+                <FileUploadButton label="معماري" category="ملف فني - معماري"
+                  projectId={project.id} clientId={project.clientId} onUploaded={() => refetchDocs()} />
+                <FileUploadButton label="إنشائي" category="ملف فني - إنشائي"
+                  projectId={project.id} clientId={project.clientId} onUploaded={() => refetchDocs()} />
+                <FileUploadButton label="صحي/كهرباء" category="ملف فني - صحي وكهرباء"
+                  projectId={project.id} clientId={project.clientId} onUploaded={() => refetchDocs()} />
+              </div>
             </div>
-          )}
-
-          {/* الملف الفني */}
-          <div className="rounded-xl border p-3 space-y-2">
-            <p className="text-xs font-bold">الملف الفني</p>
-            <p className="text-[10px] text-muted-foreground">جميع المخططات المعتمدة: معماري، إنشائي، صحي، كهرباء</p>
-            <div className="flex flex-wrap gap-2">
-              <FileUploadButton label="مخطط معماري معتمد" category="ملف فني - معماري" projectId={project.id} clientId={project.clientId} onUploaded={() => refetchDocs()} />
-              <FileUploadButton label="مخطط إنشائي معتمد" category="ملف فني - إنشائي" projectId={project.id} clientId={project.clientId} onUploaded={() => refetchDocs()} />
-              <FileUploadButton label="مخطط صحي معتمد" category="ملف فني - صحي" projectId={project.id} clientId={project.clientId} onUploaded={() => refetchDocs()} />
-              <FileUploadButton label="مخطط كهرباء معتمد" category="ملف فني - كهرباء" projectId={project.id} clientId={project.clientId} onUploaded={() => refetchDocs()} />
-            </div>
-            {supervisionDocs.length > 0 && <UploadedFilesList docs={supervisionDocs} onDeleted={() => refetchDocs()} />}
+            {technicalDocs.length > 0
+              ? <UploadedFilesList docs={technicalDocs} onDeleted={() => refetchDocs()} />
+              : <div className="px-3 py-4 text-center text-[11px] text-muted-foreground">
+                  لم يتم رفع مخططات بعد — يرفعها المعماري بعد المراجعة والاعتماد
+                </div>
+            }
           </div>
+
         </div>
       </div>
     </div>
   );
 }
-
 /* ═══════════════════════════════════════════════════════════════════
    SHARED COMPONENTS
    ═══════════════════════════════════════════════════════════════════ */
