@@ -17,8 +17,12 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
-import { useProject, useUpdateTask, useCreateProjectMeeting, useProjectMeetings, useDocuments, useProjectBrief, usePhaseMeta, useUpdatePhaseMeta } from "@/lib/api";
-import type { Document } from "@/lib/api";
+import { useProject, useUpdateTask, useCreateProjectMeeting, useProjectMeetings, useDocuments, useProjectBrief, usePhaseMeta, useUpdatePhaseMeta,
+  useMunicipalitySubmission, useUpdateMunicipality,
+  useDetailedDrawings, useCreateDrawing, useUpdateDrawing,
+  useSupervisionVisits, useCreateSupervisionVisit, useUpdateSupervisionVisit,
+  useEmployees } from "@/lib/api";
+import type { Document, MunicipalitySubmission, DetailedDrawing, SupervisionVisit, EmployeeRecord } from "@/lib/api";
 
 /* ─── Types ─── */
 interface SubTask { name: string; done: boolean; assignee?: string; }
@@ -1366,6 +1370,838 @@ function PhaseMunicipalityPopup({ phase, project, onClose, onTaskUpdate }: {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   Phase 5: تقديم البلدية
+   ═══════════════════════════════════════════════════════════════════ */
+function PhaseMunicipalitySubmissionPopup({ phase, project, onClose, onTaskUpdate }: {
+  phase: Phase; project: ProjectData; onClose: () => void;
+  onTaskUpdate: (taskId: number, status: Task["status"]) => void;
+}) {
+  const color = PHASE_COLORS[4];
+  const { data: muniData } = useMunicipalitySubmission(project.id);
+  const updateMuni = useUpdateMunicipality(project.id);
+  const { data: allDocs = [], refetch: refetchDocs } = useDocuments({ projectId: project.id });
+  const [notes, setNotes] = useState("");
+  const [refNum, setRefNum] = useState("");
+  const [licenseNum, setLicenseNum] = useState("");
+  const [showNewTask, setShowNewTask] = useState(false);
+  const [newTaskName, setNewTaskName] = useState("");
+  const [newTaskAssignee, setNewTaskAssignee] = useState("");
+
+  const muniDocs = allDocs.filter(d => d.category?.includes("بلدية") || d.category?.includes("رخصة"));
+  const status = muniData?.muniStatus || "not_submitted";
+  const statusLabel = status === "license_received" ? "تم استلام الرخصة ✓" : status === "submitted" ? "تم التقديم - قيد المراجعة" : "لم يتم التقديم بعد";
+  const statusColor = status === "license_received" ? "oklch(0.55 0.15 150)" : status === "submitted" ? "oklch(0.55 0.15 250)" : "oklch(0.70 0.00 0)";
+
+  const markSubmitted = () => {
+    updateMuni.mutate({ muniStatus: "submitted", referenceNumber: refNum, notes }, {
+      onSuccess: () => toast.success("تم تسجيل التقديم ✓"),
+    });
+  };
+  const markLicenseReceived = () => {
+    updateMuni.mutate({ muniStatus: "license_received", licenseNumber: licenseNum, notes }, {
+      onSuccess: () => toast.success("تم تسجيل استلام الرخصة ✓"),
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" dir="rtl">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative bg-background rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="p-4 border-b shrink-0 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: color }}>
+                <Upload className="w-4.5 h-4.5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold">تقديم البلدية</h3>
+                <p className="text-[11px] text-muted-foreground">متابعة التقديم واستلام الرخصة</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="w-7 h-7 rounded-full bg-muted/50 flex items-center justify-center">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {/* حالة التقديم */}
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl border" style={{ borderColor: `color-mix(in oklch, ${statusColor} 30%, transparent)`, background: `color-mix(in oklch, ${statusColor} 8%, transparent)` }}>
+            <div className="w-2 h-2 rounded-full" style={{ background: statusColor }} />
+            <span className="text-xs font-semibold" style={{ color: statusColor }}>{statusLabel}</span>
+          </div>
+        </div>
+        {/* Content */}
+        <div className="overflow-y-auto flex-1 p-4 space-y-4">
+          {/* الخطوة 1: تسجيل التقديم */}
+          <div className="rounded-xl border p-3 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: status !== "not_submitted" ? "oklch(0.55 0.15 150)" : color }}>
+                {status !== "not_submitted" ? "✓" : "1"}
+              </div>
+              <p className="text-xs font-bold">تسجيل التقديم</p>
+            </div>
+            {status === "not_submitted" && (
+              <div className="space-y-2">
+                <input
+                  value={refNum}
+                  onChange={e => setRefNum(e.target.value)}
+                  placeholder="رقم المرجع / رقم الطلب (اختياري)"
+                  className="w-full text-xs border rounded-lg px-3 py-2 bg-muted/20 focus:outline-none focus:ring-1"
+                />
+                <button
+                  onClick={markSubmitted}
+                  disabled={updateMuni.isPending}
+                  className="w-full h-9 rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-2"
+                  style={{ background: color }}
+                >
+                  <Check className="w-3.5 h-3.5" /> تم التقديم
+                </button>
+              </div>
+            )}
+            {status !== "not_submitted" && muniData?.referenceNumber && (
+              <p className="text-[11px] text-muted-foreground">رقم المرجع: <span className="font-medium text-foreground">{muniData.referenceNumber}</span></p>
+            )}
+          </div>
+
+          {/* الخطوة 2: استلام الرخصة */}
+          <div className="rounded-xl border p-3 space-y-3" style={{ opacity: status === "not_submitted" ? 0.5 : 1 }}>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: status === "license_received" ? "oklch(0.55 0.15 150)" : "oklch(0.70 0.00 0)" }}>
+                {status === "license_received" ? "✓" : "2"}
+              </div>
+              <p className="text-xs font-bold">استلام الرخصة</p>
+            </div>
+            {status === "submitted" && (
+              <div className="space-y-2">
+                <input
+                  value={licenseNum}
+                  onChange={e => setLicenseNum(e.target.value)}
+                  placeholder="رقم الرخصة"
+                  className="w-full text-xs border rounded-lg px-3 py-2 bg-muted/20 focus:outline-none focus:ring-1"
+                />
+                <button
+                  onClick={markLicenseReceived}
+                  disabled={updateMuni.isPending || !licenseNum}
+                  className="w-full h-9 rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-2"
+                  style={{ background: "oklch(0.55 0.15 150)" }}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" /> تم استلام الرخصة
+                </button>
+              </div>
+            )}
+            {status === "license_received" && muniData?.licenseNumber && (
+              <p className="text-[11px] text-muted-foreground">رقم الرخصة: <span className="font-medium text-foreground">{muniData.licenseNumber}</span></p>
+            )}
+          </div>
+
+          {/* رفع الرخصة والمخطط المعتمد */}
+          <div className="rounded-xl border-2 border-dashed p-3 space-y-2" style={{ borderColor: `color-mix(in oklch, ${color} 30%, transparent)` }}>
+            <p className="text-xs font-bold">رفع الرخصة والمخطط المعتمد</p>
+            <div className="flex flex-wrap gap-2">
+              <FileUploadButton label="رفع الرخصة" category="رخصة بلدية" projectId={project.id} clientId={project.clientId} onUploaded={() => refetchDocs()} />
+              <FileUploadButton label="رفع المخطط المعتمد" category="مخطط بلدية معتمد" projectId={project.id} clientId={project.clientId} onUploaded={() => refetchDocs()} />
+            </div>
+            <UploadedFilesList docs={muniDocs} onDeleted={() => refetchDocs()} />
+          </div>
+
+          {/* ملاحظات */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-bold">ملاحظات</p>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="أي ملاحظات على التقديم أو الرخصة..."
+              rows={3}
+              className="w-full text-xs border rounded-xl px-3 py-2 bg-muted/20 focus:outline-none focus:ring-1 resize-none"
+            />
+            {notes && (
+              <button
+                onClick={() => updateMuni.mutate({ notes }, { onSuccess: () => toast.success("تم حفظ الملاحظات ✓") })}
+                className="text-[11px] px-3 py-1.5 rounded-lg border font-medium hover:bg-muted/30 transition-colors"
+              >
+                حفظ الملاحظات
+              </button>
+            )}
+          </div>
+
+          {/* إضافة مهمة */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold">مهام إضافية</p>
+              <button
+                onClick={() => setShowNewTask(!showNewTask)}
+                className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg border font-medium hover:bg-muted/30 transition-colors"
+              >
+                <Plus className="w-3 h-3" /> إضافة مهمة
+              </button>
+            </div>
+            {showNewTask && (
+              <div className="rounded-xl border p-3 space-y-2 bg-muted/10">
+                <input
+                  value={newTaskName}
+                  onChange={e => setNewTaskName(e.target.value)}
+                  placeholder="اسم المهمة"
+                  className="w-full text-xs border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1"
+                />
+                <input
+                  value={newTaskAssignee}
+                  onChange={e => setNewTaskAssignee(e.target.value)}
+                  placeholder="المسؤول (اختياري)"
+                  className="w-full text-xs border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { if (newTaskName) { toast.success("تم إضافة المهمة ✓"); setNewTaskName(""); setNewTaskAssignee(""); setShowNewTask(false); } }}
+                    className="flex-1 h-8 rounded-lg text-xs font-semibold text-white"
+                    style={{ background: color }}
+                  >
+                    إضافة
+                  </button>
+                  <button onClick={() => setShowNewTask(false)} className="flex-1 h-8 rounded-lg text-xs font-semibold border hover:bg-muted/30">إلغاء</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Phase 6: المخططات التفصيلية
+   ═══════════════════════════════════════════════════════════════════ */
+const DRAWING_TYPES = [
+  { key: "electrical", label: "مخططات الكهرباء", icon: "⚡" },
+  { key: "plumbing", label: "مخططات الصرف الصحي", icon: "🔧" },
+  { key: "furniture", label: "مخطط الفرش", icon: "🪑" },
+  { key: "elec_points", label: "نقاط الكهرباء", icon: "🔌" },
+  { key: "lighting", label: "مخطط الإضاءة", icon: "💡" },
+  { key: "other", label: "مخطط آخر", icon: "📐" },
+];
+
+const DRAWING_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  pending:     { label: "لم يبدأ",    color: "oklch(0.70 0.00 0)" },
+  in_progress: { label: "جارٍ",       color: "oklch(0.55 0.15 250)" },
+  completed:   { label: "منجز",       color: "oklch(0.60 0.12 60)" },
+  approved:    { label: "معتمد ✓",    color: "oklch(0.55 0.15 150)" },
+};
+
+function PhaseDetailedDrawingsPopup({ phase, project, onClose, onTaskUpdate }: {
+  phase: Phase; project: ProjectData; onClose: () => void;
+  onTaskUpdate: (taskId: number, status: Task["status"]) => void;
+}) {
+  const color = PHASE_COLORS[5];
+  const { data: drawings = [], refetch: refetchDrawings } = useDetailedDrawings(project.id);
+  const createDrawing = useCreateDrawing(project.id);
+  const updateDrawing = useUpdateDrawing(project.id);
+  const { data: employees = [] } = useEmployees();
+  const { data: allDocs = [], refetch: refetchDocs } = useDocuments({ projectId: project.id });
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newDrawingType, setNewDrawingType] = useState("electrical");
+  const [newCustomType, setNewCustomType] = useState("");
+  const [newAssignee, setNewAssignee] = useState("");
+
+  const drawingDocs = allDocs.filter(d => d.category?.includes("مخطط تفصيلي") || d.category?.includes("كهرباء") || d.category?.includes("صحي"));
+
+  const addDrawing = () => {
+    const label = newDrawingType === "other" ? newCustomType : (DRAWING_TYPES.find(t => t.key === newDrawingType)?.label || newDrawingType);
+    if (!label) return;
+    createDrawing.mutate({
+      drawingType: label,
+      assignedTo: newAssignee,
+      drawingStatus: "pending",
+      phaseId: phase.id || 0,
+    }, {
+      onSuccess: () => {
+        toast.success("تم إضافة المخطط ✓");
+        setShowAddForm(false);
+        setNewCustomType("");
+        setNewAssignee("");
+      },
+    });
+  };
+
+  const toggleStatus = (drawing: DetailedDrawing) => {
+    const statuses = ["pending", "in_progress", "completed", "approved"] as const;
+    const curr = drawing.drawingStatus || "pending";
+    const next = statuses[(statuses.indexOf(curr as typeof statuses[number]) + 1) % statuses.length];
+    updateDrawing.mutate({ id: drawing.id!, drawingStatus: next }, {
+      onSuccess: () => toast.success("تم تحديث الحالة ✓"),
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" dir="rtl">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative bg-background rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="p-4 border-b shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: color }}>
+                <Pencil className="w-4.5 h-4.5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold">المخططات التفصيلية</h3>
+                <p className="text-[11px] text-muted-foreground">كهرباء • صحي • فرش • إضاءة</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="flex items-center gap-1 text-[11px] px-2.5 py-1.5 rounded-lg border font-medium hover:bg-muted/30 transition-colors"
+              >
+                <Plus className="w-3 h-3" /> إضافة مخطط
+              </button>
+              <button onClick={onClose} className="w-7 h-7 rounded-full bg-muted/50 flex items-center justify-center">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+        {/* Content */}
+        <div className="overflow-y-auto flex-1 p-4 space-y-3">
+          {/* نموذج إضافة مخطط */}
+          {showAddForm && (
+            <div className="rounded-xl border p-3 space-y-2 bg-muted/10">
+              <p className="text-xs font-bold">إضافة مخطط جديد</p>
+              <select
+                value={newDrawingType}
+                onChange={e => setNewDrawingType(e.target.value)}
+                className="w-full text-xs border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1"
+              >
+                {DRAWING_TYPES.map(t => (
+                  <option key={t.key} value={t.key}>{t.icon} {t.label}</option>
+                ))}
+              </select>
+              {newDrawingType === "other" && (
+                <input
+                  value={newCustomType}
+                  onChange={e => setNewCustomType(e.target.value)}
+                  placeholder="اسم المخطط"
+                  className="w-full text-xs border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1"
+                />
+              )}
+              <select
+                value={newAssignee}
+                onChange={e => setNewAssignee(e.target.value)}
+                className="w-full text-xs border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1"
+              >
+                <option value="">-- تعيين مسؤول (اختياري) --</option>
+                {employees.filter(e => e.isActive).map(emp => (
+                  <option key={emp.id} value={emp.name}>{emp.name} - {emp.role}</option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <button
+                  onClick={addDrawing}
+                  disabled={createDrawing.isPending}
+                  className="flex-1 h-8 rounded-lg text-xs font-semibold text-white"
+                  style={{ background: color }}
+                >
+                  إضافة
+                </button>
+                <button onClick={() => setShowAddForm(false)} className="flex-1 h-8 rounded-lg text-xs font-semibold border hover:bg-muted/30">إلغاء</button>
+              </div>
+            </div>
+          )}
+
+          {/* قائمة المخططات */}
+          {drawings.length === 0 && !showAddForm && (
+            <div className="text-center py-8 text-muted-foreground">
+              <Pencil className="w-10 h-10 mx-auto mb-2 opacity-20" />
+              <p className="text-sm">لا توجد مخططات بعد</p>
+              <p className="text-xs mt-1">اضغط "إضافة مخطط" لبدء العمل</p>
+            </div>
+          )}
+          {drawings.map(drawing => {
+            const stCfg = DRAWING_STATUS_CONFIG[drawing.drawingStatus || "pending"];
+            return (
+              <div key={drawing.id} className="rounded-xl border p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style={{ background: `color-mix(in oklch, ${color} 15%, transparent)` }}>
+                      {DRAWING_TYPES.find(t => t.label === drawing.drawingType)?.icon || "📐"}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold">{drawing.drawingType}</p>
+                      {drawing.assignedTo && <p className="text-[10px] text-muted-foreground">المسؤول: {drawing.assignedTo}</p>}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => toggleStatus(drawing)}
+                    className="text-[10px] font-semibold px-2 py-1 rounded-full border transition-colors"
+                    style={{ color: stCfg.color, borderColor: `color-mix(in oklch, ${stCfg.color} 30%, transparent)`, background: `color-mix(in oklch, ${stCfg.color} 8%, transparent)` }}
+                  >
+                    {stCfg.label}
+                  </button>
+                </div>
+                {/* رفع الملف */}
+                <div className="flex items-center gap-2">
+                  <FileUploadButton
+                    label={drawing.fileUrl ? "تحديث الملف" : "رفع الملف"}
+                    category={`مخطط تفصيلي - ${drawing.drawingType}`}
+                    projectId={project.id}
+                    clientId={project.clientId}
+                    onUploaded={(doc) => {
+                      updateDrawing.mutate({ id: drawing.id!, fileUrl: doc.url, drawingStatus: "completed" }, {
+                        onSuccess: () => { toast.success("تم رفع الملف ✓"); refetchDocs(); },
+                      });
+                    }}
+                  />
+                  {drawing.fileUrl && (
+                    <a href={drawing.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[11px] text-blue-600 hover:underline">
+                      <Eye className="w-3 h-3" /> عرض
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* ملفات المخططات المرفوعة */}
+          {drawingDocs.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-muted-foreground mb-2">الملفات المرفوعة</p>
+              <UploadedFilesList docs={drawingDocs} onDeleted={() => refetchDocs()} />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Phase 7: الإشراف
+   ═══════════════════════════════════════════════════════════════════ */
+const SUPERVISION_STAGES = [
+  { key: "excavation",       label: "الحفر واستلام المنسوب والحدود" },
+  { key: "elevator_pit",     label: "بير المصعد والجور المجاري" },
+  { key: "basement_slab",    label: "اللبشة (في حالة السرداب)" },
+  { key: "foundations",      label: "القواعد (بدون السرداب)" },
+  { key: "basement_walls",   label: "حوائط السرداب" },
+  { key: "col_necks",        label: "رقاب الأعمدة (بدون السرداب)" },
+  { key: "beams",            label: "الشناجات" },
+  { key: "reinforced_floor", label: "الأرضية المسلحة" },
+  { key: "basement_cols",    label: "أعمدة السرداب" },
+  { key: "basement_roof",    label: "سقف السرداب" },
+  { key: "ground_cols",      label: "أعمدة الأرضي" },
+  { key: "ground_roof",      label: "سقف الأرضي" },
+  { key: "first_cols",       label: "أعمدة الأول" },
+  { key: "first_roof",       label: "سقف الأول" },
+  { key: "second_cols",      label: "أعمدة الثاني" },
+  { key: "second_roof",      label: "سقف الثاني" },
+  { key: "service_cols",     label: "أعمدة سطح الخدمات" },
+  { key: "service_roof",     label: "سقف سطح الخدمات" },
+];
+
+// بنود الجك ليست حسب مرحلة الإشراف
+const CHECKLIST_ITEMS: Record<string, { section: string; items: string[] }[]> = {
+  foundations: [
+    { section: "بنود استلام القواعد المنفصلة", items: [
+      "التأكد من أماكن القواعد وعددها",
+      "استكمال مقاسات القواعد حسب المخطط المعتمد",
+      "التأكد من مقاسات القواعد حسب المخطط (سواء في المتر أو الحد الصريح للقاعدة كاملة)",
+      "يجب أن تكون نهايات التسليح السفلي بزاوية 1 سواء في الاتجاه الطولي أو القصير",
+      "التأكد من الشبكة السفلية والعلوية إذا كانت مرتبة بشكل جيد في المخطط",
+      "أن تكون الشبكة السفلية والعلوية مرتبة بزاوية 90 ولا يوجد حديد تسليح بدون تربيط",
+      "يجب أن تكون نهايات التسليح العلوي بزاوية 1 سواء في الاتجاه الطولي أو القصير",
+      "التأكد من كفايات رقب الأعمدة داخل القاعدة",
+    ]},
+  ],
+  basement_slab: [
+    { section: "بنود استلام اللبشة", items: [
+      "التأكد من مقاسات القواعد وأماكنها",
+      "تحديد مشرب اللبشة حسب المخطط",
+      "أن تكون الشبكة العلوية مستوية بشكل جيد ولا يوجد فجوات في الارتفاعات",
+      "أن تكون الشبكة السفلية والعلوية مرتبة بشكل جيد",
+    ]},
+  ],
+  col_necks: [
+    { section: "بنود استلام رقاب الأعمدة", items: [
+      "أن تكون أماكن الأعمدة في أماكنها حسب المخطط الإنشائي والتأكد من أكسات الأعمدة",
+      "أن تكون مقاسات الأعمدة قياسية قصص",
+      "أن تكون الرقب كما ذكر في المخطط",
+      "أن تكون الرقب تسليح كما ذكر في المخطط",
+      "أن يتم عقل الكفايات للأعمدة والرقب بالمسافات المطلوبة",
+      "أن يتم عمل الكفايات للأعمدة حسب عدد تسليح الأعمدة والرقب بزاوية 90 داخل القاعدة",
+      "التأكد من ارتفاع رقاب الأعمدة بحديد الصب",
+    ]},
+  ],
+  basement_walls: [
+    { section: "بنود استلام حوائط السرداب", items: [
+      "التأكد من وجود قاعدة شريطية أسفل الحوائط",
+      "أن تخرج تسليح المواطن بالعدد المطلوب من القاعدة الشريطية في اللبشة المسلحة",
+      "ألا يقل ارتفاع التسليح عن خروجها من اللبشة المسلحة عن 75 سم",
+      "أن تخرج الأشاير أعلى رقم الحائط لعمل رقم تسليح الحائط",
+      "أن يتم تسليح الحوائط بحديد رأسي وأفقي في الفي المطلوب بالمخطط",
+    ]},
+  ],
+  beams: [
+    { section: "بنود استلام الشناجات الأرضية", items: [
+      "عمل الشناجات الأرضية بالمقاسات المطلوبة بالمخطط حسب طول كل شناج",
+      "التأكيد على تسليح الشناجات العلوي والسفلي",
+      "أن يكون تسليح الشناجات السفلي مرتبطاً بالكفايات كل 1 متر على الأقل الضمان شلكه في مكانه",
+      "التأكد من وجود كفايات بين حديد الشناجات",
+      "التأكد من عدد الكفايات وتربيطها بشكل جيد",
+    ]},
+  ],
+  reinforced_floor: [
+    { section: "بنود استلام أرضية أرضي (SLAB ON GRADE)", items: [
+      "أن يكون الدفان أسفل البلاطة الأرضية مدكوكاً بشكل جيد",
+      "أن يتم تغطيلون حماية أسفل تسليح البلاطة",
+      "التأكد من تسليح البلاطة الأرضية حسب المخطط وتربيطها بشكل جيد",
+    ]},
+  ],
+  ground_cols: [
+    { section: "بنود استلام الأعمدة", items: [
+      "التأكد من تسليح الأعمدة حسب المخطط",
+      "أن تكون أشاير الأعمدة لا تقل عن 75 سم",
+      "أن تكون كفايات الأعمدة متعددة حسب التفصيل",
+      "التكفيف في أول ثلث وآخر ثلث من العمود",
+      "التأكد من أقل الكفايات",
+      "التأكد من مكان المنفيز ومكانه",
+      "التأكد من الأعمدة المزروعة وتربيطها بشكل جيد داخل الجسور الدملة",
+      "أن تكون نهايات حديد تسليح الأعمدة المزروعة بزاوية 90 وبطول مناسب",
+      "لا يقل قفل الكفايات عن 7 سم في الاتجاهين",
+    ]},
+  ],
+  ground_roof: [
+    { section: "بنود استلام الأسقف", items: [
+      "التأكد من تنفيذ الجسور بالمقاسات المذكورة وتسليحها العلوي والسفلي",
+      "التأكد من تسليح الجسور العلوي وعدم تعارضها مع التصميم الإنشائي",
+      "أن يكون تسليح الجسور السفلي مرتبطاً بالكفايات كل 1 متر على الأقل الضمان شلكه في مكانه",
+      "التأكد من تسليح الشبكات السفلية والعلوية",
+      "التأكد من عدد الكفايات وتربيطها بشكل جيد",
+      "التأكد من تفصيلة الكفات كما في الكاشف (مزدوجة أو فردية)",
+      "لا يقل قفل الكفايات عن 7 سم في الاتجاهين",
+      "التأكد من تسليح البلاطات بالبلطات السابقة",
+      "التأكد من تسليح البلاطة الواحدة إذا كانت طولية فقط أم طولية وعرضية والمسافة بين الشبكتين",
+      "أن يستمر تسليح البلاطة الواحدة إلى البلاطة المجاورة بمسافة المحذور أقل من الأمام",
+      "التأكد من طول الشلوف في الزوايا كما هي بالمخطط المحذور أقل علياً من الخلف والأمام",
+      "أن يتم تسليح البروزات بشكل كافٍ لتكتمل الأعمال",
+    ]},
+  ],
+};
+
+// الجك ليست الافتراضية لجميع المراحل
+const DEFAULT_CHECKLIST = [
+  { section: "العناصر الإنشائية", items: ["التأكد من مطابقة الأبعاد للمخطط", "التأكد من التسليح حسب المخطط الإنشائي", "التأكد من الكفايات والتربيط"] },
+  { section: "الكهرباء", items: ["التأكد من مواضع البايبات الكهربائية", "التأكد من الأقطار المطلوبة", "التأكد من التثبيت الجيد قبل الصب"] },
+  { section: "بايبات الصحي", items: ["التأكد من مواضع بايبات الصرف", "التأكد من الميول الصحيحة", "التأكد من الأقطار المطلوبة"] },
+  { section: "بروزات الواجهات", items: ["التأكد من مطابقة بروزات الواجهات للمخطط المعماري", "التأكد من الأبعاد والمناسيب"] },
+];
+
+function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
+  phase: Phase; project: ProjectData; onClose: () => void;
+  onTaskUpdate: (taskId: number, status: Task["status"]) => void;
+}) {
+  const color = PHASE_COLORS[6];
+  const { data: visits = [], refetch: refetchVisits } = useSupervisionVisits(project.id);
+  const createVisit = useCreateSupervisionVisit(project.id);
+  const updateVisit = useUpdateSupervisionVisit(project.id);
+  const { data: allDocs = [], refetch: refetchDocs } = useDocuments({ projectId: project.id });
+  const [selectedStage, setSelectedStage] = useState<string | null>(null);
+  const [activeVisit, setActiveVisit] = useState<SupervisionVisit | null>(null);
+  const [showNewVisit, setShowNewVisit] = useState(false);
+  const [newVisitStage, setNewVisitStage] = useState(SUPERVISION_STAGES[0].key);
+  const [newVisitNotes, setNewVisitNotes] = useState("");
+  const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  const supervisionDocs = allDocs.filter(d => d.category?.includes("إشراف") || d.category?.includes("زيارة"));
+
+  const startNewVisit = () => {
+    createVisit.mutate({
+      stageKey: newVisitStage,
+      stageLabel: SUPERVISION_STAGES.find(s => s.key === newVisitStage)?.label || newVisitStage,
+      visitDate: new Date().toISOString().split("T")[0],
+      visitNotes: newVisitNotes,
+      visitStatus: "in_progress",
+      checklistData: "{}",
+    }, {
+      onSuccess: (visit: unknown) => {
+        toast.success("تم إنشاء الزيارة ✓");
+        setActiveVisit(visit as SupervisionVisit);
+        setShowNewVisit(false);
+        setNewVisitNotes("");
+        setChecklistState({});
+      },
+    });
+  };
+
+  const toggleCheckItem = (sectionIdx: number, itemIdx: number) => {
+    const key = `${sectionIdx}-${itemIdx}`;
+    setChecklistState(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const saveChecklist = () => {
+    if (!activeVisit) return;
+    updateVisit.mutate({ id: activeVisit.id!, checklistData: JSON.stringify(checklistState) }, {
+      onSuccess: () => toast.success("تم حفظ الجك ليست ✓"),
+    });
+  };
+
+  const completeVisit = async () => {
+    if (!activeVisit) return;
+    setGeneratingPdf(true);
+    try {
+      await updateVisit.mutateAsync({ id: activeVisit.id!, visitStatus: "completed", checklistData: JSON.stringify(checklistState) });
+      toast.success("تم إنهاء الزيارة ✓ — جارٍ توليد PDF...");
+      // توليد PDF عبر endpoint
+      const res = await fetch(`/api/supervision/visits/${activeVisit.id}/pdf`, { method: "POST" });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `تقرير_زيارة_${activeVisit.stageLabel}_${new Date().toLocaleDateString("ar-KW")}.pdf`;
+        a.click();
+        toast.success("تم تحميل تقرير الزيارة ✓");
+      }
+      setActiveVisit(null);
+      refetchVisits();
+    } catch {
+      toast.error("حدث خطأ أثناء إنهاء الزيارة");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const stageVisits = (stageKey: string) => visits.filter(v => v.stageKey === stageKey);
+  const stageCompleted = (stageKey: string) => stageVisits(stageKey).some(v => v.visitStatus === "completed");
+
+  const checklistItems: { section: string; items: string[] }[] = activeVisit
+    ? (CHECKLIST_ITEMS[activeVisit.stageKey ?? ""] || DEFAULT_CHECKLIST)
+    : [];
+  const totalItems = checklistItems.reduce((sum: number, s: { section: string; items: string[] }) => sum + s.items.length, 0);
+  const checkedItems = Object.values(checklistState).filter(Boolean).length;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" dir="rtl">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative bg-background rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="p-4 border-b shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: color }}>
+                <ClipboardList className="w-4.5 h-4.5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold">الإشراف الهندسي</h3>
+                <p className="text-[11px] text-muted-foreground">
+                  {visits.filter(v => v.visitStatus === "completed").length} زيارة مكتملة من {SUPERVISION_STAGES.length} مرحلة
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {!activeVisit && (
+                <button
+                  onClick={() => setShowNewVisit(!showNewVisit)}
+                  className="flex items-center gap-1 text-[11px] px-2.5 py-1.5 rounded-lg border font-medium hover:bg-muted/30 transition-colors"
+                >
+                  <Plus className="w-3 h-3" /> زيارة جديدة
+                </button>
+              )}
+              <button onClick={onClose} className="w-7 h-7 rounded-full bg-muted/50 flex items-center justify-center">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-4 space-y-3">
+          {/* نموذج زيارة جديدة */}
+          {showNewVisit && !activeVisit && (
+            <div className="rounded-xl border p-3 space-y-2 bg-muted/10">
+              <p className="text-xs font-bold">زيارة إشراف جديدة</p>
+              <select
+                value={newVisitStage}
+                onChange={e => setNewVisitStage(e.target.value)}
+                className="w-full text-xs border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1"
+              >
+                {SUPERVISION_STAGES.map(s => (
+                  <option key={s.key} value={s.key}>
+                    {stageCompleted(s.key) ? "✓ " : ""}{s.label}
+                  </option>
+                ))}
+              </select>
+              <textarea
+                value={newVisitNotes}
+                onChange={e => setNewVisitNotes(e.target.value)}
+                placeholder="ملاحظات الزيارة (اختياري)"
+                rows={2}
+                className="w-full text-xs border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1 resize-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={startNewVisit}
+                  disabled={createVisit.isPending}
+                  className="flex-1 h-8 rounded-lg text-xs font-semibold text-white"
+                  style={{ background: color }}
+                >
+                  بدء الزيارة
+                </button>
+                <button onClick={() => setShowNewVisit(false)} className="flex-1 h-8 rounded-lg text-xs font-semibold border hover:bg-muted/30">إلغاء</button>
+              </div>
+            </div>
+          )}
+
+          {/* الجك ليست للزيارة النشطة */}
+          {activeVisit && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold">{activeVisit.stageLabel}</p>
+                  <p className="text-[10px] text-muted-foreground">{checkedItems}/{totalItems} بند مكتمل</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={saveChecklist} className="text-[11px] px-2.5 py-1.5 rounded-lg border font-medium hover:bg-muted/30">
+                    حفظ
+                  </button>
+                  <button
+                    onClick={completeVisit}
+                    disabled={generatingPdf}
+                    className="flex items-center gap-1 text-[11px] px-2.5 py-1.5 rounded-lg font-semibold text-white"
+                    style={{ background: "oklch(0.55 0.15 150)" }}
+                  >
+                    {generatingPdf ? <><Clock className="w-3 h-3 animate-spin" /> جارٍ...</> : <><CheckCircle2 className="w-3 h-3" /> إنهاء وتوليد PDF</>}
+                  </button>
+                </div>
+              </div>
+              {/* شريط التقدم */}
+              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${totalItems > 0 ? (checkedItems / totalItems) * 100 : 0}%`, background: color }} />
+              </div>
+              {/* بنود الجك ليست */}
+              {checklistItems.map((section: { section: string; items: string[] }, sIdx: number) => (
+                <div key={sIdx} className="rounded-xl border overflow-hidden">
+                  <div className="px-3 py-2 border-b" style={{ background: `color-mix(in oklch, ${color} 8%, transparent)` }}>
+                    <p className="text-[11px] font-bold">{section.section}</p>
+                  </div>
+                  <div className="divide-y">
+                    {section.items.map((item: string, iIdx: number) => {
+                      const key = `${sIdx}-${iIdx}`;
+                      const checked = checklistState[key] || false;
+                      return (
+                        <button
+                          key={iIdx}
+                          onClick={() => toggleCheckItem(sIdx, iIdx)}
+                          className="w-full flex items-start gap-2.5 px-3 py-2 text-right hover:bg-muted/20 transition-colors"
+                        >
+                          <div className="w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors"
+                            style={{ borderColor: checked ? color : undefined, background: checked ? color : undefined }}>
+                            {checked && <Check className="w-2.5 h-2.5 text-white" />}
+                          </div>
+                          <p className="text-[11px] leading-relaxed text-right">{item}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              {/* رفع صور الزيارة */}
+              <div className="rounded-xl border-2 border-dashed p-3 space-y-2">
+                <p className="text-xs font-bold">صور الزيارة</p>
+                <FileUploadButton
+                  label="رفع صورة"
+                  category="إشراف - صور زيارة"
+                  projectId={project.id}
+                  clientId={project.clientId}
+                  onUploaded={() => refetchDocs()}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* قائمة المراحل والزيارات السابقة */}
+          {!activeVisit && (
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">مراحل الإشراف</p>
+              {SUPERVISION_STAGES.map(stage => {
+                const sv = stageVisits(stage.key);
+                const completed = stageCompleted(stage.key);
+                return (
+                  <div key={stage.key} className="rounded-xl border overflow-hidden">
+                    <button
+                      onClick={() => setSelectedStage(selectedStage === stage.key ? null : stage.key)}
+                      className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-muted/20 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center"
+                          style={{ background: completed ? "oklch(0.55 0.15 150)" : "oklch(0.85 0.00 0)" }}>
+                          {completed ? <Check className="w-3 h-3 text-white" /> : <Circle className="w-3 h-3 text-muted-foreground" />}
+                        </div>
+                        <p className="text-xs font-medium">{stage.label}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {sv.length > 0 && <span className="text-[10px] text-muted-foreground">{sv.length} زيارة</span>}
+                        <ChevronRight className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${selectedStage === stage.key ? "rotate-90" : ""}`} />
+                      </div>
+                    </button>
+                    {selectedStage === stage.key && sv.length > 0 && (
+                      <div className="border-t divide-y bg-muted/10">
+                        {sv.map(visit => (
+                          <div key={visit.id} className="px-3 py-2 flex items-center justify-between">
+                            <div>
+                              <p className="text-[11px] font-medium">{visit.visitDate}</p>
+                              {visit.visitNotes && <p className="text-[10px] text-muted-foreground truncate max-w-[200px]">{visit.visitNotes}</p>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                                style={{ background: visit.visitStatus === "completed" ? "oklch(0.55 0.15 150 / 0.15)" : "oklch(0.55 0.15 250 / 0.15)", color: visit.visitStatus === "completed" ? "oklch(0.45 0.15 150)" : "oklch(0.45 0.15 250)" }}>
+                                {visit.visitStatus === "completed" ? "مكتملة" : "جارية"}
+                              </span>
+                              {visit.visitStatus === "completed" && (
+                                <button
+                                  onClick={async () => {
+                                    const res = await fetch(`/api/supervision/visits/${visit.id}/pdf`, { method: "POST" });
+                                    if (res.ok) {
+                                      const blob = await res.blob();
+                                      const url = URL.createObjectURL(blob);
+                                      const a = document.createElement("a");
+                                      a.href = url;
+                                      a.download = `تقرير_${visit.stageLabel}.pdf`;
+                                      a.click();
+                                    }
+                                  }}
+                                  className="text-[10px] flex items-center gap-0.5 text-blue-600 hover:underline"
+                                >
+                                  <Download className="w-3 h-3" /> PDF
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* الملف الفني */}
+          <div className="rounded-xl border p-3 space-y-2">
+            <p className="text-xs font-bold">الملف الفني</p>
+            <p className="text-[10px] text-muted-foreground">جميع المخططات المعتمدة: معماري، إنشائي، صحي، كهرباء</p>
+            <div className="flex flex-wrap gap-2">
+              <FileUploadButton label="مخطط معماري معتمد" category="ملف فني - معماري" projectId={project.id} clientId={project.clientId} onUploaded={() => refetchDocs()} />
+              <FileUploadButton label="مخطط إنشائي معتمد" category="ملف فني - إنشائي" projectId={project.id} clientId={project.clientId} onUploaded={() => refetchDocs()} />
+              <FileUploadButton label="مخطط صحي معتمد" category="ملف فني - صحي" projectId={project.id} clientId={project.clientId} onUploaded={() => refetchDocs()} />
+              <FileUploadButton label="مخطط كهرباء معتمد" category="ملف فني - كهرباء" projectId={project.id} clientId={project.clientId} onUploaded={() => refetchDocs()} />
+            </div>
+            {supervisionDocs.length > 0 && <UploadedFilesList docs={supervisionDocs} onDeleted={() => refetchDocs()} />}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    SHARED COMPONENTS
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -1507,12 +2343,26 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
           phase={project.phases[2]} project={project}
           onClose={() => setActivePopup(null)} onTaskUpdate={handleTaskUpdate} />
       )}
-      {activePopup === 3 && project.phases[3] && (
+            {activePopup === 3 && project.phases[3] && (
         <PhaseMunicipalityPopup
           phase={project.phases[3]} project={project}
           onClose={() => setActivePopup(null)} onTaskUpdate={handleTaskUpdate} />
       )}
-
+      {activePopup === 4 && project.phases[4] && (
+        <PhaseMunicipalitySubmissionPopup
+          phase={project.phases[4]} project={project}
+          onClose={() => setActivePopup(null)} onTaskUpdate={handleTaskUpdate} />
+      )}
+      {activePopup === 5 && project.phases[5] && (
+        <PhaseDetailedDrawingsPopup
+          phase={project.phases[5]} project={project}
+          onClose={() => setActivePopup(null)} onTaskUpdate={handleTaskUpdate} />
+      )}
+      {activePopup === 6 && project.phases[6] && (
+        <PhaseSupervisionPopup
+          phase={project.phases[6]} project={project}
+          onClose={() => setActivePopup(null)} onTaskUpdate={handleTaskUpdate} />
+      )}
       {/* ── Header ── */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">

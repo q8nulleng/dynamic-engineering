@@ -12,7 +12,8 @@ import {
   clients, projects, phases, tasks, quotations, contracts,
   invoices, invoiceLines, documents, crmLeads, contractTemplates, appointments,
   workPlans, workPlanPhases, workPlanTasks, projectBriefs, projectMeetings, phaseMeta,
-  employees, employeeSessions
+  employees, employeeSessions,
+  supervisionVisits, detailedDrawings, municipalitySubmissions
 } from "../drizzle/schema.js";
 import { nanoid } from "nanoid";
 import { storagePut } from "./storage.js";
@@ -1846,6 +1847,148 @@ apiRouter.delete("/api/employees/:id", async (req, res) => {
   try {
     const db = getDb();
     await db.delete(employees).where(eq(employees.id, parseInt(req.params.id)));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Municipality Submissions ───────────────────────────────────────────────────
+apiRouter.get("/api/projects/:projectId/municipality", async (req, res) => {
+  try {
+    const db = getDb();
+    const [row] = await db.select().from(municipalitySubmissions)
+      .where(eq(municipalitySubmissions.projectId, req.params.projectId));
+    res.json(row || null);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post("/api/projects/:projectId/municipality", async (req, res) => {
+  try {
+    const db = getDb();
+    const existing = await db.select().from(municipalitySubmissions)
+      .where(eq(municipalitySubmissions.projectId, req.params.projectId));
+    if (existing.length > 0) {
+      await db.update(municipalitySubmissions)
+        .set({ ...req.body })
+        .where(eq(municipalitySubmissions.projectId, req.params.projectId));
+      const [row] = await db.select().from(municipalitySubmissions)
+        .where(eq(municipalitySubmissions.projectId, req.params.projectId));
+      return res.json(row);
+    }
+    await db.insert(municipalitySubmissions).values({
+      projectId: req.params.projectId,
+      phaseId: req.body.phaseId || 0,
+      ...req.body,
+    });
+    const [row] = await db.select().from(municipalitySubmissions)
+      .where(eq(municipalitySubmissions.projectId, req.params.projectId));
+    res.status(201).json(row);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Detailed Drawings ─────────────────────────────────────────────────────────
+apiRouter.get("/api/projects/:projectId/drawings", async (req, res) => {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(detailedDrawings)
+      .where(eq(detailedDrawings.projectId, req.params.projectId))
+      .orderBy(detailedDrawings.createdAt);
+    res.json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post("/api/projects/:projectId/drawings", async (req, res) => {
+  try {
+    const db = getDb();
+    await db.insert(detailedDrawings).values({
+      projectId: req.params.projectId,
+      phaseId: req.body.phaseId || 0,
+      drawingType: req.body.drawingType,
+      assignedTo: req.body.assignedTo || "",
+      assignedEmployeeId: req.body.assignedEmployeeId || null,
+      status: req.body.status || "pending",
+      notes: req.body.notes || "",
+    });
+    const rows = await db.select().from(detailedDrawings)
+      .where(eq(detailedDrawings.projectId, req.params.projectId))
+      .orderBy(desc(detailedDrawings.createdAt))
+      .limit(1);
+    res.status(201).json(rows[0]);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.put("/api/drawings/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    await db.update(detailedDrawings).set(req.body).where(eq(detailedDrawings.id, parseInt(req.params.id)));
+    const [row] = await db.select().from(detailedDrawings).where(eq(detailedDrawings.id, parseInt(req.params.id)));
+    res.json(row);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.delete("/api/drawings/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    await db.delete(detailedDrawings).where(eq(detailedDrawings.id, parseInt(req.params.id)));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Supervision Visits ────────────────────────────────────────────────────────
+apiRouter.get("/api/projects/:projectId/supervision", async (req, res) => {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(supervisionVisits)
+      .where(eq(supervisionVisits.projectId, req.params.projectId))
+      .orderBy(desc(supervisionVisits.createdAt));
+    res.json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post("/api/projects/:projectId/supervision", async (req, res) => {
+  try {
+    const db = getDb();
+    const now = new Date().toISOString().slice(0, 10);
+    // Count existing visits to set visit number
+    const existing = await db.select().from(supervisionVisits)
+      .where(eq(supervisionVisits.projectId, req.params.projectId));
+    const visitNumber = existing.length + 1;
+    await db.insert(supervisionVisits).values({
+      projectId: req.params.projectId,
+      phaseId: req.body.phaseId || 0,
+      visitDate: req.body.visitDate || now,
+      visitNumber,
+      constructionStage: req.body.constructionStage,
+      engineerName: req.body.engineerName || "",
+      contractorName: req.body.contractorName || "",
+      ownerName: req.body.ownerName || "",
+      location: req.body.location || "",
+      licenseNumber: req.body.licenseNumber || "",
+      generalNotes: req.body.generalNotes || "",
+      checklistData: req.body.checklistData || "{}",
+      photoUrls: req.body.photoUrls || "[]",
+      status: "draft",
+    });
+    const [row] = await db.select().from(supervisionVisits)
+      .where(eq(supervisionVisits.projectId, req.params.projectId))
+      .orderBy(desc(supervisionVisits.createdAt))
+      .limit(1);
+    res.status(201).json(row);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.put("/api/supervision/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    await db.update(supervisionVisits).set(req.body).where(eq(supervisionVisits.id, parseInt(req.params.id)));
+    const [row] = await db.select().from(supervisionVisits).where(eq(supervisionVisits.id, parseInt(req.params.id)));
+    res.json(row);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.delete("/api/supervision/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    await db.delete(supervisionVisits).where(eq(supervisionVisits.id, parseInt(req.params.id)));
     res.json({ success: true });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });

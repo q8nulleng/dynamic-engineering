@@ -881,3 +881,161 @@ export function useUpdatePhaseMeta(projectId: string, phaseKey: string) {
     },
   });
 }
+
+// ── Municipality Submission ────────────────────────────────────────────────────
+export interface MunicipalitySubmission {
+  id?: number;
+  projectId: string;
+  phaseId: number;
+  submittedAt?: string;
+  submittedBy?: string;
+  referenceNumber?: string;
+  licenseReceivedAt?: string;
+  licenseNumber?: string;
+  licenseFileUrl?: string;
+  approvedPlanUrl?: string;
+  notes?: string;
+  muniStatus?: "not_submitted" | "submitted" | "license_received";
+}
+export function useMunicipalitySubmission(projectId: string) {
+  return useQuery<MunicipalitySubmission | null>({
+    queryKey: ["municipality", projectId],
+    queryFn: () => request(`/api/projects/${projectId}/municipality`),
+    enabled: !!projectId,
+  });
+}
+export function useUpdateMunicipality(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<MunicipalitySubmission>) =>
+      request(`/api/projects/${projectId}/municipality`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["municipality", projectId] });
+    },
+  });
+}
+
+// ── Detailed Drawings ─────────────────────────────────────────────────────────
+export interface DetailedDrawing {
+  id?: number;
+  projectId: string;
+  phaseId: number;
+  drawingType: string;
+  assignedTo?: string;
+  assignedEmployeeId?: number;
+  drawingStatus?: "pending" | "in_progress" | "completed" | "approved";
+  fileUrl?: string;
+  fileKey?: string;
+  notes?: string;
+}
+export function useDetailedDrawings(projectId: string) {
+  return useQuery<DetailedDrawing[]>({
+    queryKey: ["drawings", projectId],
+    queryFn: () => request(`/api/projects/${projectId}/drawings`),
+    enabled: !!projectId,
+    initialData: [],
+  });
+}
+export function useCreateDrawing(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<DetailedDrawing>) =>
+      request(`/api/projects/${projectId}/drawings`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["drawings", projectId] });
+    },
+  });
+}
+export function useUpdateDrawing(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<DetailedDrawing> & { id: number }) =>
+      request(`/api/drawings/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["drawings", projectId] });
+    },
+  });
+}
+
+// ── Supervision Visits ────────────────────────────────────────────────────────
+export interface SupervisionVisit {
+  id?: number;
+  projectId: string;
+  phaseId?: number;
+  visitDate: string;
+  visitNumber?: number;
+  constructionStage?: string;
+  stageKey?: string;
+  stageLabel?: string;
+  visitNotes?: string;
+  engineerName?: string;
+  contractorName?: string;
+  ownerName?: string;
+  location?: string;
+  licenseNumber?: string;
+  generalNotes?: string;
+  checklistData?: string;
+  photoUrls?: string;
+  visitStatus?: "draft" | "in_progress" | "completed" | "approved";
+  pdfUrl?: string;
+}
+export function useSupervisionVisits(projectId: string) {
+  return useQuery<SupervisionVisit[]>({
+    queryKey: ["supervision", projectId],
+    queryFn: () => request(`/api/projects/${projectId}/supervision`),
+    enabled: !!projectId,
+    initialData: [],
+  });
+}
+export function useCreateSupervisionVisit(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<SupervisionVisit>) =>
+      request(`/api/projects/${projectId}/supervision`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["supervision", projectId] });
+    },
+  });
+}
+export function useUpdateSupervisionVisit(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<SupervisionVisit> & { id: number }) =>
+      request(`/api/supervision/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["supervision", projectId] });
+    },
+  });
+}
+
+// ── Employees ─────────────────────────────────────────────────────────────────
+export interface EmployeeRecord {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  specialty?: string;
+  isActive: number;
+}
+export function useEmployees() {
+  return useQuery<EmployeeRecord[]>({
+    queryKey: ["employees"],
+    queryFn: () => request("/api/employees"),
+    initialData: [],
+  });
+}

@@ -71,6 +71,13 @@
       "when": 1780337798381,
       "tag": "0009_heavy_odin",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1780390555075,
+      "tag": "0010_smiling_machine_man",
+      "breakpoints": true
     }
   ]
 }

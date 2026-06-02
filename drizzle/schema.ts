@@ -357,3 +357,67 @@ export const employeeSessions = mysqlTable("employee_sessions", {
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ── Supervision Visit Reports ──────────────────────────────────────────────────
+export const supervisionVisits = mysqlTable("supervision_visits", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: varchar("project_id", { length: 64 }).notNull(),
+  phaseId: int("phase_id").notNull(),
+  visitDate: varchar("visit_date", { length: 32 }).notNull(),
+  visitNumber: int("visit_number").notNull().default(1),
+  constructionStage: varchar("construction_stage", { length: 128 }).notNull(),
+  engineerName: varchar("engineer_name", { length: 128 }).default(""),
+  contractorName: varchar("contractor_name", { length: 128 }).default(""),
+  ownerName: varchar("owner_name", { length: 128 }).default(""),
+  location: varchar("location", { length: 256 }).default(""),
+  licenseNumber: varchar("license_number", { length: 64 }).default(""),
+  generalNotes: text("general_notes").default(""),
+  checklistData: text("checklist_data").notNull().default("{}"),
+  photoUrls: text("photo_urls").default("[]"),
+  status: mysqlEnum("visit_status", ["draft", "completed", "approved"]).notNull().default("draft"),
+  pdfUrl: varchar("pdf_url", { length: 512 }).default(""),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type SupervisionVisit = typeof supervisionVisits.$inferSelect;
+export type InsertSupervisionVisit = typeof supervisionVisits.$inferInsert;
+
+// ── Detailed Drawings (Electrical / Plumbing) ─────────────────────────────────
+export const detailedDrawings = mysqlTable("detailed_drawings", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: varchar("project_id", { length: 64 }).notNull(),
+  phaseId: int("phase_id").notNull(),
+  drawingType: varchar("drawing_type", { length: 64 }).notNull(),
+  assignedTo: varchar("assigned_to", { length: 128 }).default(""),
+  assignedEmployeeId: int("assigned_employee_id"),
+  status: mysqlEnum("drawing_status", ["pending", "in_progress", "completed", "approved"]).notNull().default("pending"),
+  fileUrl: varchar("file_url", { length: 512 }).default(""),
+  fileKey: varchar("file_key", { length: 256 }).default(""),
+  notes: text("notes").default(""),
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type DetailedDrawing = typeof detailedDrawings.$inferSelect;
+export type InsertDetailedDrawing = typeof detailedDrawings.$inferInsert;
+
+// ── Municipality Submission ────────────────────────────────────────────────────
+export const municipalitySubmissions = mysqlTable("municipality_submissions", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: varchar("project_id", { length: 64 }).notNull(),
+  phaseId: int("phase_id").notNull(),
+  submittedAt: varchar("submitted_at", { length: 32 }).default(""),
+  submittedBy: varchar("submitted_by", { length: 128 }).default(""),
+  referenceNumber: varchar("reference_number", { length: 64 }).default(""),
+  licenseReceivedAt: varchar("license_received_at", { length: 32 }).default(""),
+  licenseNumber: varchar("license_number", { length: 64 }).default(""),
+  licenseFileUrl: varchar("license_file_url", { length: 512 }).default(""),
+  approvedPlanUrl: varchar("approved_plan_url", { length: 512 }).default(""),
+  notes: text("notes").default(""),
+  status: mysqlEnum("muni_status", ["not_submitted", "submitted", "license_received"]).notNull().default("not_submitted"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type MunicipalitySubmission = typeof municipalitySubmissions.$inferSelect;
+export type InsertMunicipalitySubmission = typeof municipalitySubmissions.$inferInsert;
