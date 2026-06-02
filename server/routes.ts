@@ -1992,3 +1992,85 @@ apiRouter.delete("/api/supervision/:id", async (req, res) => {
     res.json({ success: true });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
+
+
+
+// PDF Report for Supervision Visit
+apiRouter.post("/api/supervision/visits/:id/pdf", async (req, res) => {
+  try {
+    const db = getDb();
+    const [visit] = await db.select().from(supervisionVisits).where(eq(supervisionVisits.id, parseInt(req.params.id)));
+    if (!visit) return res.status(404).json({ error: "Visit not found" });
+    let checklist: Record<string, boolean> = {};
+    try { checklist = JSON.parse(visit.checklistData || "{}"); } catch {}
+    const checklistRows = Object.entries(checklist).map(([key, val]) => {
+      return "<tr><td style='padding:4px 8px;border:1px solid #ddd;'>" + key + "</td><td style='padding:4px 8px;border:1px solid #ddd;text-align:center;'>" + (val ? "&#10003;" : "&#10007;") + "</td></tr>";
+    }).join("");
+
+    const infoGrid = [
+      ["المشروع", visit.projectId || "-"],
+      ["مرحلة البناء", visit.constructionStage || "-"],
+      ["المهندس المشرف", visit.engineerName || "-"],
+      ["المقاول", visit.contractorName || "-"],
+      ["اسم المالك", visit.ownerName || "-"],
+      ["رقم الرخصة", visit.licenseNumber || "-"],
+    ].map(([label, value]) =>
+      "<div class='info-item'><div class='label'>" + label + "</div><div class='value'>" + value + "</div></div>"
+    ).join("");
+
+    const notesHtml = visit.generalNotes
+      ? "<div style='margin:8px 0;padding:8px;background:#f9f9f9;border:1px solid #ddd;border-radius:4px;'><strong>ملاحظات:</strong> " + visit.generalNotes + "</div>"
+      : "";
+
+    const tableBody = checklistRows || "<tr><td colspan='2' style='text-align:center;padding:12px;color:#999;'>لا توجد بنود مسجلة</td></tr>";
+
+    const htmlParts = [
+      "<!DOCTYPE html>",
+      "<html dir='rtl' lang='ar'>",
+      "<head><meta charset='UTF-8'/>",
+      "<style>",
+      "body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#222;}",
+      ".header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #1a3a5c;padding-bottom:10px;margin-bottom:16px;}",
+      ".company{font-size:18px;font-weight:bold;color:#1a3a5c;}",
+      ".title{font-size:14px;font-weight:bold;text-align:center;margin:12px 0;background:#1a3a5c;color:white;padding:8px;border-radius:4px;}",
+      "table{width:100%;border-collapse:collapse;margin:8px 0;}",
+      "th{background:#1a3a5c;color:white;padding:6px 8px;text-align:right;}",
+      "td{padding:5px 8px;border:1px solid #ddd;}",
+      "tr:nth-child(even){background:#f5f5f5;}",
+      ".info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0;}",
+      ".info-item{border:1px solid #ddd;padding:6px 10px;border-radius:4px;background:#fafafa;}",
+      ".label{font-size:10px;color:#666;}",
+      ".value{font-weight:bold;font-size:12px;}",
+      ".footer{margin-top:40px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px;text-align:center;}",
+      ".sig-box{border-top:1px solid #333;padding-top:8px;font-size:11px;}",
+      "</style></head><body>",
+      "<div class='header'>",
+      "<div><div class='company'>DYNAMIC DESIGN</div>",
+      "<div style='font-size:10px;color:#666;'>ENGINEERING CONSULTANTS OFFICE</div>",
+      "<div style='font-size:10px;color:#666;'>Kuwait City - Al Qiblah - Salhia St. Building No. 18</div>",
+      "<div style='font-size:10px;color:#666;'>Tel: 22091228 | Mob: 99674300 - 50855599</div></div>",
+      "<div style='text-align:left;'>",
+      "<div style='font-size:16px;font-weight:bold;color:#1a3a5c;'>&#1583;&#1610;&#1606;&#1575;&#1605;&#1610;&#1603; &#1583;&#1610;&#1586;&#1575;&#1610;&#1606;</div>",
+      "<div style='font-size:10px;color:#666;'>&#1604;&#1604;&#1575;&#1587;&#1578;&#1588;&#1575;&#1585;&#1575;&#1578; &#1575;&#1604;&#1607;&#1606;&#1583;&#1587;&#1610;&#1577;</div>",
+      "<div style='font-size:10px;color:#666;'>E-mail: Info@DynamicSaud.com</div></div></div>",
+    ];
+
+    const htmlContent = htmlParts.join("") +
+      "<div class='title'>&#1602;&#1575;&#1574;&#1605;&#1577; &#1578;&#1583;&#1602;&#1610;&#1602; &#1575;&#1604;&#1571;&#1593;&#1605;&#1575;&#1604; &#1575;&#1604;&#1605;&#1583;&#1606;&#1610;&#1577;</div>" +
+      "<div style='text-align:center;font-size:11px;color:#666;margin-bottom:12px;'>" +
+      "&#1585;&#1602;&#1605; &#1575;&#1604;&#1586;&#1610;&#1575;&#1585;&#1577;: " + (visit.visitNumber || "-") + " | " +
+      "&#1575;&#1604;&#1578;&#1575;&#1585;&#1610;&#1582;: " + (visit.visitDate || "-") + "</div>" +
+      "<div class='info-grid'>" + infoGrid + "</div>" +
+      notesHtml +
+      "<table><thead><tr><th>&#1575;&#1604;&#1576;&#1606;&#1583;</th><th style='width:80px;text-align:center;'>&#1575;&#1604;&#1581;&#1575;&#1604;&#1577;</th></tr></thead>" +
+      "<tbody>" + tableBody + "</tbody></table>" +
+      "<div class='footer'>" +
+      "<div class='sig-box'><strong>&#1575;&#1604;&#1605;&#1607;&#1606;&#1583;&#1587; &#1575;&#1604;&#1605;&#1588;&#1585;&#1601;</strong><br/><br/>_________________</div>" +
+      "<div class='sig-box'><strong>&#1575;&#1604;&#1605;&#1575;&#1604;&#1603;</strong><br/><br/>_________________</div>" +
+      "<div class='sig-box'><strong>&#1605;&#1605;&#1579;&#1604; &#1575;&#1604;&#1605;&#1602;&#1575;&#1608;&#1604;</strong><br/><br/>_________________</div>" +
+      "</div></body></html>";
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(htmlContent);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});

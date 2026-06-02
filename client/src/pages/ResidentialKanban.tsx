@@ -1914,10 +1914,10 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
 
   const startNewVisit = () => {
     createVisit.mutate({
+      constructionStage: SUPERVISION_STAGES.find(s => s.key === newVisitStage)?.label || newVisitStage,
       stageKey: newVisitStage,
-      stageLabel: SUPERVISION_STAGES.find(s => s.key === newVisitStage)?.label || newVisitStage,
       visitDate: new Date().toISOString().split("T")[0],
-      visitNotes: newVisitNotes,
+      generalNotes: newVisitNotes,
       visitStatus: "in_progress",
       checklistData: "{}",
     }, {
@@ -1956,7 +1956,7 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `تقرير_زيارة_${activeVisit.stageLabel}_${new Date().toLocaleDateString("ar-KW")}.pdf`;
+        a.download = `تقرير_زيارة_${activeVisit.constructionStage}_${new Date().toLocaleDateString("ar-KW")}.pdf`;
         a.click();
         toast.success("تم تحميل تقرير الزيارة ✓");
       }
@@ -1969,11 +1969,11 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
     }
   };
 
-  const stageVisits = (stageKey: string) => visits.filter(v => v.stageKey === stageKey);
+  const stageVisits = (stageKey: string) => visits.filter(v => v.stageKey === stageKey || v.constructionStage === (SUPERVISION_STAGES.find(s => s.key === stageKey)?.label || stageKey));
   const stageCompleted = (stageKey: string) => stageVisits(stageKey).some(v => v.visitStatus === "completed");
 
   const checklistItems: { section: string; items: string[] }[] = activeVisit
-    ? (CHECKLIST_ITEMS[activeVisit.stageKey ?? ""] || DEFAULT_CHECKLIST)
+    ? (CHECKLIST_ITEMS[activeVisit.stageKey ?? activeVisit.constructionStage ?? ""] || DEFAULT_CHECKLIST)
     : [];
   const totalItems = checklistItems.reduce((sum: number, s: { section: string; items: string[] }) => sum + s.items.length, 0);
   const checkedItems = Object.values(checklistState).filter(Boolean).length;
@@ -2054,7 +2054,7 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold">{activeVisit.stageLabel}</p>
+                  <p className="text-xs font-bold">{activeVisit.constructionStage}</p>
                   <p className="text-[10px] text-muted-foreground">{checkedItems}/{totalItems} بند مكتمل</p>
                 </div>
                 <div className="flex gap-2">
@@ -2163,7 +2163,7 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
                                       const url = URL.createObjectURL(blob);
                                       const a = document.createElement("a");
                                       a.href = url;
-                                      a.download = `تقرير_${visit.stageLabel}.pdf`;
+                                      a.download = `تقرير_${visit.constructionStage}.pdf`;
                                       a.click();
                                     }
                                   }}
