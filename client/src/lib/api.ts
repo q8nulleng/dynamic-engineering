@@ -979,11 +979,13 @@ export interface SupervisionVisit {
   visitNotes?: string;
   engineerName?: string;
   contractorName?: string;
+  contractorPhone?: string;
   ownerName?: string;
   location?: string;
   licenseNumber?: string;
   generalNotes?: string;
   checklistData?: string;
+  itemNotes?: string;
   photoUrls?: string;
   visitStatus?: "draft" | "in_progress" | "completed" | "approved";
   pdfUrl?: string;

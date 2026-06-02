@@ -2081,6 +2081,8 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
   const createVisit = useCreateSupervisionVisit(project.id);
   const updateVisit = useUpdateSupervisionVisit(project.id);
   const { data: allDocs = [], refetch: refetchDocs } = useDocuments({ projectId: project.id });
+  // استيراد بيانات الرخصة من كرت البلدية
+  const { data: muniData } = useMunicipalitySubmission(project.id);
 
   // الحالة الرئيسية: اختيار المرحلة من dropdown
   const [selectedStageKey, setSelectedStageKey] = useState<string>(SUPERVISION_STAGES[0].key);
@@ -2088,13 +2090,36 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
   const [activeVisit, setActiveVisit] = useState<SupervisionVisit | null>(null);
   // حالة بنود الجك ليست: Record<"sIdx-iIdx", ItemStatus>
   const [checklistState, setChecklistState] = useState<Record<string, ItemStatus>>({});
+  // ملاحظات كل بند: Record<"sIdx-iIdx", string>
+  const [itemNotes, setItemNotes] = useState<Record<string, string>>({});
   // ملاحظات الزيارة
   const [visitNotes, setVisitNotes] = useState("");
-  const [engineerName, setEngineerName] = useState("");
-  const [contractorName, setContractorName] = useState("");
-  const [licenseNumber, setLicenseNumber] = useState("");
+  // المهندس المشرف: يُستورد من المسؤول عن مهام مرحلة الإشراف
+  const autoEngineer = phase.tasks.find(t => t.assignee)?.assignee || "";
+  const [engineerName, setEngineerName] = useState(autoEngineer);
+  // المقاول: يُحفظ محلياً لكل مشروع (مرة واحدة)
+  const contractorKey = `contractor_${project.id}`;
+  const [contractorName, setContractorName] = useState(() => localStorage.getItem(contractorKey + "_name") || "");
+  const [contractorPhone, setContractorPhone] = useState(() => localStorage.getItem(contractorKey + "_phone") || "");
+  // رقم الرخصة: يُستورد من بيانات البلدية المعتمدة
+  const autoLicense = muniData?.licenseNumber || "";
+  const [licenseNumber, setLicenseNumber] = useState(autoLicense);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [showStartForm, setShowStartForm] = useState(false);
+
+  // تحديث بيانات المقاول في localStorage عند التغيير
+  const saveContractor = (name: string, phone: string) => {
+    localStorage.setItem(contractorKey + "_name", name);
+    localStorage.setItem(contractorKey + "_phone", phone);
+  };
+
+  // تحديث المهندس والرخصة عند تغيير بيانات المشروع
+  React.useEffect(() => {
+    if (autoEngineer && !engineerName) setEngineerName(autoEngineer);
+  }, [autoEngineer]);
+  React.useEffect(() => {
+    if (autoLicense && !licenseNumber) setLicenseNumber(autoLicense);
+  }, [autoLicense]);
 
   // المخططات المعتمدة (مرفوعة مسبقاً من المعماري)
   const technicalDocs = allDocs.filter(d =>
@@ -2120,6 +2145,7 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
     setSelectedStageKey(key);
     setActiveVisit(null);
     setChecklistState({});
+    setItemNotes({});
     setShowStartForm(false);
     const inProgress = visits.find(v => v.stageKey === key && (v.visitStatus === "in_progress" || v.visitStatus === "draft"));
     if (inProgress) {
@@ -2128,9 +2154,14 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
         const parsed: Record<string, ItemStatus> = JSON.parse(inProgress.checklistData || "{}");
         setChecklistState(parsed);
       } catch {}
-      setEngineerName(inProgress.engineerName || "");
-      setContractorName(inProgress.contractorName || "");
-      setLicenseNumber(inProgress.licenseNumber || "");
+      try {
+        const parsedNotes: Record<string, string> = JSON.parse(inProgress.itemNotes || "{}");
+        setItemNotes(parsedNotes);
+      } catch {}
+      setEngineerName(inProgress.engineerName || autoEngineer);
+      setContractorName(inProgress.contractorName || localStorage.getItem(contractorKey + "_name") || "");
+      setContractorPhone(inProgress.contractorPhone || localStorage.getItem(contractorKey + "_phone") || "");
+      setLicenseNumber(inProgress.licenseNumber || autoLicense);
       setVisitNotes(inProgress.generalNotes || "");
     }
   };
@@ -2145,6 +2176,8 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
         initChecklist[`${sIdx}-${iIdx}`] = "pending";
       });
     });
+    // حفظ بيانات المقاول محلياً
+    saveContractor(contractorName, contractorPhone);
     createVisit.mutate({
       constructionStage: stage?.label || selectedStageKey,
       stageKey: selectedStageKey,
@@ -2152,15 +2185,18 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
       visitStatus: "in_progress",
       engineerName,
       contractorName,
+      contractorPhone,
       licenseNumber,
       generalNotes: visitNotes,
       checklistData: JSON.stringify(initChecklist),
+      itemNotes: "{}",
     }, {
       onSuccess: (visit: unknown) => {
         toast.success("تم بدء الزيارة ✓");
         const v = visit as SupervisionVisit;
         setActiveVisit(v);
         setChecklistState(initChecklist);
+        setItemNotes({});
         setShowStartForm(false);
       },
     });
@@ -2173,16 +2209,29 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
     const cycle: ItemStatus[] = ["pending", "accepted", "rejected", "accepted_with_notes"];
     const next = cycle[(cycle.indexOf(current) + 1) % cycle.length];
     setChecklistState(prev => ({ ...prev, [key]: next }));
+    // إذا تغيرت الحالة إلى pending أو accepted، امسح الملاحظة
+    if (next === "pending" || next === "accepted") {
+      setItemNotes(prev => { const n = { ...prev }; delete n[key]; return n; });
+    }
+  };
+
+  // تعيين ملاحظة بند
+  const setItemNote = (sIdx: number, iIdx: number, note: string) => {
+    const key = `${sIdx}-${iIdx}`;
+    setItemNotes(prev => ({ ...prev, [key]: note }));
   };
 
   // حفظ الجك ليست
   const saveChecklist = () => {
     if (!activeVisit?.id) return;
+    saveContractor(contractorName, contractorPhone);
     updateVisit.mutate({
       id: activeVisit.id,
       checklistData: JSON.stringify(checklistState),
+      itemNotes: JSON.stringify(itemNotes),
       engineerName,
       contractorName,
+      contractorPhone,
       licenseNumber,
       generalNotes: visitNotes,
     }, {
@@ -2195,12 +2244,15 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
     if (!activeVisit?.id) return;
     setGeneratingPdf(true);
     try {
+      saveContractor(contractorName, contractorPhone);
       await updateVisit.mutateAsync({
         id: activeVisit.id,
         visitStatus: "completed",
         checklistData: JSON.stringify(checklistState),
+        itemNotes: JSON.stringify(itemNotes),
         engineerName,
         contractorName,
+        contractorPhone,
         licenseNumber,
         generalNotes: visitNotes,
       });
@@ -2373,32 +2425,68 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
           {showStartForm && !activeVisit && (
             <div className="rounded-xl border p-3 space-y-3 bg-muted/10">
               <p className="text-xs font-bold">بيانات الزيارة</p>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-muted-foreground mb-1 block">المهندس المشرف</label>
-                  <input value={engineerName} onChange={e => setEngineerName(e.target.value)}
-                    placeholder="اسم المهندس"
-                    className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+
+              {/* المهندس المشرف - مستورد تلقائياً */}
+              <div className="rounded-lg border p-2.5 space-y-1.5" style={{ background: "oklch(0.97 0.02 250 / 0.3)" }}>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-semibold text-muted-foreground">المهندس المشرف</label>
+                  {autoEngineer && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                      style={{ background: "oklch(0.55 0.15 250 / 0.15)", color: "oklch(0.45 0.15 250)" }}>
+                      مستورد من المهام
+                    </span>
+                  )}
                 </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground mb-1 block">المقاول</label>
-                  <input value={contractorName} onChange={e => setContractorName(e.target.value)}
+                <input value={engineerName} onChange={e => setEngineerName(e.target.value)}
+                  placeholder="اسم المهندس المشرف"
+                  className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+              </div>
+
+              {/* رقم الرخصة - مستورد من البلدية */}
+              <div className="rounded-lg border p-2.5 space-y-1.5" style={{ background: "oklch(0.97 0.02 150 / 0.3)" }}>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-semibold text-muted-foreground">رقم الرخصة</label>
+                  {autoLicense && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                      style={{ background: "oklch(0.55 0.15 150 / 0.15)", color: "oklch(0.45 0.15 150)" }}>
+                      مستورد من البلدية
+                    </span>
+                  )}
+                </div>
+                <input value={licenseNumber} onChange={e => setLicenseNumber(e.target.value)}
+                  placeholder="رقم رخصة البناء"
+                  className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+              </div>
+
+              {/* بيانات المقاول - تُحفظ مرة واحدة */}
+              <div className="rounded-lg border p-2.5 space-y-1.5" style={{ background: "oklch(0.97 0.02 30 / 0.3)" }}>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-semibold text-muted-foreground">بيانات المقاول</label>
+                  {(localStorage.getItem(contractorKey + "_name")) && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                      style={{ background: "oklch(0.60 0.12 30 / 0.15)", color: "oklch(0.50 0.12 30)" }}>
+                      محفوظة
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={contractorName} onChange={e => { setContractorName(e.target.value); saveContractor(e.target.value, contractorPhone); }}
                     placeholder="اسم المقاول"
-                    className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground mb-1 block">رقم الرخصة</label>
-                  <input value={licenseNumber} onChange={e => setLicenseNumber(e.target.value)}
-                    placeholder="رقم رخصة البناء"
-                    className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground mb-1 block">ملاحظات</label>
-                  <input value={visitNotes} onChange={e => setVisitNotes(e.target.value)}
-                    placeholder="ملاحظات الزيارة"
-                    className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                    className="text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                  <input value={contractorPhone} onChange={e => { setContractorPhone(e.target.value); saveContractor(contractorName, e.target.value); }}
+                    placeholder="رقم هاتف المقاول"
+                    className="text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
                 </div>
               </div>
+
+              {/* ملاحظات الزيارة */}
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-1 block">ملاحظات الزيارة</label>
+                <input value={visitNotes} onChange={e => setVisitNotes(e.target.value)}
+                  placeholder="ملاحظات عامة للزيارة"
+                  className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+              </div>
+
               <div className="flex gap-2">
                 <button onClick={startVisit} disabled={createVisit.isPending}
                   className="flex-1 h-9 rounded-lg text-xs font-semibold text-white"
@@ -2451,26 +2539,48 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
                       const key = `${sIdx}-${iIdx}`;
                       const status: ItemStatus = checklistState[key] || "pending";
                       const cfg = ITEM_STATUS_CONFIG[status];
+                      const needsNote = status === "rejected" || status === "accepted_with_notes";
+                      const noteText = itemNotes[key] || "";
                       return (
-                        <button
-                          key={iIdx}
-                          onClick={() => cycleItemStatus(sIdx, iIdx)}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 text-right hover:bg-muted/10 transition-colors"
-                        >
-                          {/* مؤشر الحالة */}
-                          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm font-bold transition-all"
-                            style={{ background: cfg.bg, color: cfg.color, border: `1.5px solid ${cfg.color}` }}>
-                            {cfg.short}
-                          </div>
-                          <p className="text-[11px] leading-relaxed text-right flex-1">{item}</p>
-                          {/* شارة الحالة */}
-                          {status !== "pending" && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-medium"
-                              style={{ background: cfg.bg, color: cfg.color }}>
-                              {cfg.label}
-                            </span>
+                        <div key={iIdx} className="border-b last:border-b-0">
+                          <button
+                            onClick={() => cycleItemStatus(sIdx, iIdx)}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 text-right hover:bg-muted/10 transition-colors"
+                          >
+                            {/* مؤشر الحالة */}
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm font-bold transition-all"
+                              style={{ background: cfg.bg, color: cfg.color, border: `1.5px solid ${cfg.color}` }}>
+                              {cfg.short}
+                            </div>
+                            <p className="text-[11px] leading-relaxed text-right flex-1">{item}</p>
+                            {/* شارة الحالة */}
+                            {status !== "pending" && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-medium"
+                                style={{ background: cfg.bg, color: cfg.color }}>
+                                {cfg.label}
+                              </span>
+                            )}
+                          </button>
+                          {/* خانة الملاحظات عند الرفض أو مقبول بملاحظات */}
+                          {needsNote && (
+                            <div className="px-3 pb-2.5" onClick={e => e.stopPropagation()}>
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <div className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.color }} />
+                                <span className="text-[10px] font-medium" style={{ color: cfg.color }}>
+                                  {status === "rejected" ? "سبب الرفض" : "الملاحظات المطلوب استيفاؤها"}
+                                </span>
+                              </div>
+                              <textarea
+                                value={noteText}
+                                onChange={e => setItemNote(sIdx, iIdx, e.target.value)}
+                                placeholder={status === "rejected" ? "اكتب سبب الرفض..." : "اكتب الملاحظات المطلوبة..."}
+                                rows={2}
+                                className="w-full text-[11px] border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1 resize-none"
+                                style={{ borderColor: `color-mix(in oklch, ${cfg.color} 40%, transparent)` }}
+                              />
+                            </div>
                           )}
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -2481,18 +2591,36 @@ function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
               <div className="rounded-xl border p-3 space-y-2">
                 <p className="text-xs font-bold">بيانات الزيارة</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <input value={engineerName} onChange={e => setEngineerName(e.target.value)}
-                    placeholder="المهندس المشرف"
-                    className="text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
-                  <input value={contractorName} onChange={e => setContractorName(e.target.value)}
-                    placeholder="المقاول"
-                    className="text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
-                  <input value={licenseNumber} onChange={e => setLicenseNumber(e.target.value)}
-                    placeholder="رقم الرخصة"
-                    className="text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
-                  <input value={visitNotes} onChange={e => setVisitNotes(e.target.value)}
-                    placeholder="ملاحظات"
-                    className="text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                  <div>
+                    <label className="text-[10px] text-muted-foreground mb-0.5 block">المهندس المشرف</label>
+                    <input value={engineerName} onChange={e => setEngineerName(e.target.value)}
+                      placeholder="اسم المهندس"
+                      className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground mb-0.5 block">رقم الرخصة</label>
+                    <input value={licenseNumber} onChange={e => setLicenseNumber(e.target.value)}
+                      placeholder="رقم رخصة البناء"
+                      className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground mb-0.5 block">اسم المقاول</label>
+                    <input value={contractorName} onChange={e => { setContractorName(e.target.value); saveContractor(e.target.value, contractorPhone); }}
+                      placeholder="اسم المقاول"
+                      className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground mb-0.5 block">هاتف المقاول</label>
+                    <input value={contractorPhone} onChange={e => { setContractorPhone(e.target.value); saveContractor(contractorName, e.target.value); }}
+                      placeholder="رقم هاتف المقاول"
+                      className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[10px] text-muted-foreground mb-0.5 block">ملاحظات الزيارة</label>
+                    <input value={visitNotes} onChange={e => setVisitNotes(e.target.value)}
+                      placeholder="ملاحظات عامة"
+                      className="w-full text-xs border rounded-lg px-2.5 py-2 bg-background focus:outline-none focus:ring-1" />
+                  </div>
                 </div>
               </div>
 

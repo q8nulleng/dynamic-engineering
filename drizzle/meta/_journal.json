@@ -78,6 +78,13 @@
       "when": 1780390555075,
       "tag": "0010_smiling_machine_man",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1780399284489,
+      "tag": "0011_curious_mad_thinker",
+      "breakpoints": true
     }
   ]
 }

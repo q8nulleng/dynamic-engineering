@@ -1958,14 +1958,18 @@ apiRouter.post("/api/projects/:projectId/supervision", async (req, res) => {
       visitDate: req.body.visitDate || now,
       visitNumber,
       constructionStage: req.body.constructionStage,
+      stageKey: req.body.stageKey || "",
       engineerName: req.body.engineerName || "",
       contractorName: req.body.contractorName || "",
+      contractorPhone: req.body.contractorPhone || "",
       ownerName: req.body.ownerName || "",
       location: req.body.location || "",
       licenseNumber: req.body.licenseNumber || "",
       generalNotes: req.body.generalNotes || "",
       checklistData: req.body.checklistData || "{}",
+      itemNotes: req.body.itemNotes || null,
       photoUrls: req.body.photoUrls || "[]",
+      visitStatus: req.body.visitStatus || "in_progress",
       status: "draft",
     });
     const [row] = await db.select().from(supervisionVisits)
@@ -2002,9 +2006,11 @@ apiRouter.post("/api/supervision/visits/:id/pdf", async (req, res) => {
     const [visit] = await db.select().from(supervisionVisits).where(eq(supervisionVisits.id, parseInt(req.params.id)));
     if (!visit) return res.status(404).json({ error: "Visit not found" });
 
-    // Parse checklist: Record<"sIdx-iIdx", "pending"|"accepted"|"rejected"|"accepted_with_notes">
+    // Parse checklist and item notes
     let checklist: Record<string, string> = {};
+    let itemNotesMap: Record<string, string> = {};
     try { checklist = JSON.parse(visit.checklistData || "{}"); } catch {}
+    try { itemNotesMap = JSON.parse((visit as any).itemNotes || "{}"); } catch {}
 
     // Status display config
     const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
@@ -2024,18 +2030,22 @@ apiRouter.post("/api/supervision/visits/:id/pdf", async (req, res) => {
       pending: values.filter(v => v === "pending" || !v).length,
     };
 
-    // Build checklist rows grouped by section (key format: "sIdx-iIdx")
+    // Build checklist rows with item notes
     const checklistRows = Object.entries(checklist).map(([key, status]) => {
       const cfg = statusConfig[status] || statusConfig["pending"];
-      return "<tr><td style='padding:5px 8px;border:1px solid #e5e7eb;'>" + key + "</td>" +
-        "<td style='padding:5px 8px;border:1px solid #e5e7eb;text-align:center;background:" + cfg.bg + ";color:" + cfg.color + ";font-weight:600;font-size:11px;'>" + cfg.label + "</td></tr>";
+      const note = itemNotesMap[key] || "";
+      const noteHtml = note
+        ? "<div style='margin-top:3px;font-size:10px;color:" + cfg.color + ";background:" + cfg.bg + ";padding:3px 6px;border-radius:4px;border-right:3px solid " + cfg.color + ";'>" + note + "</div>"
+        : "";
+      return "<tr><td style='padding:6px 8px;border:1px solid #e5e7eb;'>" + key + noteHtml + "</td>" +
+        "<td style='padding:6px 8px;border:1px solid #e5e7eb;text-align:center;background:" + cfg.bg + ";color:" + cfg.color + ";font-weight:600;font-size:11px;width:160px;'>" + cfg.label + "</td></tr>";
     }).join("");
 
     const infoGrid = [
       ["المشروع", visit.projectId || "-"],
       ["مرحلة البناء", visit.constructionStage || "-"],
       ["المهندس المشرف", visit.engineerName || "-"],
-      ["المقاول", visit.contractorName || "-"],
+      ["المقاول", (visit.contractorName || "-") + ((visit as any).contractorPhone ? " | " + (visit as any).contractorPhone : "")],
       ["رقم الرخصة", visit.licenseNumber || "-"],
       ["تاريخ الزيارة", visit.visitDate || "-"],
     ].map(([label, value]) =>
