@@ -27,7 +27,7 @@ import {
   Building, Percent, Tag, Save,
   ClipboardList, MessageCircle, Activity, Users, MapPin, Loader2,
   Pencil, Trash2, Eye, CheckCircle, Hash, Ruler, ArrowRightLeft,
-  Clock, UserCheck, CalendarPlus, Bell,
+  Clock, UserCheck, CalendarPlus, Bell, Briefcase,
 } from "lucide-react";
 import { Link } from "wouter";
 import { kuwaitGovernorates } from "./Clients";
@@ -70,12 +70,13 @@ interface Lead {
 }
 
 const stageTemplates = [
-  { title: "استفسار جديد",    color: "oklch(0.55 0.15 250)", icon: Users },
-  { title: "تم التواصل",      color: "oklch(0.72 0.10 60)",  icon: Phone },
-  { title: "عرض سعر مرسل",   color: "oklch(0.60 0.15 280)", icon: FileText },
-  { title: "بانتظار التعاقد", color: "oklch(0.65 0.15 140)", icon: FileText },
-  { title: "تم التعاقد",      color: "oklch(0.55 0.15 150)", icon: Trophy },
-  { title: "فرص خاسرة",      color: "oklch(0.55 0.15 25)",  icon: X },
+  { title: "استفسار جديد",           color: "oklch(0.55 0.15 250)", icon: Users },
+  { title: "تم التواصل",             color: "oklch(0.72 0.10 60)",  icon: Phone },
+  { title: "عرض سعر مرسل",          color: "oklch(0.60 0.15 280)", icon: FileText },
+  { title: "بانتظار التعاقد",        color: "oklch(0.65 0.15 140)", icon: FileText },
+  { title: "جارٍ العمل - بدون عقد",  color: "oklch(0.60 0.18 45)",  icon: Briefcase },
+  { title: "تم التعاقد",             color: "oklch(0.55 0.15 150)", icon: Trophy },
+  { title: "فرص خاسرة",             color: "oklch(0.55 0.15 25)",  icon: X },
 ];
 
 const priorityStars = (p: number) => (
@@ -1134,6 +1135,105 @@ export default function CRM() {
     }
   };
 
+  // ── بدء العمل بدون عقد (للأدمن) ──────────────────────────────────────────
+  const handleStartWithoutContract = async (lead: Lead) => {
+    setSigningBusy(true);
+    try {
+      const now = new Date().toISOString().slice(0, 10);
+      const clientId = `C${Date.now().toString(36).toUpperCase()}`;
+
+      const client = await createClient.mutateAsync({
+        id: clientId,
+        name: lead.name,
+        phone: lead.phone,
+        type: "individual" as const,
+        governorate: lead.governorate || "",
+        area: lead.area || "",
+        block: "",
+        plot: lead.plotNumber || "",
+        parcelArea: lead.landArea || 0,
+        status: "active" as const,
+        rating: 3,
+        createdAt: now,
+        projectType: lead.type || "",
+        serviceType: lead.serviceType || "",
+        leadId: lead.id,
+        totalContractsValue: 0,
+        totalPaid: 0,
+        totalRemaining: 0,
+        notes: (lead.notes || "") + (lead.notes ? " | " : "") + "تم بدء العمل قبل إتمام التعاقد",
+        civilId: lead.civilId || "",
+        email: "",
+        ownershipDoc: "",
+        ownershipDate: "",
+        spouseName: "",
+        spouseCivilId: "",
+        phone2: "",
+        parcelShape: "",
+        parcelFacing: "",
+      });
+
+      const maxSeq = allProjects.reduce((max, p) => {
+        const n = parseInt(p.id.replace(/^S/, ""), 10);
+        return isNaN(n) ? max : Math.max(max, n);
+      }, 0);
+      const projectId = `S${String(maxSeq + 1).padStart(5, "0")}`;
+      const defaultPhases = [
+        { title: "تجهيز الملف", tasks: [
+          { name: "تصميم الكروكي", status: "pending", order: 0 },
+          { name: "تجميع المستندات", status: "pending", order: 1 },
+          { name: "العقد والدفعة الأولى", status: "pending", order: 2 },
+          { name: "نماذج البلدية", status: "pending", order: 3 },
+        ]},
+        { title: "التصميم", tasks: [
+          { name: "التصميم المعماري", status: "pending", order: 0 },
+          { name: "تصميم الواجهات", status: "pending", order: 1 },
+          { name: "مخطط البلدية", status: "pending", order: 2 },
+        ]},
+        { title: "البلدية والاعتماد", tasks: [
+          { name: "تقديم بلدية", status: "pending", order: 0 },
+          { name: "الحصول على موافقة البلدية", status: "pending", order: 1 },
+          { name: "دفع رسوم البلدية", status: "pending", order: 2 },
+        ]},
+        { title: "الكراسة والمخططات", tasks: [
+          { name: "التصميم الإنشائي", status: "pending", order: 0 },
+          { name: "التصميم الصحي", status: "pending", order: 1 },
+          { name: "التصميم الكهربائي", status: "pending", order: 2 },
+        ]},
+        { title: "الإشراف", tasks: [
+          { name: "إصدار خطاب إشراف", status: "pending", order: 0 },
+          { name: "الإشراف الميداني", status: "pending", order: 1 },
+          { name: "شهادة الإنجاز", status: "pending", order: 2 },
+        ]},
+      ];
+      await createProject.mutateAsync({
+        id: projectId,
+        name: `${lead.type || "مشروع"} - ${lead.name}`,
+        clientId: client.id,
+        client: lead.name,
+        type: lead.type || "سكن خاص",
+        serviceType: lead.serviceType || "بناء جديد",
+        area: lead.area || "",
+        contractId: "",
+        leadId: lead.id,
+        status: "جارٍ العمل - بدون عقد",
+        phases: defaultPhases as unknown[],
+      });
+
+      await fetch(`/api/projects/${projectId}/auto-tasks`, { method: "POST" }).catch(() => null);
+      await updateLead.mutateAsync({ id: lead.id, stage: "جارٍ العمل - بدون عقد" });
+
+      setSelectedLead(null);
+      setOpenStage(stageTemplates.findIndex((s) => s.title === "جارٍ العمل - بدون عقد"));
+      toast.success(`⚡ تم بدء العمل مع "${lead.name}" — المشروع مؤقت (بدون عقد)`);
+    } catch (err) {
+      toast.error("حدث خطأ أثناء بدء العمل — تحقق من البيانات");
+      console.error(err);
+    } finally {
+      setSigningBusy(false);
+    }
+  };
+
   const totalLeads = leadsData?.length ?? 0;
   const totalRevenue = (leadsData || []).reduce((s, l) => s + parseFloat((l.expectedRevenue || "0").replace(",", "") || "0"), 0);
 
@@ -1425,15 +1525,48 @@ export default function CRM() {
                             </>)}
 
                             {/* ── Stage 3: بانتظار التعاقد ── */}
-                            {si === 3 && (<LeadContractSection lead={lead} onCreateContract={() => setContractTarget(lead)} onViewQuote={() => setViewQuoteTarget(lead)} signingBusy={signingBusy} onSigned={() => handleContractSigned(lead)} />)}
+                            {si === 3 && (
+                              <div className="space-y-2 w-full">
+                                <LeadContractSection lead={lead} onCreateContract={() => setContractTarget(lead)} onViewQuote={() => setViewQuoteTarget(lead)} signingBusy={signingBusy} onSigned={() => handleContractSigned(lead)} />
+                                <div className="border-t pt-2">
+                                  <p className="text-[10px] text-muted-foreground mb-1.5">أو ابدأ العمل فوراً وأتمم التعاقد لاحقاً:</p>
+                                  <Button size="sm" variant="outline" className="text-xs h-7 text-orange-700 border-orange-300 w-full"
+                                    disabled={signingBusy}
+                                    onClick={() => handleStartWithoutContract(lead)}
+                                  >
+                                    {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <Briefcase className="w-3 h-3 ml-1" />}
+                                    ⚡ بدء العمل بدون عقد
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
 
-                            {/* ── Stage 4: تم التعاقد (archived) ── */}
+                            {/* ── Stage 4: جارٍ العمل - بدون عقد ── */}
                             {si === 4 && (
+                              <div className="space-y-2 w-full">
+                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-2.5 text-xs">
+                                  <p className="font-semibold text-orange-800 flex items-center gap-1 mb-1">
+                                    <Briefcase className="w-3.5 h-3.5" />جارٍ العمل — بدون عقد
+                                  </p>
+                                  <p className="text-orange-700">تم إنشاء المشروع مؤقتاً. يرجى إتمام التعاقد لتفعيل كافة الخدمات.</p>
+                                </div>
+                                <Button size="sm" className="text-xs h-7 text-white w-full" style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
+                                  disabled={signingBusy}
+                                  onClick={() => handleContractSigned(lead)}
+                                >
+                                  {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <CheckCircle className="w-3 h-3 ml-1" />}
+                                  إتمام التعاقد
+                                </Button>
+                              </div>
+                            )}
+
+                            {/* ── Stage 5: تم التعاقد (archived) ── */}
+                            {si === 5 && (
                               <span className="text-xs text-muted-foreground italic">مكتمل — تم نقله للعملاء</span>
                             )}
 
-                            {/* ── Stage 5: فرص خاسرة ── */}
-                            {si === 5 && (<>
+                            {/* ── Stage 6: فرص خاسرة ── */}
+                            {si === 6 && (<>
                               <Button size="sm" variant="outline" className="text-xs h-7 text-blue-600 border-blue-200"
                                 onClick={async () => {
                                   await updateLead.mutateAsync({ id: lead.id, stage: "استفسار جديد" });
@@ -1452,7 +1585,7 @@ export default function CRM() {
                             </>)}
 
                             {/* Edit + Delete always visible except archived/lost */}
-                            {si < 4 && (<>
+                            {si < 5 && (<>
                               <Button size="sm" variant="outline" className="text-xs h-7"
                                 onClick={() => {
                                   setEditForm({

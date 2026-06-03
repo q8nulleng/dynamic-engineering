@@ -391,6 +391,15 @@ export default function Projects() {
                       </div>
                     </div>
 
+                    {/* شارة بدون عقد */}
+                    {project.status === "جارٍ العمل - بدون عقد" && (
+                      <div className="mb-2 flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-semibold"
+                        style={{ backgroundColor: "oklch(0.97 0.05 45)", color: "oklch(0.55 0.18 45)", border: "1px solid oklch(0.88 0.10 45)" }}>
+                        <Briefcase className="w-3 h-3" />
+                        جارٍ العمل — بدون عقد • يرجى إتمام التعاقد
+                      </div>
+                    )}
+
                     {/* Client + Location */}
                     <div className="space-y-1.5 mb-3">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
