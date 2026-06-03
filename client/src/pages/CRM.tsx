@@ -837,7 +837,7 @@ function AppointmentDialog({ lead, onClose }: { lead: Lead; onClose: () => void 
     const dateStr = new Date(appt.date).toLocaleDateString("ar-KW", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
     const timeStr = appt.time ? ` الساعة ${appt.time}` : "";
     const assignedStr = appt.assignedTo ? `\nالمسؤول: ${appt.assignedTo}` : "";
-    const msg = `السلام عليكم ${lead.name}،\n\nتذكير بموعدكم مع مكتب ديناميك للاستشارات الهندسية:\n📅 ${dateStr}${timeStr}\n📋 ${appt.reason}${assignedStr}\n\nنتطلع لرؤيتكم. للاستفسار يرجى التواصل معنا.`;
+    const msg = `السيد / ${lead.name} المحترم،\n\nتحية طيبة وبعد،\n\nيسعدنا في مكتب ديناميك للاستشارات الهندسية تذكيركم بموعدكم المحدد وفق التفاصيل التالية:\n\n📅 التاريخ: ${dateStr}\n⏰ الوقت: ${timeStr.replace(" الساعة ", "")}\n📋 نوع الاجتماع: ${appt.reason}${assignedStr}\n\nنتشرف بلقائكم في الموعد المحدد، ونأمل أن يكون اللقاء مثمراً.\n\nللاستفسار أو تعديل الموعد، يرجى التواصل معنا:\n📞 22091228 - 50855599\n📧 Info@DynamicSaud.com\n\nمع خالص التقدير والاحترام،\nمكتب ديناميك للاستشارات الهندسية`;
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
