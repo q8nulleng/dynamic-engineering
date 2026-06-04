@@ -85,6 +85,13 @@
       "when": 1780399284489,
       "tag": "0011_curious_mad_thinker",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1780563947014,
+      "tag": "0012_light_logan",
+      "breakpoints": true
     }
   ]
 }

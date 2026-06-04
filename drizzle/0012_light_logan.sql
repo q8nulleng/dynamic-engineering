@@ -1,0 +1,1 @@
+ALTER TABLE `projects` MODIFY COLUMN `status` varchar(64) DEFAULT 'جديد';
