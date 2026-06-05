@@ -38,6 +38,7 @@ import {
   useCreateClient, useCreateProject, useCreateContract, useUpdateContract,
   useCreateInvoice, useContracts, useContractsByLead, useProjects, useContractTemplates,
   useAppointmentsByLead, useCreateAppointment, useDeleteAppointment,
+  useEmployees,
 } from "@/lib/api";
 import { exportQuotationPdf, exportContractPdf } from "@/lib/pdf";
 import { toast } from "sonner";
@@ -794,6 +795,8 @@ function AppointmentDialog({ lead, onClose }: { lead: Lead; onClose: () => void 
   const createAppointment = useCreateAppointment();
   const deleteAppointment = useDeleteAppointment();
   const { data: appointments = [], isLoading } = useAppointmentsByLead(lead.id);
+  const { data: employees = [] } = useEmployees();
+  const activeEmployees = employees.filter((e: any) => e.isActive !== 0);
   const [form, setForm] = useState({
     date: "",
     time: "",
@@ -890,9 +893,14 @@ function AppointmentDialog({ lead, onClose }: { lead: Lead; onClose: () => void 
                 <SelectValue placeholder="اختر المسؤول..." />
               </SelectTrigger>
               <SelectContent>
-                {officeStaff.map(s => (
-                  <SelectItem key={s} value={s} className="text-sm">{s}</SelectItem>
-                ))}
+                {activeEmployees.length > 0
+                  ? activeEmployees.map((e: any) => (
+                      <SelectItem key={e.id} value={e.name} className="text-sm">{e.name}</SelectItem>
+                    ))
+                  : officeStaff.map(s => (
+                      <SelectItem key={s} value={s} className="text-sm">{s}</SelectItem>
+                    ))
+                }
               </SelectContent>
             </Select>
           </div>

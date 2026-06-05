@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
-import { useAllTasks, useInvoices, useClients } from "@/lib/api";
+import { useAllTasks, useInvoices, useClients, useEmployeeNotifications, useMarkAllNotificationsRead } from "@/lib/api";
 import {
   LayoutDashboard,
   Users,
@@ -78,9 +78,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // إشعارات الفواتير تظهر فقط للأدمن والمحاسب
   // إذا لم يكن هناك employee (أدمن Manus OAuth) → يرى كل شيء
   const empCanViewFinance = !employee ? true : ROLE_PERMISSIONS[employee.role as EmployeeRole]?.canViewFinance === true;
-  const notifCount = overdueTasks.length + pendingReview.length + (empCanViewFinance ? overdueInvoices.length : 0);
+
+  // إشعارات الموظف الشخصية (مواعيد جديدة مسندة إليه)
+  const { data: empNotifs = [] } = useEmployeeNotifications(employee?.id ?? null);
+  const markAllRead = useMarkAllNotificationsRead();
+  const unreadEmpNotifs = empNotifs.filter((n) => !n.isRead);
+
+  const notifCount = overdueTasks.length + pendingReview.length + (empCanViewFinance ? overdueInvoices.length : 0) + unreadEmpNotifs.length;
 
   const notifications = [
+    ...unreadEmpNotifs.map((n) => ({ id: `en${n.id}`, dot: "bg-blue-500", text: n.title, sub: n.body || "" })),
     ...overdueTasks.map((t) => ({ id: `t${t.id}`, dot: "bg-red-500", text: `مهمة متأخرة: ${t.name}`, sub: t.projectName })),
     ...pendingReview.map((t) => ({ id: `r${t.id}`, dot: "bg-amber-500", text: `بانتظار مراجعة: ${t.name}`, sub: t.projectName })),
     ...(empCanViewFinance ? overdueInvoices.map((i) => ({ id: `i${i.id}`, dot: "bg-orange-500", text: `فاتورة متأخرة: ${i.invoiceNumber || i.id}`, sub: i.client })) : []),
@@ -271,8 +278,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       </div>
                     ))}
                   </div>
-                  <div className="p-2 border-t">
-                    <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setShowNotifs(false)}>
+                  <div className="p-2 border-t flex gap-2">
+                    {employee && unreadEmpNotifs.length > 0 && (
+                      <Button variant="ghost" size="sm" className="flex-1 text-xs text-blue-600" onClick={() => { markAllRead.mutate(employee.id); }}>
+                        قراءة الكل
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" className="flex-1 text-xs" onClick={() => setShowNotifs(false)}>
                       إغلاق
                     </Button>
                   </div>

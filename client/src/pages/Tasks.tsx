@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ListChecks, LayoutGrid, Clock, User, FolderKanban, Lock } from "lucide-react";
 import { useAllTasks, useUpdateTaskStatus } from "@/lib/api";
+import { useEmployee } from "@/hooks/useEmployee";
 import { toast } from "sonner";
 
 /* ─── تحويل حالة DB إلى عرض عربي ─── */
@@ -40,6 +41,7 @@ const priorityMap: Record<number, { label: string; color: string; bg: string }> 
 export default function Tasks() {
   const { data: rawTasks = [], isLoading } = useAllTasks();
   const updateStatus = useUpdateTaskStatus();
+  const { employee } = useEmployee();
   const [view, setView]                     = useState<"list" | "kanban">("list");
   const [filterAssignee, setFilterAssignee] = useState("all");
   const [filterStatus, setFilterStatus]     = useState("all");
@@ -66,8 +68,26 @@ export default function Tasks() {
   /* قائمة المسؤولين الفريدة */
   const assignees = [...new Set(tasks.map((t) => t.assignee).filter(Boolean))];
 
-  /* تصفية */
+  /* تصفية: الموظف يرى مهامه فقط، الأدمن/محاسب يرى الكل */
+  const isAdminView = !employee || employee.role === "admin" || employee.role === "accountant";
+  const empName = employee?.name ?? null;
+
   const filtered = tasks.filter((t) => {
+    // فلتر حسب الموظف المسجّل
+    if (!isAdminView && empName) {
+      const tAssignee = (t.assignee || "").trim().toLowerCase();
+      const eName = empName.trim().toLowerCase();
+      // مطابقة مباشرة أو جزئية
+      const directMatch = tAssignee.includes(eName) || eName.includes(tAssignee);
+      // مطابقة حسب الدور
+      const roleMatch =
+        (employee?.role === "architect" && (tAssignee.includes("معماري") || tAssignee.includes("مصطفى"))) ||
+        (employee?.role === "structural" && (tAssignee.includes("إنشائي") || tAssignee.includes("أمين"))) ||
+        (employee?.role === "secretary" && (tAssignee.includes("سكرتير") || tAssignee.includes("ثروت") || tAssignee.includes("محمد"))) ||
+        (employee?.role === "draftsman" && (tAssignee.includes("رسام") || tAssignee.includes("عرفان"))) ||
+        (employee?.role === "facade_designer" && (tAssignee.includes("واجهات") || tAssignee.includes("عفيف")));
+      if (!directMatch && !roleMatch) return false;
+    }
     if (filterAssignee !== "all" && t.assignee !== filterAssignee) return false;
     if (filterStatus !== "all" && t.statusAr !== filterStatus) return false;
     return true;

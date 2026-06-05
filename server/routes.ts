@@ -13,7 +13,8 @@ import {
   invoices, invoiceLines, documents, crmLeads, contractTemplates, appointments,
   workPlans, workPlanPhases, workPlanTasks, projectBriefs, projectMeetings, phaseMeta,
   employees, employeeSessions,
-  supervisionVisits, detailedDrawings, municipalitySubmissions
+  supervisionVisits, detailedDrawings, municipalitySubmissions,
+  employeeNotifications
 } from "../drizzle/schema.js";
 import { nanoid } from "nanoid";
 import { storagePut } from "./storage.js";
@@ -1061,6 +1062,29 @@ apiRouter.post("/api/appointments", async (req, res) => {
     });
     const [row] = await db.select().from(appointments)
       .orderBy(desc(appointments.id)).limit(1);
+
+    // ── إشعار للموظف المسند إليه الموعد ──
+    if (assignedTo) {
+      try {
+        const allEmps = await db.select().from(employees);
+        const matched = allEmps.find((e: any) => {
+          const eName = (e.name || "").trim().toLowerCase();
+          const aName = (assignedTo || "").trim().toLowerCase();
+          return eName.includes(aName) || aName.includes(eName);
+        });
+        if (matched) {
+          await db.insert(employeeNotifications).values({
+            employeeId: (matched as any).id,
+            type: "new_appointment",
+            title: `موعد جديد: ${clientName}`,
+            body: `تاريخ: ${date}${time ? ` - ${time}` : ""}\nالسبب: ${reason || ""}`,
+            relatedId: row?.id || null,
+            isRead: 0,
+          });
+        }
+      } catch (_) { /* لا نوقف الاستجابة بسبب فشل الإشعار */ }
+    }
+
     res.json(row);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
@@ -2232,3 +2256,41 @@ apiRouter.get("/api/supervision/visits/:id/pdf", async (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 ;
+
+// ── Employee Notifications (إشعارات الموظفين) ─────────────────────────────────
+// GET /api/employee-notifications?employeeId=X  — جلب إشعارات موظف
+apiRouter.get("/api/employee-notifications", async (req, res) => {
+  try {
+    const db = getDb();
+    const empId = parseInt(req.query.employeeId as string);
+    if (!empId) return res.json([]);
+    const rows = await db.select().from(employeeNotifications)
+      .where(eq(employeeNotifications.employeeId, empId))
+      .orderBy(desc(employeeNotifications.createdAt));
+    res.json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/employee-notifications/:id/read  — تعليم كمقروء
+apiRouter.patch("/api/employee-notifications/:id/read", async (req, res) => {
+  try {
+    const db = getDb();
+    await db.update(employeeNotifications)
+      .set({ isRead: 1 })
+      .where(eq(employeeNotifications.id, parseInt(req.params.id)));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/employee-notifications/read-all  — تعليم الكل كمقروء
+apiRouter.patch("/api/employee-notifications/read-all", async (req, res) => {
+  try {
+    const db = getDb();
+    const empId = parseInt(req.body.employeeId);
+    if (!empId) return res.json({ success: false });
+    await db.update(employeeNotifications)
+      .set({ isRead: 1 })
+      .where(eq(employeeNotifications.employeeId, empId));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});

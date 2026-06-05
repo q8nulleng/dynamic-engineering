@@ -1041,3 +1041,41 @@ export function useEmployees() {
     initialData: [],
   });
 }
+
+// ── Employee Notifications ─────────────────────────────────────────────────────
+export interface EmployeeNotification {
+  id: number;
+  employeeId: number;
+  type: string;
+  title: string;
+  body: string | null;
+  relatedId: number | null;
+  isRead: number;
+  createdAt: string;
+}
+
+export function useEmployeeNotifications(employeeId: number | null) {
+  return useQuery<EmployeeNotification[]>({
+    queryKey: ["employee-notifications", employeeId],
+    queryFn: () => employeeId ? request(`/api/employee-notifications?employeeId=${employeeId}`) : Promise.resolve([]),
+    enabled: !!employeeId,
+    refetchInterval: 30000, // تحديث كل 30 ثانية
+    initialData: [],
+  });
+}
+
+export function useMarkNotificationRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => request(`/api/employee-notifications/${id}/read`, { method: "PATCH" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["employee-notifications"] }),
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (employeeId: number) => request("/api/employee-notifications/read-all", { method: "PATCH", body: JSON.stringify({ employeeId }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["employee-notifications"] }),
+  });
+}

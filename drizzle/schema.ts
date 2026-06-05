@@ -425,3 +425,17 @@ export const municipalitySubmissions = mysqlTable("municipality_submissions", {
 });
 export type MunicipalitySubmission = typeof municipalitySubmissions.$inferSelect;
 export type InsertMunicipalitySubmission = typeof municipalitySubmissions.$inferInsert;
+
+// ── Employee Notifications (إشعارات الموظفين) ─────────────────────────────────
+export const employeeNotifications = mysqlTable("employee_notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  employeeId: int("employee_id").notNull(),
+  type: varchar("type", { length: 64 }).notNull(),
+  title: varchar("title", { length: 256 }).notNull(),
+  body: text("body").default(""),
+  relatedId: int("related_id"),
+  isRead: tinyint("is_read").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type EmployeeNotification = typeof employeeNotifications.$inferSelect;
+export type InsertEmployeeNotification = typeof employeeNotifications.$inferInsert;
