@@ -29,9 +29,10 @@ export default function Dashboard() {
   const today = new Date().toISOString().slice(0, 10);
 
   // تحديد ما إذا كان الموظف مخوّلاً برؤية البيانات المالية
-  const canViewFinance = employee
-    ? ROLE_PERMISSIONS[employee.role]?.canViewFinance === true
-    : false;
+  // إذا لم يكن هناك employee (أي الأدمن الرئيسي عبر Manus OAuth) → يرى كل شيء
+  const canViewFinance = !employee
+    ? true
+    : ROLE_PERMISSIONS[employee.role]?.canViewFinance === true;
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
   const activeProjects  = projects.filter((p) => p.status !== "مكتمل" && p.status !== "مُقفل");

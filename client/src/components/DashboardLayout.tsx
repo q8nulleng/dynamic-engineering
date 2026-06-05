@@ -76,7 +76,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     (i) => i.status === "متأخرة" || (i.status === "مُرسلة" && i.dueDate && i.dueDate < today)
   );
   // إشعارات الفواتير تظهر فقط للأدمن والمحاسب
-  const empCanViewFinance = employee ? ROLE_PERMISSIONS[employee.role as EmployeeRole]?.canViewFinance === true : true;
+  // إذا لم يكن هناك employee (أدمن Manus OAuth) → يرى كل شيء
+  const empCanViewFinance = !employee ? true : ROLE_PERMISSIONS[employee.role as EmployeeRole]?.canViewFinance === true;
   const notifCount = overdueTasks.length + pendingReview.length + (empCanViewFinance ? overdueInvoices.length : 0);
 
   const notifications = [
