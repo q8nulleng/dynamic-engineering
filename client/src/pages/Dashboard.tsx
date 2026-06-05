@@ -1,12 +1,13 @@
 /*
  * Dashboard — لوحة التحكم ببيانات حقيقية من API
+ * البيانات المالية (الإيرادات، الفواتير) تظهر فقط للأدمن والمحاسب
  */
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
-  FolderKanban, FileText, Users, CreditCard,
+  FolderKanban, FileText, CreditCard,
   TrendingUp, Clock, AlertTriangle, CheckCircle2,
   FileSignature, Lock,
 } from "lucide-react";
@@ -14,8 +15,10 @@ import {
   useProjects, useQuotations, useContracts,
   useInvoices, useAllTasks, useClients,
 } from "@/lib/api";
+import { useEmployee, ROLE_PERMISSIONS } from "@/hooks/useEmployee";
 
 export default function Dashboard() {
+  const { employee } = useEmployee();
   const { data: projects = [] }   = useProjects();
   const { data: quotations = [] } = useQuotations();
   const { data: contracts = [] }  = useContracts();
@@ -24,6 +27,11 @@ export default function Dashboard() {
   const { data: clients = [] }    = useClients();
 
   const today = new Date().toISOString().slice(0, 10);
+
+  // تحديد ما إذا كان الموظف مخوّلاً برؤية البيانات المالية
+  const canViewFinance = employee
+    ? ROLE_PERMISSIONS[employee.role]?.canViewFinance === true
+    : false;
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
   const activeProjects  = projects.filter((p) => p.status !== "مكتمل" && p.status !== "مُقفل");
@@ -40,6 +48,7 @@ export default function Dashboard() {
       icon: FolderKanban,
       change: `${clients.length} عميل إجمالاً`,
       color: "oklch(0.30 0.05 250)",
+      financeOnly: false,
     },
     {
       label: "عروض الأسعار",
@@ -47,6 +56,7 @@ export default function Dashboard() {
       icon: FileText,
       change: `${quotations.filter((q) => q.status === "مرسل").length} مرسلة`,
       color: "oklch(0.72 0.10 60)",
+      financeOnly: false,
     },
     {
       label: "العقود النشطة",
@@ -54,6 +64,7 @@ export default function Dashboard() {
       icon: FileSignature,
       change: `${contracts.filter((c) => c.status === "مسودة").length} بانتظار التوقيع`,
       color: "oklch(0.55 0.15 150)",
+      financeOnly: false,
     },
     {
       label: "الإيرادات المحصّلة (د.ك)",
@@ -61,8 +72,12 @@ export default function Dashboard() {
       icon: CreditCard,
       change: `${invoices.filter((i) => i.status === "متأخرة" || (i.status === "مُرسلة" && i.dueDate && i.dueDate < today)).length} فاتورة متأخرة`,
       color: "oklch(0.60 0.12 30)",
+      financeOnly: true,
     },
   ];
+
+  // تصفية الـ KPIs بناءً على الصلاحيات
+  const visibleKpis = kpis.filter((kpi) => !kpi.financeOnly || canViewFinance);
 
   // ── Active Projects (last 5) ───────────────────────────────────────────────
   const displayProjects = activeProjects.slice(0, 5);
@@ -71,7 +86,6 @@ export default function Dashboard() {
   const pendingTasksList = tasks
     .filter((t) => t.status === "in_progress" || t.status === "blocked")
     .sort((a, b) => {
-      // overdue first
       if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline);
       if (a.deadline) return -1;
       if (b.deadline) return 1;
@@ -79,7 +93,7 @@ export default function Dashboard() {
     })
     .slice(0, 6);
 
-  // ── Recent Invoices as Activity ────────────────────────────────────────────
+  // ── Recent Invoices as Activity (للمالية فقط) ─────────────────────────────
   const recentInvoices = invoices.slice(0, 3);
   const overdueInvoices = invoices.filter(
     (i) => i.status === "متأخرة" || (i.status === "مُرسلة" && i.dueDate && i.dueDate < today)
@@ -107,9 +121,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpis.map((kpi, i) => (
+      {/* KPI Cards — يتكيف عدد الأعمدة مع عدد البطاقات المرئية */}
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${visibleKpis.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-4`}>
+        {visibleKpis.map((kpi, i) => (
           <Card key={i} className="border-0 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
@@ -134,7 +148,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Active Projects */}
-        <div className="lg:col-span-2">
+        <div className={canViewFinance ? "lg:col-span-2" : "lg:col-span-3"}>
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-bold flex items-center gap-2">
@@ -182,54 +196,56 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Overdue + Recent Invoices */}
-        <Card className="border-0 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Clock className="w-5 h-5" style={{ color: "oklch(0.72 0.10 60)" }} />
-              آخر الفواتير
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {overdueInvoices.length > 0 && (
-              <div className="flex items-center gap-2 mb-3 p-2 rounded-lg bg-red-50 text-red-700 text-xs">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                {overdueInvoices.length} فاتورة متأخرة تحتاج متابعة
-              </div>
-            )}
-            <div className="space-y-3">
-              {recentInvoices.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">لا توجد فواتير</p>
-              ) : recentInvoices.map((inv) => {
-                const isOverdue = inv.status === "متأخرة" || (inv.status === "مُرسلة" && inv.dueDate && inv.dueDate < today);
-                return (
-                  <div key={inv.id} className="flex gap-3 items-start">
-                    {inv.status === "مدفوعة" ? (
-                      <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-green-600" />
-                    ) : isOverdue ? (
-                      <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
-                    ) : (
-                      <FileText className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{inv.invoiceNumber || inv.id}</p>
-                      <p className="text-xs text-muted-foreground">{inv.client}</p>
-                      <p className="text-xs font-bold" style={{ fontFamily: "'Space Grotesk'" }}>
-                        {inv.total.toLocaleString()} د.ك
-                      </p>
+        {/* Overdue + Recent Invoices — للمالية فقط */}
+        {canViewFinance && (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Clock className="w-5 h-5" style={{ color: "oklch(0.72 0.10 60)" }} />
+                آخر الفواتير
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {overdueInvoices.length > 0 && (
+                <div className="flex items-center gap-2 mb-3 p-2 rounded-lg bg-red-50 text-red-700 text-xs">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  {overdueInvoices.length} فاتورة متأخرة تحتاج متابعة
+                </div>
+              )}
+              <div className="space-y-3">
+                {recentInvoices.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">لا توجد فواتير</p>
+                ) : recentInvoices.map((inv) => {
+                  const isOverdue = inv.status === "متأخرة" || (inv.status === "مُرسلة" && inv.dueDate && inv.dueDate < today);
+                  return (
+                    <div key={inv.id} className="flex gap-3 items-start">
+                      {inv.status === "مدفوعة" ? (
+                        <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-green-600" />
+                      ) : isOverdue ? (
+                        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+                      ) : (
+                        <FileText className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{inv.invoiceNumber || inv.id}</p>
+                        <p className="text-xs text-muted-foreground">{inv.client}</p>
+                        <p className="text-xs font-bold" style={{ fontFamily: "'Space Grotesk'" }}>
+                          {inv.total.toLocaleString()} د.ك
+                        </p>
+                      </div>
+                      <Badge
+                        className="text-[10px] shrink-0"
+                        variant={inv.status === "مدفوعة" ? "default" : isOverdue ? "destructive" : "secondary"}
+                      >
+                        {inv.status}
+                      </Badge>
                     </div>
-                    <Badge
-                      className="text-[10px] shrink-0"
-                      variant={inv.status === "مدفوعة" ? "default" : isOverdue ? "destructive" : "secondary"}
-                    >
-                      {inv.status}
-                    </Badge>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Pending Tasks */}

@@ -33,7 +33,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useEmployee, canAccessPath, getRoleLabel, type EmployeeRole } from "@/hooks/useEmployee";
+import { useEmployee, canAccessPath, getRoleLabel, type EmployeeRole, ROLE_PERMISSIONS } from "@/hooks/useEmployee";
 
 const allNavItems = [
   { path: "/", label: "لوحة التحكم", icon: LayoutDashboard },
@@ -75,12 +75,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const overdueInvoices = allInvoices.filter(
     (i) => i.status === "متأخرة" || (i.status === "مُرسلة" && i.dueDate && i.dueDate < today)
   );
-  const notifCount = overdueTasks.length + pendingReview.length + overdueInvoices.length;
+  // إشعارات الفواتير تظهر فقط للأدمن والمحاسب
+  const empCanViewFinance = employee ? ROLE_PERMISSIONS[employee.role as EmployeeRole]?.canViewFinance === true : true;
+  const notifCount = overdueTasks.length + pendingReview.length + (empCanViewFinance ? overdueInvoices.length : 0);
 
   const notifications = [
     ...overdueTasks.map((t) => ({ id: `t${t.id}`, dot: "bg-red-500", text: `مهمة متأخرة: ${t.name}`, sub: t.projectName })),
     ...pendingReview.map((t) => ({ id: `r${t.id}`, dot: "bg-amber-500", text: `بانتظار مراجعة: ${t.name}`, sub: t.projectName })),
-    ...overdueInvoices.map((i) => ({ id: `i${i.id}`, dot: "bg-orange-500", text: `فاتورة متأخرة: ${i.invoiceNumber || i.id}`, sub: i.client })),
+    ...(empCanViewFinance ? overdueInvoices.map((i) => ({ id: `i${i.id}`, dot: "bg-orange-500", text: `فاتورة متأخرة: ${i.invoiceNumber || i.id}`, sub: i.client })) : []),
   ];
 
   // فلترة عناصر القائمة حسب الصلاحيات
