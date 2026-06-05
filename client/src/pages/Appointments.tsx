@@ -9,6 +9,7 @@ import {
   MessageCircle, Trash2, UserCheck, CalendarDays,
 } from "lucide-react";
 import { useAppointments, useDeleteAppointment } from "@/lib/api";
+import { useEmployee } from "@/hooks/useEmployee";
 import { toast } from "sonner";
 
 const MONTHS_AR = [
@@ -30,8 +31,20 @@ function getStatusLabel(status: string) {
 }
 
 export default function Appointments() {
-  const { data: appointments = [], isLoading, isError } = useAppointments();
+  const { data: allAppointments = [], isLoading, isError } = useAppointments();
   const deleteAppointment = useDeleteAppointment();
+  const { employee } = useEmployee();
+
+  // الأدمن يرى كل المواعيد، الموظف يرى فقط مواعيده (مطابقة جزئية للاسم)
+  const appointments = !employee
+    ? allAppointments
+    : allAppointments.filter((a: any) => {
+        if (!a.assignedTo) return false;
+        const empName = employee.name.trim().toLowerCase();
+        const assigned = a.assignedTo.trim().toLowerCase();
+        // مطابقة جزئية: "م. مصطفى" يطابق "م. مصطفى المعامري" والعكس
+        return assigned.includes(empName) || empName.includes(assigned);
+      });
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [currentDate, setCurrentDate] = useState(new Date());
 
