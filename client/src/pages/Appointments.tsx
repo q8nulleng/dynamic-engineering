@@ -63,6 +63,9 @@ function BookingModal({
   const { data: clients = [] } = useClients();
   const { data: employees = [] } = useEmployees();
   const createAppointment = useCreateAppointment();
+  const { employee: currentEmployee } = useEmployee();
+  // هل المستخدم الحالي سكرتير؟ — تعيين الموظف إلزامي له
+  const isSecretary = currentEmployee?.role === "secretary";
 
   // الخطوات: 1=نوع العميل، 2=اختيار/إدخال العميل، 3=تفاصيل الموعد
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -107,6 +110,7 @@ function BookingModal({
   const handleSave = async () => {
     if (!apptDate) { toast.error("اختر تاريخ الموعد"); return; }
     if (!apptTime) { toast.error("اختر وقت الموعد"); return; }
+    if (isSecretary && !assignedTo) { toast.error("يجب تعيين الموعد لموظف معين"); return; }
     setSaving(true);
     try {
       const clientName = clientType === "existing" ? selectedClient?.name : newClientName;
@@ -344,19 +348,66 @@ function BookingModal({
                 </div>
               </div>
 
-              {/* المسؤول */}
+              {/* المسؤول عن الموعد */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">المسؤول عن الموعد</label>
-                <select
-                  value={assignedTo}
-                  onChange={e => setAssignedTo(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-orange-400"
-                >
-                  <option value="">— اختياري —</option>
-                  {(employees as any[]).map((emp: any) => (
-                    <option key={emp.id} value={emp.name}>{emp.name} · {emp.role}</option>
-                  ))}
-                </select>
+                <label className="text-xs font-medium mb-1 flex items-center gap-1">
+                  <UserCheck className="w-3.5 h-3.5 text-orange-500" />
+                  تعيين الموعد لموظف
+                  {isSecretary && <span className="text-red-500 mr-1">*</span>}
+                  {!isSecretary && <span className="text-[10px] text-muted-foreground">(اختياري)</span>}
+                </label>
+                <div className="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto">
+                  {!isSecretary && (
+                    <button
+                      className={`p-2 rounded-lg border text-right transition-all text-xs ${
+                        assignedTo === ""
+                          ? "border-orange-400 bg-orange-50 text-orange-700"
+                          : "border-border hover:border-orange-300"
+                      }`}
+                      onClick={() => setAssignedTo("")}
+                    >
+                      <p className="font-medium">بدون تعيين</p>
+                      <p className="text-[10px] text-muted-foreground">اختياري</p>
+                    </button>
+                  )}
+                  {(employees as any[]).filter((e: any) => e.isActive !== 0).map((emp: any) => {
+                    const roleLabels: Record<string, string> = {
+                      admin: "مدير", secretary: "سكرتير", architect: "م. معماري",
+                      accountant: "محاسب", structural: "م. إنشائي",
+                      draftsman: "رسام", facade_designer: "رسام واجهات",
+                    };
+                    const roleLabel = roleLabels[emp.role] || emp.role;
+                    const isSelected = assignedTo === emp.name;
+                    return (
+                      <button
+                        key={emp.id}
+                        className={`p-2 rounded-lg border text-right transition-all ${
+                          isSelected
+                            ? "border-orange-400 bg-orange-50"
+                            : "border-border hover:border-orange-300 hover:bg-orange-50/50"
+                        }`}
+                        onClick={() => setAssignedTo(emp.name)}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                            isSelected ? "bg-orange-500 text-white" : "bg-muted text-muted-foreground"
+                          }`}>
+                            {emp.name.charAt(0)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold truncate">{emp.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{roleLabel}</p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {isSecretary && !assignedTo && (
+                  <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                    <span>⚠</span> يجب اختيار موظف لتعيين الموعد له
+                  </p>
+                )}
               </div>
 
               {/* ملاحظات */}
@@ -396,16 +447,25 @@ export default function Appointments() {
   const { data: allAppointments = [], isLoading, isError } = useAppointments();
   const deleteAppointment = useDeleteAppointment();
   const { employee } = useEmployee();
+  const { data: allEmployees = [] } = useEmployees();
 
-  // الأدمن يرى كل المواعيد، الموظف يرى فقط مواعيده
-  const appointments = !employee
+  // صلاحيات عرض المواعيد:
+  // - بدون تسجيل (Manus owner): يرى الكل
+  // - سكرتير: يرى كل المواعيد (مسؤول عن الجدولة)
+  // - أدمن / محاسب: يرى كل المواعيد
+  // - باقي الموظفين: يرى فقط مواعيده المعيّنة له
+  const canViewAll = !employee || employee.role === "secretary" || employee.role === "admin" || employee.role === "accountant";
+  const appointments = canViewAll
     ? allAppointments
     : allAppointments.filter((a: any) => {
         if (!a.assignedTo) return false;
-        const empName = employee.name.trim().toLowerCase();
+        const empName = employee!.name.trim().toLowerCase();
         const assigned = a.assignedTo.trim().toLowerCase();
         return assigned.includes(empName) || empName.includes(assigned);
       });
+
+  // فلتر حسب الموظف (للأدمن والسكرتير)
+  const [filterEmployee, setFilterEmployee] = useState("");
 
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -418,8 +478,16 @@ export default function Appointments() {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
+  // تطبيق فلتر الموظف (للأدمن والسكرتير فقط)
+  const filteredAppointments = canViewAll && filterEmployee
+    ? appointments.filter((a: any) => {
+        if (!a.assignedTo) return false;
+        return a.assignedTo.trim().toLowerCase().includes(filterEmployee.trim().toLowerCase());
+      })
+    : appointments;
+
   const apptByDate: Record<string, any[]> = {};
-  appointments.forEach((a: any) => {
+  filteredAppointments.forEach((a: any) => {
     const key = a.date?.slice(0, 10);
     if (key) {
       if (!apptByDate[key]) apptByDate[key] = [];
@@ -536,31 +604,65 @@ export default function Appointments() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <CalendarDays className="w-5 h-5 text-orange-500" />
-            تقويم المواعيد
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {appointments.length} موعد إجمالي · {todayAppts.length} موعد اليوم
-          </p>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <CalendarDays className="w-5 h-5 text-orange-500" />
+              تقويم المواعيد
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {filteredAppointments.length} موعد إجمالي · {todayAppts.length} موعد اليوم
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className="text-xs bg-orange-500 hover:bg-orange-600 text-white"
+              onClick={() => { setBookingDate(undefined); setShowBooking(true); }}
+            >
+              <Plus className="w-3.5 h-3.5 ml-1" />حجز موعد
+            </Button>
+            <Button size="sm" variant={view === "calendar" ? "default" : "outline"} onClick={() => setView("calendar")} className="text-xs">
+              <Calendar className="w-3.5 h-3.5 ml-1" />تقويم
+            </Button>
+            <Button size="sm" variant={view === "list" ? "default" : "outline"} onClick={() => setView("list")} className="text-xs">
+              <Clock className="w-3.5 h-3.5 ml-1" />قائمة
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            className="text-xs bg-orange-500 hover:bg-orange-600 text-white"
-            onClick={() => { setBookingDate(undefined); setShowBooking(true); }}
-          >
-            <Plus className="w-3.5 h-3.5 ml-1" />حجز موعد
-          </Button>
-          <Button size="sm" variant={view === "calendar" ? "default" : "outline"} onClick={() => setView("calendar")} className="text-xs">
-            <Calendar className="w-3.5 h-3.5 ml-1" />تقويم
-          </Button>
-          <Button size="sm" variant={view === "list" ? "default" : "outline"} onClick={() => setView("list")} className="text-xs">
-            <Clock className="w-3.5 h-3.5 ml-1" />قائمة
-          </Button>
-        </div>
+
+        {/* فلتر حسب الموظف — للأدمن والسكرتير فقط */}
+        {canViewAll && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <UserCheck className="w-3.5 h-3.5" />عرض مواعيد:
+            </span>
+            <button
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
+                filterEmployee === ""
+                  ? "bg-orange-500 text-white border-orange-500"
+                  : "border-border hover:border-orange-300"
+              }`}
+              onClick={() => setFilterEmployee("")}
+            >
+              الجميع
+            </button>
+            {(allEmployees as any[]).filter((e: any) => e.isActive !== 0).map((emp: any) => (
+              <button
+                key={emp.id}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
+                  filterEmployee === emp.name
+                    ? "bg-orange-500 text-white border-orange-500"
+                    : "border-border hover:border-orange-300"
+                }`}
+                onClick={() => setFilterEmployee(filterEmployee === emp.name ? "" : emp.name)}
+              >
+                {emp.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* مواعيد اليوم */}
@@ -646,7 +748,7 @@ export default function Appointments() {
       ) : (
         /* ── عرض القائمة ── */
         <div className="space-y-2">
-          {appointments.length === 0 ? (
+          {filteredAppointments.length === 0 ? (
             <div className="text-center py-12">
               <CalendarDays className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
               <p className="text-muted-foreground text-sm mb-3">لا توجد مواعيد بعد</p>
@@ -656,7 +758,7 @@ export default function Appointments() {
               </Button>
             </div>
           ) : (
-            [...appointments]
+            [...filteredAppointments]
               .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
               .map((appt: any) => (
                 <div key={appt.id} className="p-3 rounded-lg border bg-card flex items-start gap-3">
