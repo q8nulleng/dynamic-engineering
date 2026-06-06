@@ -314,6 +314,11 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
   const [expandedGroup, setExpandedGroup] = useState<string | null>("docs");
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // تواريخ الفحوصات التقنية — محفوظة في phase_meta
+  const { data: fileMetaRow } = usePhaseMeta(project.id, "file_preparation");
+  const updateFileMeta = useUpdatePhaseMeta(project.id, "file_preparation");
+  const fileMeta: Record<string, any> = (fileMetaRow as any)?.data || {};
+
   // جلب جميع مستندات المشروع من قاعدة البيانات
   const { data: allProjectDocs = [], refetch: refetchDocs } = useDocuments({ projectId: project.id });
 
@@ -468,14 +473,9 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
             </div>
             {expandedGroup === "tech" && (
               <div className="px-3 pb-4 pt-3 space-y-3 border-t">
-                <p className="text-[11px] text-muted-foreground">ارفع نتائج الفحوصات — ستظهر في المستندات</p>
-                <div className="flex flex-wrap gap-2">
-                  <FileUploadButton label="رفع ملف فحوصات" category="فحوصات تقنية" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
-                </div>
-                <UploadedFilesList docs={techDocs} key={refreshKey + 100} onDeleted={() => { refetchDocs(); setRefreshKey(k => k + 1); }} />
-                {/* مهام الفحوصات من قاعدة البيانات */}
+                {/* ── مهام الفحوصات من قاعدة البيانات ── */}
                 {techTasks.map(task => (
-                  <div key={task.id} className="flex items-center justify-between py-1.5 border-t">
+                  <div key={task.id} className="flex items-center justify-between py-1.5">
                     <div className="flex items-center gap-2">
                       <button
                         className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0"
@@ -487,11 +487,83 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
                       >
                         {task.status === "done" && <Check className="w-2.5 h-2.5 text-white" />}
                       </button>
-                      <span className={`text-xs ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>{task.name}</span>
+                      <span className={`text-xs font-medium ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>{task.name}</span>
                     </div>
                     <TaskStatusBadge status={task.status} />
                   </div>
                 ))}
+
+                {/* ── فحص التربة: طلب + استلام ── */}
+                <div className="rounded-lg border bg-muted/10 overflow-hidden">
+                  <div className="px-3 py-2 border-b" style={{ backgroundColor: "color-mix(in oklch, oklch(0.60 0.12 30) 6%, white)" }}>
+                    <p className="text-[11px] font-bold" style={{ color: "oklch(0.45 0.10 30)" }}>فحص التربة</p>
+                  </div>
+                  <div className="px-3 py-2.5 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[11px] text-muted-foreground shrink-0 w-20">تاريخ الطلب</label>
+                      <input
+                        type="date"
+                        value={fileMeta.soilRequestDate || ""}
+                        onChange={e => updateFileMeta.mutate({ ...fileMeta, soilRequestDate: e.target.value })}
+                        className="flex-1 text-[11px] border rounded-md px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-orange-400"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[11px] text-muted-foreground shrink-0 w-20">تاريخ الاستلام</label>
+                      <input
+                        type="date"
+                        value={fileMeta.soilReceiveDate || ""}
+                        onChange={e => updateFileMeta.mutate({ ...fileMeta, soilReceiveDate: e.target.value })}
+                        className="flex-1 text-[11px] border rounded-md px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-green-500"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <FileUploadButton label="رفع تقرير التربة" category="فحص تربة" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
+                      {allProjectDocs.filter(d => d.category === "فحص تربة").length > 0 && (
+                        <span className="text-[10px] text-green-600 font-medium flex items-center gap-1">
+                          <Check className="w-3 h-3" /> {allProjectDocs.filter(d => d.category === "فحص تربة").length} ملف مرفوع
+                        </span>
+                      )}
+                    </div>
+                    <UploadedFilesList docs={allProjectDocs.filter(d => d.category === "فحص تربة")} key={refreshKey + 110} onDeleted={() => { refetchDocs(); setRefreshKey(k => k + 1); }} />
+                  </div>
+                </div>
+
+                {/* ── إمكانية الكهرباء: طلب + استلام ── */}
+                <div className="rounded-lg border bg-muted/10 overflow-hidden">
+                  <div className="px-3 py-2 border-b" style={{ backgroundColor: "color-mix(in oklch, oklch(0.55 0.15 250) 6%, white)" }}>
+                    <p className="text-[11px] font-bold" style={{ color: "oklch(0.40 0.12 250)" }}>إمكانية الكهرباء</p>
+                  </div>
+                  <div className="px-3 py-2.5 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[11px] text-muted-foreground shrink-0 w-20">تاريخ الطلب</label>
+                      <input
+                        type="date"
+                        value={fileMeta.elecRequestDate || ""}
+                        onChange={e => updateFileMeta.mutate({ ...fileMeta, elecRequestDate: e.target.value })}
+                        className="flex-1 text-[11px] border rounded-md px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[11px] text-muted-foreground shrink-0 w-20">تاريخ الاستلام</label>
+                      <input
+                        type="date"
+                        value={fileMeta.elecReceiveDate || ""}
+                        onChange={e => updateFileMeta.mutate({ ...fileMeta, elecReceiveDate: e.target.value })}
+                        className="flex-1 text-[11px] border rounded-md px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-green-500"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <FileUploadButton label="رفع كتاب الكهرباء" category="كتاب كهرباء" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
+                      {allProjectDocs.filter(d => d.category === "كتاب كهرباء").length > 0 && (
+                        <span className="text-[10px] text-green-600 font-medium flex items-center gap-1">
+                          <Check className="w-3 h-3" /> {allProjectDocs.filter(d => d.category === "كتاب كهرباء").length} ملف مرفوع
+                        </span>
+                      )}
+                    </div>
+                    <UploadedFilesList docs={allProjectDocs.filter(d => d.category === "كتاب كهرباء")} key={refreshKey + 120} onDeleted={() => { refetchDocs(); setRefreshKey(k => k + 1); }} />
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -2787,6 +2859,11 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
   const [activePopup, setActivePopup] = useState<number | null>(null);
   // جلب زيارات الإشراف لحساب تقدم مرحلة الإشراف من الخارج
   const { data: supervisionVisitsData = [] } = useSupervisionVisits(projectId);
+  // جلب مستندات المشروع لعرضها في كاردات المراحل
+  const { data: allProjectDocsMain = [] } = useDocuments({ projectId });
+  // جلب تواريخ الفحوصات لمرحلة تجهيز الملف
+  const { data: fileMetaMain } = usePhaseMeta(projectId, "file_preparation");
+  const fileMetaDataMain: Record<string, any> = (fileMetaMain as any)?.data || {};
 
   const project = projectData as ProjectData | undefined;
 
@@ -3043,6 +3120,36 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
                     </div>
                   )}
                 </div>
+
+                {/* مؤشرات خاصة بمرحلة تجهيز الملف */}
+                {idx === 0 && (() => {
+                  const soilDocs = allProjectDocsMain.filter((d: any) => d.category === "فحص تربة");
+                  const elecDocs = allProjectDocsMain.filter((d: any) => d.category === "كتاب كهرباء");
+                  const totalFileDocs = allProjectDocsMain.filter((d: any) =>
+                    d.category === "فحص تربة" || d.category === "كتاب كهرباء" ||
+                    d.category === "بطاقة مدنية" || d.category === "وثيقة ملكية" || d.category === "خريطة موقع"
+                  ).length;
+                  return (
+                    <div className="space-y-1">
+                      {totalFileDocs > 0 && (
+                        <div className="flex items-center gap-1 text-[10px]" style={{ color: "oklch(0.45 0.12 150)" }}>
+                          <Check className="w-2.5 h-2.5" />
+                          <span>{totalFileDocs} ملف مرفوع</span>
+                        </div>
+                      )}
+                      {fileMetaDataMain.soilReceiveDate && (
+                        <div className="flex items-center gap-1 text-[10px] text-orange-600">
+                          <span>تربة ✓ {fileMetaDataMain.soilReceiveDate}</span>
+                        </div>
+                      )}
+                      {fileMetaDataMain.elecReceiveDate && (
+                        <div className="flex items-center gap-1 text-[10px] text-blue-600">
+                          <span>كهرباء ✓ {fileMetaDataMain.elecReceiveDate}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Tap hint */}
                 <div className="text-[9px] text-muted-foreground flex items-center gap-0.5 justify-center mt-1">
