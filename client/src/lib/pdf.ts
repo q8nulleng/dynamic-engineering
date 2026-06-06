@@ -515,3 +515,58 @@ export async function exportInvoicePdf(invoice: Invoice): Promise<void> {
 export async function exportQuotationPdf(lead: QuotationLead, pkg: QuotationPackage): Promise<void> {
   await openPrintWindow(buildPage(quotationBody(lead, pkg), `عرض سعر — ${lead.name}`));
 }
+
+// ── Download quotation as real PDF blob using jsPDF + html2canvas ──────────
+export async function downloadQuotationPdf(lead: QuotationLead, pkg: QuotationPackage): Promise<string> {
+  const { default: jsPDF } = await import("jspdf");
+  const { default: html2canvas } = await import("html2canvas");
+
+  // Build HTML in a hidden iframe
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:794px;height:1123px;border:none;visibility:hidden;";
+  document.body.appendChild(iframe);
+
+  const htmlContent = buildPage(quotationBody(lead, pkg), `عرض سعر — ${lead.name}`);
+  // Remove auto-print script and print button
+  const cleanHtml = htmlContent
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<button[\s\S]*?<\/button>/gi, "");
+
+  const doc = iframe.contentDocument!;
+  doc.open();
+  doc.write(cleanHtml);
+  doc.close();
+
+  // Wait for fonts and images to load
+  await new Promise(r => setTimeout(r, 1800));
+
+  const canvas = await html2canvas(doc.body, {
+    scale: 2,
+    useCORS: true,
+    allowTaint: true,
+    width: 794,
+    windowWidth: 794,
+    backgroundColor: "#ffffff",
+  });
+
+  document.body.removeChild(iframe);
+
+  const imgData = canvas.toDataURL("image/jpeg", 0.95);
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+  const pageHeight = pdf.internal.pageSize.getHeight();
+
+  let position = 0;
+  let remainingHeight = pdfHeight;
+  while (remainingHeight > 0) {
+    pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, pdfHeight);
+    remainingHeight -= pageHeight;
+    position -= pageHeight;
+    if (remainingHeight > 0) pdf.addPage();
+  }
+
+  const fileName = `عرض-سعر-${lead.name.replace(/\s+/g, "-")}.pdf`;
+  pdf.save(fileName);
+  return fileName;
+}

@@ -40,7 +40,7 @@ import {
   useAppointmentsByLead, useCreateAppointment, useDeleteAppointment,
   useEmployees,
 } from "@/lib/api";
-import { exportQuotationPdf, exportContractPdf } from "@/lib/pdf";
+import { exportQuotationPdf, exportContractPdf, downloadQuotationPdf } from "@/lib/pdf";
 import { toast } from "sonner";
 
 interface Lead {
@@ -415,20 +415,69 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
     onClose();
   };
 
-  const handleSendWhatsApp = () => {
+  const [sendingPdf, setSendingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
     if (!quote) return;
+    setSendingPdf(true);
+    const tid = toast.loading("جاري إنشاء PDF...");
+    try {
+      const allFlat = Object.values(allPackages).flat();
+      const matchedPkg = allFlat.find(p => p.name === quote.package);
+      const pkgForPdf = matchedPkg
+        ? { ...matchedPkg, price: quote.amount }
+        : { name: quote.package, price: quote.amount, level: "-", features: [quote.service] };
+      const leadForPdf = {
+        name: lead.name,
+        phone: lead.phone,
+        type: quote.type,
+        serviceType: quote.service,
+        governorate: lead.governorate,
+        area: lead.area,
+      };
+      await downloadQuotationPdf(leadForPdf, pkgForPdf);
+      toast.success("تم تحميل PDF بنجاح", { id: tid });
+    } catch {
+      toast.error("فشل إنشاء PDF", { id: tid });
+    } finally {
+      setSendingPdf(false);
+    }
+  };
+
+  const handleSendWhatsApp = async () => {
+    if (!quote) return;
+    // تحميل PDF أولاً
+    setSendingPdf(true);
+    const tid = toast.loading("جاري تحميل PDF ثم فتح واتساب...");
+    try {
+      const allFlat = Object.values(allPackages).flat();
+      const matchedPkg = allFlat.find(p => p.name === quote.package);
+      const pkgForPdf = matchedPkg
+        ? { ...matchedPkg, price: quote.amount }
+        : { name: quote.package, price: quote.amount, level: "-", features: [quote.service] };
+      const leadForPdf = {
+        name: lead.name,
+        phone: lead.phone,
+        type: quote.type,
+        serviceType: quote.service,
+        governorate: lead.governorate,
+        area: lead.area,
+      };
+      await downloadQuotationPdf(leadForPdf, pkgForPdf);
+      toast.success("تم تحميل PDF — الآن أرفقه في واتساب", { id: tid });
+    } catch {
+      toast.dismiss(tid);
+    } finally {
+      setSendingPdf(false);
+    }
+    // فتح واتساب على رقم العميل
     const phone = (lead.phone || "").replace(/[^0-9]/g, "");
     const msg = encodeURIComponent(
-      `مرحباً ${lead.name}،\nيسعدنا إرسال عرض السعر الخاص بمشروعكم.\nالباقة: ${quote.package}\nالمبلغ: ${quote.amount} د.ك\nتاريخ الانتهاء: ${quote.expiryDate || "—"}\nنرجو مراجعة العرض والتواصل معنا لأي استفسار.\nشكراً لثقتكم بديناميك للاستشارات الهندسية`
+      `مرحباً ${lead.name}،\nيسعدنا إرسال عرض السعر الخاص بمشروعكم.\nالباقة: ${quote.package}\nالمبلغ: ${quote.amount} د.ك\nتاريخ الانتهاء: ${quote.expiryDate || "—"}\nيرجى مراجعة الملف المرفق.\nشكراً لثقتكم بديناميك للاستشارات الهندسية`
     );
     const url = `https://wa.me/965${phone}?text=${msg}`;
-    // فتح واتساب — يعمل على الجوال مباشرة، وعلى الحاسوب يفتح واتساب ويب
     const win = window.open(url, "_blank", "noopener,noreferrer");
-    if (!win) {
-      // إذا منع المتصفح النافذة، نفتح في نفس التبويب كحل بديل
-      window.location.href = url;
-    }
-    toast.success("جاري فتح واتساب...");
+    if (!win) window.location.href = url;
   };
 
   return (
@@ -528,10 +577,14 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
                 <Pencil className="w-3.5 h-3.5 ml-1" />
                 تعديل العرض
               </Button>
-              <Button size="sm" onClick={handleSendWhatsApp}
+              <Button variant="outline" size="sm" disabled={sendingPdf} onClick={handleDownloadPdf}>
+                {sendingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin ml-1" /> : <FileText className="w-3.5 h-3.5 ml-1" />}
+                تحميل PDF
+              </Button>
+              <Button size="sm" disabled={sendingPdf} onClick={handleSendWhatsApp}
                 style={{ backgroundColor: "#25D366", color: "white" }}>
-                <MessageCircle className="w-3.5 h-3.5 ml-1" />
-                إرسال واتساب
+                {sendingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin ml-1" /> : <MessageCircle className="w-3.5 h-3.5 ml-1" />}
+                إرسال واتساب + PDF
               </Button>
             </div>
           </div>
