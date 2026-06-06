@@ -535,7 +535,13 @@ apiRouter.put("/api/quotations/:id", async (req, res) => {
     res.json(row);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
-
+apiRouter.delete("/api/quotations/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    await db.delete(quotations).where(eq(quotations.id, req.params.id));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
 // ── Contracts ─────────────────────────────────────────────────────────────
 apiRouter.get("/api/contracts", async (req, res) => {
   try {

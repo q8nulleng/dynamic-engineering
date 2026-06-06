@@ -317,6 +317,13 @@ export function useUpdateQuotation() {
   });
 }
 
+export function useDeleteQuotation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => request<{ success: boolean }>(`/api/quotations/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["quotations"] }),
+  });
+}
 export function useQuotationsByLead(leadId: string | undefined) {
   return useQuery<Quotation[]>({
     queryKey: ["quotations", { leadId }],

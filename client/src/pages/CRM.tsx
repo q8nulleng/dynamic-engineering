@@ -33,7 +33,7 @@ import { Link } from "wouter";
 import { kuwaitGovernorates } from "./Clients";
 import { allPackages } from "./Quotations";
 import {
-  useCreateQuotation, useUpdateQuotation, useQuotationsByLead, useQuotations,
+  useCreateQuotation, useUpdateQuotation, useDeleteQuotation, useQuotationsByLead, useQuotations,
   useCrmLeads, useCreateCrmLead, useUpdateCrmLead, useDeleteCrmLead,
   useCreateClient, useCreateProject, useCreateContract, useUpdateContract,
   useCreateInvoice, useContracts, useContractsByLead, useProjects, useContractTemplates,
@@ -347,9 +347,11 @@ function QuotationDialog({ lead, onClose, onSaved }: {
               const q = await createQuotation.mutateAsync({ ...buildQuotationPayload(), status: "مرسل" });
               toast.success("تم حفظ العرض كمرسل");
               onSaved(q.id);
-              const phone = lead.phone?.replace(/[^0-9]/g, "");
+              const phone = (lead.phone || "").replace(/[^0-9]/g, "");
               const msg = encodeURIComponent(`مرحباً ${lead.name}،\nيسعدنا إرسال عرض السعر الخاص بمشروعكم.\nالباقة: ${selectedPkg.name}\nالمبلغ: ${agreedPrice.trim() || selectedPkg.price} د.ك\nنرجو مراجعة العرض والتواصل معنا لأي استفسار.\nشكراً لثقتكم بديناميك للاستشارات الهندسية`);
-              window.open(`https://wa.me/965${phone}?text=${msg}`, "_blank");
+              const url = `https://wa.me/965${phone}?text=${msg}`;
+              const win = window.open(url, "_blank", "noopener,noreferrer");
+              if (!win) { window.location.href = url; }
             }}
             style={{ backgroundColor: "#25D366" }}
           >
@@ -387,9 +389,11 @@ function QuotationDialog({ lead, onClose, onSaved }: {
 function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   const { data: quotes, isLoading } = useQuotationsByLead(lead.id);
   const updateQuotation = useUpdateQuotation();
+  const deleteQuotation = useDeleteQuotation();
   const quote = quotes?.[0];
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ amount: "", service: "", package: "", status: "", type: "" });
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const startEdit = () => {
     if (!quote) return;
@@ -402,6 +406,29 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
     await updateQuotation.mutateAsync({ id: quote.id, ...editForm });
     toast.success("تم تحديث عرض السعر بنجاح");
     setEditing(false);
+  };
+
+  const handleDelete = async () => {
+    if (!quote) return;
+    await deleteQuotation.mutateAsync(quote.id);
+    toast.success("تم حذف عرض السعر");
+    onClose();
+  };
+
+  const handleSendWhatsApp = () => {
+    if (!quote) return;
+    const phone = (lead.phone || "").replace(/[^0-9]/g, "");
+    const msg = encodeURIComponent(
+      `مرحباً ${lead.name}،\nيسعدنا إرسال عرض السعر الخاص بمشروعكم.\nالباقة: ${quote.package}\nالمبلغ: ${quote.amount} د.ك\nتاريخ الانتهاء: ${quote.expiryDate || "—"}\nنرجو مراجعة العرض والتواصل معنا لأي استفسار.\nشكراً لثقتكم بديناميك للاستشارات الهندسية`
+    );
+    const url = `https://wa.me/965${phone}?text=${msg}`;
+    // فتح واتساب — يعمل على الجوال مباشرة، وعلى الحاسوب يفتح واتساب ويب
+    const win = window.open(url, "_blank", "noopener,noreferrer");
+    if (!win) {
+      // إذا منع المتصفح النافذة، نفتح في نفس التبويب كحل بديل
+      window.location.href = url;
+    }
+    toast.success("جاري فتح واتساب...");
   };
 
   return (
@@ -474,18 +501,38 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
               <div><span className="text-muted-foreground">نوع الخدمة:</span> <span>{quote.service}</span></div>
               <div><span className="text-muted-foreground">نوع المشروع:</span> <span>{quote.type}</span></div>
             </div>
-            <div className="flex gap-2 justify-end">
+
+            {/* تأكيد الحذف */}
+            {confirmDelete && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm">
+                <p className="font-semibold text-red-800 mb-2">هل أنت متأكد من حذف عرض السعر؟ لا يمكن التراجع.</p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setConfirmDelete(false)}>إلغاء</Button>
+                  <Button size="sm" disabled={deleteQuotation.isPending} onClick={handleDelete}
+                    style={{ backgroundColor: "oklch(0.55 0.15 25)", color: "white" }}>
+                    {deleteQuotation.isPending ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Trash2 className="w-3 h-3 ml-1" />}
+                    تأكيد الحذف
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 flex-wrap justify-end">
               <Button variant="outline" size="sm" onClick={onClose}>إغلاق</Button>
+              <Button variant="outline" size="sm" className="text-red-600 border-red-200"
+                onClick={() => setConfirmDelete(true)}>
+                <Trash2 className="w-3.5 h-3.5 ml-1" />
+                حذف العرض
+              </Button>
               <Button variant="outline" size="sm" onClick={startEdit}>
                 <Pencil className="w-3.5 h-3.5 ml-1" />
                 تعديل العرض
               </Button>
-              <Link href="/quotations">
-                <Button size="sm" style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>
-                  <FileText className="w-3.5 h-3.5 ml-1" />
-                  فتح قسم عروض الأسعار
-                </Button>
-              </Link>
+              <Button size="sm" onClick={handleSendWhatsApp}
+                style={{ backgroundColor: "#25D366", color: "white" }}>
+                <MessageCircle className="w-3.5 h-3.5 ml-1" />
+                إرسال واتساب
+              </Button>
             </div>
           </div>
         )}
