@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { kuwaitGovernorates } from "./Clients";
-import { allPackages } from "./Quotations";
+import { allPackages, loadPackages } from "./Quotations";
 import {
   useCreateQuotation, useUpdateQuotation, useDeleteQuotation, useQuotationsByLead, useQuotations,
   useCrmLeads, useCreateCrmLead, useUpdateCrmLead, useDeleteCrmLead,
@@ -107,8 +107,9 @@ function QuotationDialog({ lead, onClose, onSaved }: {
   const [generating, setGenerating] = useState(false);
   const [agreedPrice, setAgreedPrice] = useState("");
 
-  const allFlat = Object.values(allPackages).flat();
-  const byType = lead.type ? (allPackages[lead.type] || allFlat) : allFlat;
+  const dynamicPackages = loadPackages();
+  const allFlat = Object.values(dynamicPackages).flat();
+  const byType = lead.type ? (dynamicPackages[lead.type] || allFlat) : allFlat;
   const packages: PkgType[] = lead.serviceType
     ? (byType.filter(p => p.serviceType === lead.serviceType).length > 0
         ? byType.filter(p => p.serviceType === lead.serviceType)

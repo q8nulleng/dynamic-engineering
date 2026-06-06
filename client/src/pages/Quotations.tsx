@@ -90,9 +90,9 @@ const fallbackStatus = { label: "—", color: "text-gray-500", bg: "bg-gray-50" 
 
 type Package = { name: string; price: string; buildingType: string; serviceType: string; level: string; features: string[] };
 
-const STORAGE_KEY = "dynamic_packages_v1";
+export const STORAGE_KEY = "dynamic_packages_v1";
 
-function loadPackages(): Record<string, Package[]> {
+export function loadPackages(): Record<string, Package[]> {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) return JSON.parse(saved);
