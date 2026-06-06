@@ -31,14 +31,13 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { kuwaitGovernorates } from "./Clients";
-import { allPackages, loadPackages } from "./Quotations";
 import {
   useCreateQuotation, useUpdateQuotation, useDeleteQuotation, useQuotationsByLead, useQuotations,
   useCrmLeads, useCreateCrmLead, useUpdateCrmLead, useDeleteCrmLead,
   useCreateClient, useCreateProject, useCreateContract, useUpdateContract,
   useCreateInvoice, useContracts, useContractsByLead, useProjects, useContractTemplates,
   useAppointmentsByLead, useCreateAppointment, useDeleteAppointment,
-  useEmployees,
+  useEmployees, usePackages,
 } from "@/lib/api";
 import { exportQuotationPdf, exportContractPdf, downloadQuotationPdf } from "@/lib/pdf";
 import { toast } from "sonner";
@@ -107,7 +106,7 @@ function QuotationDialog({ lead, onClose, onSaved }: {
   const [generating, setGenerating] = useState(false);
   const [agreedPrice, setAgreedPrice] = useState("");
 
-  const dynamicPackages = loadPackages();
+  const { data: dynamicPackages = {} } = usePackages();
   const allFlat = Object.values(dynamicPackages).flat();
   const byType = lead.type ? (dynamicPackages[lead.type] || allFlat) : allFlat;
   const packages: PkgType[] = lead.serviceType
@@ -418,12 +417,14 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
 
   const [sendingPdf, setSendingPdf] = useState(false);
 
+  const { data: allPkgsDb = {} } = usePackages();
+
   const handleDownloadPdf = async () => {
     if (!quote) return;
     setSendingPdf(true);
     const tid = toast.loading("جاري إنشاء PDF...");
     try {
-      const allFlat = Object.values(allPackages).flat();
+      const allFlat = Object.values(allPkgsDb).flat();
       const matchedPkg = allFlat.find(p => p.name === quote.package);
       const pkgForPdf = matchedPkg
         ? { ...matchedPkg, price: quote.amount }
@@ -451,10 +452,10 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
     setSendingPdf(true);
     const tid = toast.loading("جاري تحميل PDF ثم فتح واتساب...");
     try {
-      const allFlat = Object.values(allPackages).flat();
-      const matchedPkg = allFlat.find(p => p.name === quote.package);
-      const pkgForPdf = matchedPkg
-        ? { ...matchedPkg, price: quote.amount }
+      const allFlat2 = Object.values(allPkgsDb).flat();
+      const matchedPkg2 = allFlat2.find(p => p.name === quote.package);
+      const pkgForPdf = matchedPkg2
+        ? { ...matchedPkg2, price: quote.amount }
         : { name: quote.package, price: quote.amount, level: "-", features: [quote.service] };
       const leadForPdf = {
         name: lead.name,

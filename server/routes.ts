@@ -14,7 +14,7 @@ import {
   workPlans, workPlanPhases, workPlanTasks, projectBriefs, projectMeetings, phaseMeta,
   employees, employeeSessions,
   supervisionVisits, detailedDrawings, municipalitySubmissions,
-  employeeNotifications
+  employeeNotifications, packages
 } from "../drizzle/schema.js";
 import { nanoid } from "nanoid";
 import { storagePut } from "./storage.js";
@@ -2297,6 +2297,74 @@ apiRouter.patch("/api/employee-notifications/read-all", async (req, res) => {
     await db.update(employeeNotifications)
       .set({ isRead: 1 })
       .where(eq(employeeNotifications.employeeId, empId));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Packages (الباقات) ─────────────────────────────────────────────────────────
+// GET /api/packages — جلب كل الباقات
+apiRouter.get("/api/packages", async (_req, res) => {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(packages).orderBy(packages.buildingType, packages.name);
+    // إرجاع الباقات كـ Record<buildingType, Package[]>
+    const grouped: Record<string, any[]> = {};
+    for (const row of rows) {
+      const bt = row.buildingType;
+      if (!grouped[bt]) grouped[bt] = [];
+      grouped[bt].push({
+        ...row,
+        features: (() => { try { return JSON.parse(row.features || "[]"); } catch { return []; } })(),
+      });
+    }
+    res.json(grouped);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/packages — إضافة باقة جديدة
+apiRouter.post("/api/packages", async (req, res) => {
+  try {
+    const db = getDb();
+    const { name, price, buildingType, serviceType, level, features } = req.body;
+    await db.insert(packages).values({
+      name,
+      price,
+      buildingType,
+      serviceType,
+      level: level || "-",
+      features: JSON.stringify(Array.isArray(features) ? features : []),
+    });
+    const [row] = await db.select().from(packages)
+      .where(eq(packages.name, name))
+      .orderBy(desc(packages.id))
+      .limit(1);
+    res.status(201).json({ ...row, features: JSON.parse(row.features || "[]") });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT /api/packages/:id — تعديل باقة
+apiRouter.put("/api/packages/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    const { name, price, buildingType, serviceType, level, features } = req.body;
+    await db.update(packages).set({
+      name,
+      price,
+      buildingType,
+      serviceType,
+      level: level || "-",
+      features: JSON.stringify(Array.isArray(features) ? features : []),
+    }).where(eq(packages.id, parseInt(req.params.id)));
+    const [row] = await db.select().from(packages).where(eq(packages.id, parseInt(req.params.id)));
+    res.json({ ...row, features: JSON.parse(row.features || "[]") });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/packages/:id — حذف باقة
+apiRouter.delete("/api/packages/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    await db.delete(packages).where(eq(packages.id, parseInt(req.params.id)));
     res.json({ success: true });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });

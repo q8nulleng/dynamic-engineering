@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { Link } from "wouter";
-import { useQuotations, useUpdateQuotation, useCreateQuotation, useClients } from "@/lib/api";
+import { useQuotations, useUpdateQuotation, useCreateQuotation, useClients, usePackages, useCreatePackage, useUpdatePackage, useDeletePackage } from "@/lib/api";
 import { exportQuotationPdf } from "@/lib/pdf";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -112,9 +112,12 @@ export default function Quotations() {
   const [editForm, setEditForm] = useState({ amount: "", service: "", package: "", status: "", type: "" });
   const updateQuotation = useUpdateQuotation();
 
-  // Package editing state
-  const [packages, setPackages] = useState<Record<string, Package[]>>(loadPackages);
-  const [editingPkg, setEditingPkg] = useState<Package | null>(null);
+  // Package editing state — now from DB
+  const { data: packages = {} } = usePackages();
+  const createPackageMutation = useCreatePackage();
+  const updatePackageMutation = useUpdatePackage();
+  const deletePackageMutation = useDeletePackage();
+  const [editingPkg, setEditingPkg] = useState<(Package & { id?: number }) | null>(null);
   const [pkgForm, setPkgForm] = useState<Package>({ name: "", price: "", buildingType: "", serviceType: "", level: "", features: [] });
   const [pkgFeaturesText, setPkgFeaturesText] = useState("");
 
@@ -180,46 +183,32 @@ export default function Quotations() {
     setNewQuoteNotes("");
   };
 
-  const saveNewPkg = () => {
-    const newPkg: Package = { ...newPkgForm, features: newPkgFeaturesText.split("\n").map(f => f.trim()).filter(Boolean) };
-    const bt = newPkg.buildingType;
-    const newPackages = { ...packages, [bt]: [...(packages[bt] || []), newPkg] };
-    setPackages(newPackages);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newPackages));
+  const saveNewPkg = async () => {
+    const newPkg = { ...newPkgForm, features: newPkgFeaturesText.split("\n").map(f => f.trim()).filter(Boolean) };
+    await createPackageMutation.mutateAsync(newPkg);
     setAddingPkg(false);
     setNewPkgForm({ name: "", price: "", buildingType: "سكن خاص", serviceType: "بناء جديد", level: "-", features: [] });
     setNewPkgFeaturesText("");
     toast.success("تم إضافة الباقة بنجاح");
   };
 
-  const deletePkg = (pkg: Package) => {
+  const deletePkg = async (pkg: Package & { id?: number }) => {
+    if (!pkg.id) return;
     if (!confirm(`هل تريد حذف باقة "${pkg.name}"?`)) return;
-    const newPackages = { ...packages };
-    for (const bt of Object.keys(newPackages)) {
-      newPackages[bt] = newPackages[bt].filter(p => !(p.name === pkg.name && p.buildingType === pkg.buildingType));
-    }
-    setPackages(newPackages);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newPackages));
+    await deletePackageMutation.mutateAsync(pkg.id);
     toast.success("تم حذف الباقة");
   };
 
-  const openEditPkg = (pkg: Package) => {
+  const openEditPkg = (pkg: Package & { id?: number }) => {
     setEditingPkg(pkg);
     setPkgForm({ ...pkg });
     setPkgFeaturesText(pkg.features.join("\n"));
   };
 
-  const saveEditPkg = () => {
-    if (!editingPkg) return;
-    const updated = { ...pkgForm, features: pkgFeaturesText.split("\n").map(f => f.trim()).filter(Boolean) };
-    const newPackages = { ...packages };
-    for (const bt of Object.keys(newPackages)) {
-      newPackages[bt] = newPackages[bt].map(p =>
-        p.name === editingPkg.name && p.buildingType === editingPkg.buildingType ? updated : p
-      );
-    }
-    setPackages(newPackages);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newPackages));
+  const saveEditPkg = async () => {
+    if (!editingPkg || !editingPkg.id) return;
+    const updated = { ...pkgForm, id: editingPkg.id, features: pkgFeaturesText.split("\n").map(f => f.trim()).filter(Boolean) };
+    await updatePackageMutation.mutateAsync(updated as any);
     setEditingPkg(null);
     toast.success("تم حفظ تعديلات الباقة");
   };

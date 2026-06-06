@@ -439,3 +439,18 @@ export const employeeNotifications = mysqlTable("employee_notifications", {
 });
 export type EmployeeNotification = typeof employeeNotifications.$inferSelect;
 export type InsertEmployeeNotification = typeof employeeNotifications.$inferInsert;
+
+// ── Packages (الباقات) ─────────────────────────────────────────────────────────
+export const packages = mysqlTable("packages", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 128 }).notNull(),
+  price: varchar("price", { length: 32 }).notNull(),
+  buildingType: varchar("building_type", { length: 64 }).notNull(),
+  serviceType: varchar("service_type", { length: 64 }).notNull(),
+  level: varchar("level", { length: 64 }).notNull().default("-"),
+  features: text("features").notNull().default("[]"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type Package = typeof packages.$inferSelect;
+export type InsertPackage = typeof packages.$inferInsert;

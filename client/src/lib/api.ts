@@ -1086,3 +1086,46 @@ export function useMarkAllNotificationsRead() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["employee-notifications"] }),
   });
 }
+
+// ── Packages (الباقات) ─────────────────────────────────────────────────────────
+export interface DbPackage {
+  id: number;
+  name: string;
+  price: string;
+  buildingType: string;
+  serviceType: string;
+  level: string;
+  features: string[];
+}
+export function usePackages() {
+  return useQuery<Record<string, DbPackage[]>>({
+    queryKey: ["packages"],
+    queryFn: () => request("/api/packages"),
+    initialData: {},
+    staleTime: 0,
+  });
+}
+export function useCreatePackage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Omit<DbPackage, "id">) =>
+      request("/api/packages", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["packages"] }),
+  });
+}
+export function useUpdatePackage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: DbPackage) =>
+      request(`/api/packages/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["packages"] }),
+  });
+}
+export function useDeletePackage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      request(`/api/packages/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["packages"] }),
+  });
+}
