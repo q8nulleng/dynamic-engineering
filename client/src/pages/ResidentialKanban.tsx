@@ -493,77 +493,137 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
                   </div>
                 ))}
 
-                {/* ── فحص التربة: طلب + استلام ── */}
-                <div className="rounded-lg border bg-muted/10 overflow-hidden">
-                  <div className="px-3 py-2 border-b" style={{ backgroundColor: "color-mix(in oklch, oklch(0.60 0.12 30) 6%, white)" }}>
-                    <p className="text-[11px] font-bold" style={{ color: "oklch(0.45 0.10 30)" }}>فحص التربة</p>
+                {/* ── صفوف الفحوصات: checkbox + تاريخ تلقائي ── */}
+                <div className="space-y-1 py-1">
+                  {/* طلب فحص التربة */}
+                  <div className="flex items-center justify-between py-1.5 px-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
+                        style={{
+                          borderColor: fileMeta.soilRequestDone ? "oklch(0.55 0.15 150)" : "hsl(var(--border))",
+                          backgroundColor: fileMeta.soilRequestDone ? "oklch(0.55 0.15 150)" : "transparent",
+                        }}
+                        onClick={() => {
+                          const now = !fileMeta.soilRequestDone;
+                          updateFileMeta.mutate({ ...fileMeta, soilRequestDone: now, soilRequestDate: now ? new Date().toISOString().slice(0, 10) : "" });
+                        }}
+                      >
+                        {fileMeta.soilRequestDone && <Check className="w-3 h-3 text-white" />}
+                      </button>
+                      <div>
+                        <span className={`text-xs font-medium ${fileMeta.soilRequestDone ? "line-through text-muted-foreground" : ""}`}>طلب فحص التربة</span>
+                        {fileMeta.soilRequestDone && fileMeta.soilRequestDate && (
+                          <p className="text-[10px] text-green-600">{new Date(fileMeta.soilRequestDate).toLocaleDateString("ar-KW", { day: "numeric", month: "short", year: "numeric" })}</p>
+                        )}
+                      </div>
+                    </div>
+                    {fileMeta.soilRequestDone ? (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">مكتملة</span>
+                    ) : (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">لم تبدأ</span>
+                    )}
                   </div>
-                  <div className="px-3 py-2.5 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <label className="text-[11px] text-muted-foreground shrink-0 w-20">تاريخ الطلب</label>
-                      <input
-                        type="date"
-                        value={fileMeta.soilRequestDate || ""}
-                        onChange={e => updateFileMeta.mutate({ ...fileMeta, soilRequestDate: e.target.value })}
-                        className="flex-1 text-[11px] border rounded-md px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-orange-400"
-                      />
+
+                  {/* استلام فحص التربة */}
+                  <div className="flex items-center justify-between py-1.5 px-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
+                        style={{
+                          borderColor: fileMeta.soilReceiveDone ? "oklch(0.55 0.15 150)" : "hsl(var(--border))",
+                          backgroundColor: fileMeta.soilReceiveDone ? "oklch(0.55 0.15 150)" : "transparent",
+                        }}
+                        onClick={() => {
+                          const now = !fileMeta.soilReceiveDone;
+                          updateFileMeta.mutate({ ...fileMeta, soilReceiveDone: now, soilReceiveDate: now ? new Date().toISOString().slice(0, 10) : "" });
+                        }}
+                      >
+                        {fileMeta.soilReceiveDone && <Check className="w-3 h-3 text-white" />}
+                      </button>
+                      <div>
+                        <span className={`text-xs font-medium ${fileMeta.soilReceiveDone ? "line-through text-muted-foreground" : ""}`}>استلام فحص التربة</span>
+                        {fileMeta.soilReceiveDone && fileMeta.soilReceiveDate && (
+                          <p className="text-[10px] text-green-600">{new Date(fileMeta.soilReceiveDate).toLocaleDateString("ar-KW", { day: "numeric", month: "short", year: "numeric" })}</p>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <label className="text-[11px] text-muted-foreground shrink-0 w-20">تاريخ الاستلام</label>
-                      <input
-                        type="date"
-                        value={fileMeta.soilReceiveDate || ""}
-                        onChange={e => updateFileMeta.mutate({ ...fileMeta, soilReceiveDate: e.target.value })}
-                        className="flex-1 text-[11px] border rounded-md px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-green-500"
-                      />
+                    {fileMeta.soilReceiveDone ? (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">مكتملة</span>
+                    ) : (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">لم تبدأ</span>
+                    )}
+                  </div>
+
+                  {/* طلب إمكانية الكهرباء */}
+                  <div className="flex items-center justify-between py-1.5 px-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
+                        style={{
+                          borderColor: fileMeta.elecRequestDone ? "oklch(0.55 0.15 150)" : "hsl(var(--border))",
+                          backgroundColor: fileMeta.elecRequestDone ? "oklch(0.55 0.15 150)" : "transparent",
+                        }}
+                        onClick={() => {
+                          const now = !fileMeta.elecRequestDone;
+                          updateFileMeta.mutate({ ...fileMeta, elecRequestDone: now, elecRequestDate: now ? new Date().toISOString().slice(0, 10) : "" });
+                        }}
+                      >
+                        {fileMeta.elecRequestDone && <Check className="w-3 h-3 text-white" />}
+                      </button>
+                      <div>
+                        <span className={`text-xs font-medium ${fileMeta.elecRequestDone ? "line-through text-muted-foreground" : ""}`}>طلب إمكانية الكهرباء</span>
+                        {fileMeta.elecRequestDone && fileMeta.elecRequestDate && (
+                          <p className="text-[10px] text-green-600">{new Date(fileMeta.elecRequestDate).toLocaleDateString("ar-KW", { day: "numeric", month: "short", year: "numeric" })}</p>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 pt-1">
-                      <FileUploadButton label="رفع تقرير التربة" category="فحص تربة" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
-                      {allProjectDocs.filter(d => d.category === "فحص تربة").length > 0 && (
-                        <span className="text-[10px] text-green-600 font-medium flex items-center gap-1">
-                          <Check className="w-3 h-3" /> {allProjectDocs.filter(d => d.category === "فحص تربة").length} ملف مرفوع
-                        </span>
-                      )}
+                    {fileMeta.elecRequestDone ? (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">مكتملة</span>
+                    ) : (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">لم تبدأ</span>
+                    )}
+                  </div>
+
+                  {/* استلام إمكانية الكهرباء */}
+                  <div className="flex items-center justify-between py-1.5 px-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
+                        style={{
+                          borderColor: fileMeta.elecReceiveDone ? "oklch(0.55 0.15 150)" : "hsl(var(--border))",
+                          backgroundColor: fileMeta.elecReceiveDone ? "oklch(0.55 0.15 150)" : "transparent",
+                        }}
+                        onClick={() => {
+                          const now = !fileMeta.elecReceiveDone;
+                          updateFileMeta.mutate({ ...fileMeta, elecReceiveDone: now, elecReceiveDate: now ? new Date().toISOString().slice(0, 10) : "" });
+                        }}
+                      >
+                        {fileMeta.elecReceiveDone && <Check className="w-3 h-3 text-white" />}
+                      </button>
+                      <div>
+                        <span className={`text-xs font-medium ${fileMeta.elecReceiveDone ? "line-through text-muted-foreground" : ""}`}>استلام إمكانية الكهرباء</span>
+                        {fileMeta.elecReceiveDone && fileMeta.elecReceiveDate && (
+                          <p className="text-[10px] text-green-600">{new Date(fileMeta.elecReceiveDate).toLocaleDateString("ar-KW", { day: "numeric", month: "short", year: "numeric" })}</p>
+                        )}
+                      </div>
                     </div>
-                    <UploadedFilesList docs={allProjectDocs.filter(d => d.category === "فحص تربة")} key={refreshKey + 110} onDeleted={() => { refetchDocs(); setRefreshKey(k => k + 1); }} />
+                    {fileMeta.elecReceiveDone ? (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">مكتملة</span>
+                    ) : (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">لم تبدأ</span>
+                    )}
                   </div>
                 </div>
 
-                {/* ── إمكانية الكهرباء: طلب + استلام ── */}
-                <div className="rounded-lg border bg-muted/10 overflow-hidden">
-                  <div className="px-3 py-2 border-b" style={{ backgroundColor: "color-mix(in oklch, oklch(0.55 0.15 250) 6%, white)" }}>
-                    <p className="text-[11px] font-bold" style={{ color: "oklch(0.40 0.12 250)" }}>إمكانية الكهرباء</p>
-                  </div>
-                  <div className="px-3 py-2.5 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <label className="text-[11px] text-muted-foreground shrink-0 w-20">تاريخ الطلب</label>
-                      <input
-                        type="date"
-                        value={fileMeta.elecRequestDate || ""}
-                        onChange={e => updateFileMeta.mutate({ ...fileMeta, elecRequestDate: e.target.value })}
-                        className="flex-1 text-[11px] border rounded-md px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-blue-400"
-                      />
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <label className="text-[11px] text-muted-foreground shrink-0 w-20">تاريخ الاستلام</label>
-                      <input
-                        type="date"
-                        value={fileMeta.elecReceiveDate || ""}
-                        onChange={e => updateFileMeta.mutate({ ...fileMeta, elecReceiveDate: e.target.value })}
-                        className="flex-1 text-[11px] border rounded-md px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-green-500"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2 pt-1">
-                      <FileUploadButton label="رفع كتاب الكهرباء" category="كتاب كهرباء" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
-                      {allProjectDocs.filter(d => d.category === "كتاب كهرباء").length > 0 && (
-                        <span className="text-[10px] text-green-600 font-medium flex items-center gap-1">
-                          <Check className="w-3 h-3" /> {allProjectDocs.filter(d => d.category === "كتاب كهرباء").length} ملف مرفوع
-                        </span>
-                      )}
-                    </div>
-                    <UploadedFilesList docs={allProjectDocs.filter(d => d.category === "كتاب كهرباء")} key={refreshKey + 120} onDeleted={() => { refetchDocs(); setRefreshKey(k => k + 1); }} />
-                  </div>
+                {/* رفع الملفات */}
+                <div className="flex flex-wrap gap-2 pt-1 border-t">
+                  <FileUploadButton label="رفع تقرير التربة" category="فحص تربة" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
+                  <FileUploadButton label="رفع كتاب الكهرباء" category="كتاب كهرباء" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("tech", d)} />
                 </div>
+                {techDocs.length > 0 && (
+                  <UploadedFilesList docs={techDocs} key={refreshKey + 110} onDeleted={() => { refetchDocs(); setRefreshKey(k => k + 1); }} />
+                )}
               </div>
             )}
           </div>
