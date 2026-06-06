@@ -292,7 +292,8 @@ apiRouter.post("/api/projects", async (req, res) => {
         await db.insert(phases).values({ ...phaseData, projectId: id, order: i });
         const [phase] = await db.select().from(phases)
           .where(eq(phases.projectId, id))
-          .orderBy(desc(phases.id));
+          .orderBy(desc(phases.id))
+          .limit(1);
         if (Array.isArray(tasksData)) {
           for (let j = 0; j < tasksData.length; j++) {
             await db.insert(tasks).values({ ...tasksData[j], phaseId: phase.id, order: j });
@@ -440,7 +441,8 @@ apiRouter.post("/api/projects/:id/auto-tasks", async (req, res) => {
       await db.insert(phases).values({ projectId, order: nextOrder++, title: pd.title, subtitle: pd.subtitle });
       const [ph] = await db.select().from(phases)
         .where(eq(phases.projectId, projectId))
-        .orderBy(desc(phases.id));
+        .orderBy(desc(phases.id))
+        .limit(1);
       phaseMap[pd.title] = ph.id;
     }
 
@@ -1295,7 +1297,8 @@ apiRouter.post("/api/work-plans/:id/apply/:projectId", async (req, res) => {
       });
       const [newPhase] = await db.select().from(phases)
         .where(eq(phases.projectId, projectId))
-        .orderBy(desc(phases.id));
+        .orderBy(desc(phases.id))
+        .limit(1);
 
       const planTasks = await db.select().from(workPlanTasks)
         .where(eq(workPlanTasks.workPlanPhaseId, ph.id))
