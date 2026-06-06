@@ -16,8 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Plus, FileText, Send, CheckCircle, Eye, Download, MessageCircle, Receipt, ChevronDown, ChevronUp, MapPin, Loader2, Pencil, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-/* ── Full 23 Engineering Packages from Odoo.sh ── */
-export const allPackages: Record<string, { name: string; price: string; buildingType: string; serviceType: string; level: string; features: string[] }[]> = {
+/* ── Fallback packages (used only if DB is empty) ── */
+const allPackages: Record<string, { name: string; price: string; buildingType: string; serviceType: string; level: string; features: string[] }[]> = {
   "سكن خاص": [
     { name: "الباقة الأساسية - سكن خاص", price: "1,500", buildingType: "سكن خاص", serviceType: "بناء جديد", level: "Basic",
       features: ["التصميم المعماري", "التصميم الإنشائي", "فحص التربة", "إمكانية إيصال التيار", "إصدار رخصة البلدية", "مخطط صرف صحي", "واجهة 3D", "مخطط فرش", "إشراف 3 أشهر"] },
@@ -90,15 +90,7 @@ const fallbackStatus = { label: "—", color: "text-gray-500", bg: "bg-gray-50" 
 
 type Package = { name: string; price: string; buildingType: string; serviceType: string; level: string; features: string[] };
 
-export const STORAGE_KEY = "dynamic_packages_v1";
-
-export function loadPackages(): Record<string, Package[]> {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
-  } catch {}
-  return allPackages;
-}
+// loadPackages removed — use usePackages() hook from api.ts
 
 export default function Quotations() {
   const { data: quotations = [], isLoading } = useQuotations();
