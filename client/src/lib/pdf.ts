@@ -516,57 +516,44 @@ export async function exportQuotationPdf(lead: QuotationLead, pkg: QuotationPack
   await openPrintWindow(buildPage(quotationBody(lead, pkg), `عرض سعر — ${lead.name}`));
 }
 
-// ── Download quotation as real PDF blob using jsPDF + html2canvas ──────────
+// ── Download quotation PDF via print dialog (Save as PDF) ──────────────────
 export async function downloadQuotationPdf(lead: QuotationLead, pkg: QuotationPackage): Promise<string> {
-  const { default: jsPDF } = await import("jspdf");
-  const { default: html2canvas } = await import("html2canvas");
-
-  // Build HTML in a hidden iframe
-  const iframe = document.createElement("iframe");
-  iframe.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:794px;height:1123px;border:none;visibility:hidden;";
-  document.body.appendChild(iframe);
-
+  const fileName = `عرض-سعر-${lead.name.replace(/\s+/g, "-")}.pdf`;
   const htmlContent = buildPage(quotationBody(lead, pkg), `عرض سعر — ${lead.name}`);
-  // Remove auto-print script and print button
-  const cleanHtml = htmlContent
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<button[\s\S]*?<\/button>/gi, "");
 
-  const doc = iframe.contentDocument!;
-  doc.open();
-  doc.write(cleanHtml);
-  doc.close();
-
-  // Wait for fonts and images to load
-  await new Promise(r => setTimeout(r, 1800));
-
-  const canvas = await html2canvas(doc.body, {
-    scale: 2,
-    useCORS: true,
-    allowTaint: true,
-    width: 794,
-    windowWidth: 794,
-    backgroundColor: "#ffffff",
-  });
-
-  document.body.removeChild(iframe);
-
-  const imgData = canvas.toDataURL("image/jpeg", 0.95);
-  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const pdfWidth = pdf.internal.pageSize.getWidth();
-  const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-  const pageHeight = pdf.internal.pageSize.getHeight();
-
-  let position = 0;
-  let remainingHeight = pdfHeight;
-  while (remainingHeight > 0) {
-    pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, pdfHeight);
-    remainingHeight -= pageHeight;
-    position -= pageHeight;
-    if (remainingHeight > 0) pdf.addPage();
+  // Open in new window and trigger print dialog (user saves as PDF)
+  const win = window.open("", "_blank", "width=900,height=700");
+  if (!win) {
+    // Fallback: open in same tab
+    const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName.replace(".pdf", ".html");
+    a.click();
+    URL.revokeObjectURL(url);
+    return fileName;
   }
 
-  const fileName = `عرض-سعر-${lead.name.replace(/\s+/g, "-")}.pdf`;
-  pdf.save(fileName);
+  win.document.write(htmlContent);
+  win.document.close();
+
+  // Wait for content to load then trigger print
+  await new Promise<void>(resolve => {
+    win.onload = () => {
+      setTimeout(() => {
+        win.focus();
+        win.print();
+        resolve();
+      }, 800);
+    };
+    // Fallback if onload already fired
+    setTimeout(() => {
+      win.focus();
+      win.print();
+      resolve();
+    }, 1500);
+  });
+
   return fileName;
 }
