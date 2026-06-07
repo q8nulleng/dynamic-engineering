@@ -6,9 +6,9 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import {
-  useContracts, useUpdateContract,
+  useContracts, useUpdateContract, useCreateContract, useClients,
   useContractTemplates, useCreateContractTemplate, useUpdateContractTemplate, useDeleteContractTemplate,
-  type ContractTemplate,
+  type ContractTemplate, type Contract, type Client,
 } from "@/lib/api";
 import { exportContractPdf } from "@/lib/pdf";
 import { Card, CardContent } from "@/components/ui/card";
@@ -521,12 +521,75 @@ function TemplateViewDialog({ template, onClose }: { template: ContractTemplate;
 export default function Contracts() {
   const { data: contracts = [], isLoading } = useContracts();
   const { data: templates = [], isLoading: templatesLoading } = useContractTemplates();
+  const { data: clients = [] } = useClients();
   const updateContract = useUpdateContract();
+  const createContract = useCreateContract();
   const createTemplate = useCreateContractTemplate();
   const updateTemplate = useUpdateContractTemplate();
   const deleteTemplate = useDeleteContractTemplate();
-
   const [view, setView] = useState<"list" | "templates">("list");
+  const [showNewContract, setShowNewContract] = useState(false);
+  const [newContractForm, setNewContractForm] = useState({
+    clientId: "",
+    selectedTemplateId: 0,
+    civilId: "",
+    area: "",
+    block: "",
+    plot: "",
+    amount: "",
+    signingDate: new Date().toISOString().slice(0, 10),
+  });
+  const [newContractBusy, setNewContractBusy] = useState(false);
+
+  const handleCreateContract = async () => {
+    if (!newContractForm.civilId.trim()) { toast.error("يرجى إدخال الرقم المدني"); return; }
+    if (!newContractForm.selectedTemplateId) { toast.error("يرجى اختيار قالب العقد"); return; }
+    setNewContractBusy(true);
+    try {
+      const selectedTemplate = templates.find(t => t.id === newContractForm.selectedTemplateId);
+      const selectedClient = clients.find(c => c.id === newContractForm.clientId);
+      const termsText = selectedTemplate
+        ? JSON.stringify({
+            scopeOfWork: selectedTemplate.scopeOfWork,
+            terms: selectedTemplate.terms,
+            party1Obligations: selectedTemplate.party1Obligations,
+            party2Obligations: selectedTemplate.party2Obligations,
+            paymentSchedule: selectedTemplate.paymentSchedule,
+            duration: selectedTemplate.duration,
+            notes: selectedTemplate.notes,
+            content: (selectedTemplate as any).content,
+          })
+        : "";
+      await createContract.mutateAsync({
+        client: selectedClient?.name || "",
+        clientId: newContractForm.clientId || null,
+        quotationId: null,
+        projectId: null,
+        type: selectedTemplate?.buildingType || "",
+        service: selectedTemplate?.serviceType || "",
+        package: "",
+        template: selectedTemplate?.name || "",
+        status: "مسودة",
+        date: new Date().toISOString().slice(0, 10),
+        amount: newContractForm.amount,
+        civilId: newContractForm.civilId,
+        area: newContractForm.area,
+        block: newContractForm.block,
+        plot: newContractForm.plot,
+        leadId: "",
+        templateType: selectedTemplate?.name || "",
+        termsText,
+        signingDate: newContractForm.signingDate,
+      });
+      toast.success("تم إنشاء العقد بنجاح");
+      setShowNewContract(false);
+      setNewContractForm({ clientId: "", selectedTemplateId: 0, civilId: "", area: "", block: "", plot: "", amount: "", signingDate: new Date().toISOString().slice(0, 10) });
+    } catch {
+      toast.error("فشل إنشاء العقد");
+    } finally {
+      setNewContractBusy(false);
+    }
+  };
   const [expandedContract, setExpandedContract] = useState<string | null>(null);
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [activatingId, setActivatingId] = useState<string | null>(null);
@@ -658,7 +721,7 @@ export default function Contracts() {
             قالب جديد
           </Button>
         ) : (
-          <Button style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>
+          <Button style={{ backgroundColor: "oklch(0.30 0.05 250)" }} onClick={() => setShowNewContract(true)}>
             <Plus className="w-4 h-4 ml-2" />
             عقد جديد
           </Button>
@@ -972,6 +1035,102 @@ export default function Contracts() {
           template={viewTemplate}
           onClose={() => setViewTemplate(null)}
         />
+      )}
+
+      {/* New Contract Dialog */}
+      {showNewContract && (
+        <Dialog open onOpenChange={() => setShowNewContract(false)}>
+          <DialogContent className="max-w-lg" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="text-base font-bold flex items-center gap-2">
+                <Plus className="w-4 h-4" />
+                إنشاء عقد جديد
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              {/* Client */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">العميل</label>
+                <Select value={newContractForm.clientId} onValueChange={(v) => {
+                  const cl = clients.find(c => c.id === v);
+                  setNewContractForm(p => ({
+                    ...p,
+                    clientId: v,
+                    civilId: cl?.civilId || p.civilId,
+                    area: cl?.area || p.area,
+                    block: cl?.block || p.block,
+                    plot: cl?.plot || p.plot,
+                  }));
+                }}>
+                  <SelectTrigger><SelectValue placeholder="اختر العميل..." /></SelectTrigger>
+                  <SelectContent>
+                    {clients.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Template */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">نوع/قالب العقد <span className="text-red-500">*</span></label>
+                <Select
+                  value={newContractForm.selectedTemplateId ? String(newContractForm.selectedTemplateId) : ""}
+                  onValueChange={(v) => setNewContractForm(p => ({ ...p, selectedTemplateId: parseInt(v, 10) }))}
+                >
+                  <SelectTrigger><SelectValue placeholder={templatesLoading ? "جاري التحميل..." : "اختر قالب العقد..."} /></SelectTrigger>
+                  <SelectContent>
+                    {templates.map(t => (
+                      <SelectItem key={t.id} value={String(t.id)}>
+                        <span className="text-muted-foreground text-xs ml-1">{t.id}.</span> {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Civil ID + Amount */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">الرقم المدني <span className="text-red-500">*</span></label>
+                  <Input placeholder="2XXXXXXXXXX" dir="ltr" value={newContractForm.civilId}
+                    onChange={(e) => setNewContractForm(p => ({ ...p, civilId: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">قيمة العقد (د.ك)</label>
+                  <Input type="number" dir="ltr" value={newContractForm.amount}
+                    onChange={(e) => setNewContractForm(p => ({ ...p, amount: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">المنطقة</label>
+                  <Input placeholder="المنطقة" value={newContractForm.area}
+                    onChange={(e) => setNewContractForm(p => ({ ...p, area: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">القطعة</label>
+                  <Input placeholder="رقم القطعة" value={newContractForm.plot}
+                    onChange={(e) => setNewContractForm(p => ({ ...p, plot: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">القسيمة</label>
+                  <Input placeholder="رقم القسيمة" value={newContractForm.block}
+                    onChange={(e) => setNewContractForm(p => ({ ...p, block: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">تاريخ التوقيع</label>
+                  <Input type="date" dir="ltr" value={newContractForm.signingDate}
+                    onChange={(e) => setNewContractForm(p => ({ ...p, signingDate: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setShowNewContract(false)}>إلغاء</Button>
+              <Button disabled={newContractBusy} onClick={handleCreateContract}
+                style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>
+                {newContractBusy ? <Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> : <Save className="w-3.5 h-3.5 ml-1" />}
+                إنشاء العقد
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
