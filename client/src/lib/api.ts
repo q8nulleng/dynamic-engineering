@@ -565,6 +565,7 @@ export interface ContractTemplate {
   paymentSchedule: string;
   duration: string;
   notes: string;
+  content: string;
   createdAt: string;
   isDefault: number;
 }

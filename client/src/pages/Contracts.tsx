@@ -1,8 +1,8 @@
-/*
+/**
  * Design: Desert Oasis Professional
  * Contracts - العقود الهندسية
  */
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import {
@@ -15,14 +15,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   Plus, FileSignature, Download, Eye,
   FileText, CheckCircle2, XCircle, Send,
   ChevronDown, ChevronUp, Loader2, ExternalLink,
-  Pencil, Copy, Trash2, Save, X,
+  Pencil, Copy, Trash2, Save,
+  Bold, Underline, AlignRight, AlignLeft, AlignCenter,
+  Palette, Type,
 } from "lucide-react";
 
 const statusConfig: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
@@ -55,29 +56,48 @@ const PREVIEW_DATA: Record<string, string> = {
   "{رقم_العقد}": "CON-2026-001",
 };
 
-function applyPreview(text: string): string {
+function applyPreview(html: string): string {
   return Object.entries(PREVIEW_DATA).reduce(
     (t, [k, v]) => t.replace(new RegExp(k.replace(/[{}]/g, "\\$&"), "g"), v),
-    text
+    html
   );
 }
 
-const SECTIONS = [
-  { key: "scopeOfWork",       label: "نطاق العمل" },
-  { key: "terms",             label: "الشروط العامة" },
-  { key: "party1Obligations", label: "التزامات الطرف الأول (العميل)" },
-  { key: "party2Obligations", label: "التزامات الطرف الثاني (المكتب)" },
-  { key: "paymentSchedule",   label: "جدول الدفعات" },
-  { key: "duration",          label: "المدة الزمنية" },
-  { key: "notes",             label: "ملاحظات" },
-] as const;
+// Convert old multi-field template to HTML content
+function templateToHtml(t: Partial<ContractTemplate>): string {
+  if (t.content && t.content.trim()) return t.content;
+  // Migrate from old fields
+  const sections = [
+    { label: "نطاق العمل", value: t.scopeOfWork },
+    { label: "الشروط العامة", value: t.terms },
+    { label: "التزامات الطرف الأول (العميل)", value: t.party1Obligations },
+    { label: "التزامات الطرف الثاني (المكتب)", value: t.party2Obligations },
+    { label: "جدول الدفعات", value: t.paymentSchedule },
+    { label: "المدة الزمنية", value: t.duration },
+    { label: "ملاحظات", value: t.notes },
+  ].filter((s) => s.value && s.value.trim());
+  if (sections.length === 0) return "";
+  return sections
+    .map((s) => `<p><strong>${s.label}:</strong></p><p>${s.value!.replace(/\n/g, "<br/>")}</p>`)
+    .join("<p><br/></p>");
+}
 
-type SectionKey = typeof SECTIONS[number]["key"];
+const FONT_SIZES = ["12", "14", "16", "18", "20", "22", "24", "28", "32"];
+const TEXT_COLORS = [
+  { label: "أسود", value: "#000000" },
+  { label: "رمادي", value: "#6b7280" },
+  { label: "أزرق", value: "#1d4ed8" },
+  { label: "أخضر", value: "#15803d" },
+  { label: "أحمر", value: "#b91c1c" },
+  { label: "بني", value: "#92400e" },
+];
 
 interface TemplateForm {
   name: string;
   buildingType: string;
   serviceType: string;
+  content: string;
+  // Legacy fields kept for backward compat
   scopeOfWork: string;
   terms: string;
   party1Obligations: string;
@@ -89,13 +109,232 @@ interface TemplateForm {
 
 const emptyForm: TemplateForm = {
   name: "", buildingType: "", serviceType: "",
+  content: "",
   scopeOfWork: "", terms: "", party1Obligations: "",
   party2Obligations: "", paymentSchedule: "", duration: "", notes: "",
 };
 
 // Count non-empty sections in a template
 function countSections(t: ContractTemplate): number {
-  return SECTIONS.filter((s) => (t[s.key] || "").trim().length > 0).length;
+  if (t.content && t.content.trim()) return 1;
+  const SECTIONS = ["scopeOfWork", "terms", "party1Obligations", "party2Obligations", "paymentSchedule", "duration", "notes"] as const;
+  return SECTIONS.filter((s) => (t[s] || "").trim().length > 0).length;
+}
+
+// ── Rich Text Editor ──────────────────────────────────────────────────────
+function RichTextEditor({
+  value,
+  onChange,
+  onInsertVar,
+}: {
+  value: string;
+  onChange: (html: string) => void;
+  onInsertVar: (insert: () => void) => void;
+}) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [fontSize, setFontSize] = useState("16");
+  const [textColor, setTextColor] = useState("#000000");
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const savedRangeRef = useRef<Range | null>(null);
+
+  // Initialize content
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value || "";
+    }
+  }, []);
+
+  const saveRange = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+    }
+  };
+
+  const restoreRange = () => {
+    const sel = window.getSelection();
+    if (sel && savedRangeRef.current) {
+      sel.removeAllRanges();
+      sel.addRange(savedRangeRef.current);
+    }
+  };
+
+  const exec = (cmd: string, value?: string) => {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, value);
+    onChange(editorRef.current?.innerHTML || "");
+  };
+
+  const handleInput = () => {
+    onChange(editorRef.current?.innerHTML || "");
+  };
+
+  // Expose insert function to parent
+  useEffect(() => {
+    onInsertVar(() => (varText: string) => {
+      restoreRange();
+      editorRef.current?.focus();
+      document.execCommand("insertText", false, varText);
+      onChange(editorRef.current?.innerHTML || "");
+    });
+  }, []);
+
+  const insertVarInEditor = useCallback((varText: string) => {
+    restoreRange();
+    editorRef.current?.focus();
+    document.execCommand("insertText", false, varText);
+    onChange(editorRef.current?.innerHTML || "");
+  }, [onChange]);
+
+  // Expose to parent via ref callback
+  useEffect(() => {
+    onInsertVar(insertVarInEditor as unknown as () => void);
+  }, [insertVarInEditor]);
+
+  return (
+    <div className="border rounded-lg overflow-hidden" dir="rtl">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-1 p-2 border-b bg-muted/20">
+        {/* Bold */}
+        <button
+          type="button"
+          title="غامق"
+          className="p-1.5 rounded hover:bg-muted transition-colors"
+          onMouseDown={(e) => { e.preventDefault(); exec("bold"); }}
+        >
+          <Bold className="w-4 h-4" />
+        </button>
+
+        {/* Underline */}
+        <button
+          type="button"
+          title="تسطير"
+          className="p-1.5 rounded hover:bg-muted transition-colors"
+          onMouseDown={(e) => { e.preventDefault(); exec("underline"); }}
+        >
+          <Underline className="w-4 h-4" />
+        </button>
+
+        <div className="w-px h-5 bg-border mx-0.5" />
+
+        {/* Font Size */}
+        <div className="flex items-center gap-1">
+          <Type className="w-3.5 h-3.5 text-muted-foreground" />
+          <select
+            className="text-xs border rounded px-1 py-0.5 bg-background h-7"
+            value={fontSize}
+            onChange={(e) => {
+              setFontSize(e.target.value);
+              exec("fontSize", "7"); // placeholder
+              // Use CSS instead
+              const sel = window.getSelection();
+              if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+                const range = sel.getRangeAt(0);
+                const span = document.createElement("span");
+                span.style.fontSize = e.target.value + "px";
+                range.surroundContents(span);
+                onChange(editorRef.current?.innerHTML || "");
+              }
+            }}
+          >
+            {FONT_SIZES.map((s) => (
+              <option key={s} value={s}>{s}px</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="w-px h-5 bg-border mx-0.5" />
+
+        {/* Text Color */}
+        <div className="relative">
+          <button
+            type="button"
+            title="لون النص"
+            className="p-1.5 rounded hover:bg-muted transition-colors flex items-center gap-1"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              saveRange();
+              setShowColorPicker((v) => !v);
+            }}
+          >
+            <Palette className="w-4 h-4" />
+            <div className="w-3 h-1.5 rounded-sm border" style={{ backgroundColor: textColor }} />
+          </button>
+          {showColorPicker && (
+            <div className="absolute top-full right-0 mt-1 z-50 bg-white border rounded-lg shadow-lg p-2 flex flex-wrap gap-1.5 w-36">
+              {TEXT_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  title={c.label}
+                  className="w-7 h-7 rounded border-2 border-transparent hover:border-gray-400 transition-colors"
+                  style={{ backgroundColor: c.value }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    restoreRange();
+                    setTextColor(c.value);
+                    exec("foreColor", c.value);
+                    setShowColorPicker(false);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="w-px h-5 bg-border mx-0.5" />
+
+        {/* Alignment */}
+        <button
+          type="button"
+          title="محاذاة يمين"
+          className="p-1.5 rounded hover:bg-muted transition-colors"
+          onMouseDown={(e) => { e.preventDefault(); exec("justifyRight"); }}
+        >
+          <AlignRight className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          title="محاذاة وسط"
+          className="p-1.5 rounded hover:bg-muted transition-colors"
+          onMouseDown={(e) => { e.preventDefault(); exec("justifyCenter"); }}
+        >
+          <AlignCenter className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          title="محاذاة يسار"
+          className="p-1.5 rounded hover:bg-muted transition-colors"
+          onMouseDown={(e) => { e.preventDefault(); exec("justifyLeft"); }}
+        >
+          <AlignLeft className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Editable Area */}
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        dir="rtl"
+        className="min-h-[320px] p-4 text-sm leading-relaxed focus:outline-none"
+        style={{ fontFamily: "inherit", direction: "rtl", textAlign: "right" }}
+        onInput={handleInput}
+        onMouseUp={saveRange}
+        onKeyUp={saveRange}
+        onFocus={saveRange}
+        data-placeholder="اكتب اشتراطات العقد هنا..."
+      />
+
+      <style>{`
+        [contenteditable]:empty:before {
+          content: attr(data-placeholder);
+          color: #9ca3af;
+          pointer-events: none;
+        }
+      `}</style>
+    </div>
+  );
 }
 
 // ── Template Editor Dialog ────────────────────────────────────────────────
@@ -110,32 +349,24 @@ function TemplateEditorDialog({
   onClose: () => void;
   onSave: (data: TemplateForm) => Promise<void>;
 }) {
-  const [form, setForm] = useState<TemplateForm>(initialData);
+  const [form, setForm] = useState<TemplateForm>({
+    ...initialData,
+    content: initialData.content || templateToHtml(initialData),
+  });
   const [busy, setBusy] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const insertVarFnRef = useRef<((v: string) => void) | null>(null);
 
   const setField = (key: keyof TemplateForm, value: string) =>
     setForm((p) => ({ ...p, [key]: value }));
 
-  // Insert variable at cursor in the focused textarea using onMouseDown+preventDefault
   const insertVariable = useCallback((v: string) => {
-    const el = document.activeElement;
-    if (!(el instanceof HTMLTextAreaElement) || !el.dataset.field) {
-      toast.info("انقر داخل أي حقل نصي أولاً ثم اختر المتغير");
-      return;
+    if (insertVarFnRef.current) {
+      insertVarFnRef.current(v);
+    } else {
+      toast.info("انقر داخل حقل الكتابة أولاً ثم اختر المتغير");
     }
-    const start = el.selectionStart ?? 0;
-    const end = el.selectionEnd ?? 0;
-    const field = el.dataset.field as keyof TemplateForm;
-    const current = form[field] ?? "";
-    const next = current.slice(0, start) + v + current.slice(end);
-    setForm((p) => ({ ...p, [field]: next }));
-    requestAnimationFrame(() => {
-      el.focus();
-      const pos = start + v.length;
-      el.setSelectionRange(pos, pos);
-    });
-  }, [form]);
+  }, []);
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error("يرجى إدخال اسم القالب"); return; }
@@ -152,7 +383,7 @@ function TemplateEditorDialog({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" style={{ direction: "rtl" }}>
+      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto" style={{ direction: "rtl" }}>
         <DialogHeader>
           <DialogTitle className="text-base font-bold">
             {mode === "create" ? "قالب جديد" : "تعديل القالب"}
@@ -196,7 +427,7 @@ function TemplateEditorDialog({
 
           {/* Variable insertion */}
           <div className="rounded-lg border p-3 bg-muted/20 space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">إدراج متغير — انقر داخل أي حقل أولاً ثم اختر المتغير:</p>
+            <p className="text-xs font-medium text-muted-foreground">إدراج متغير — ضع المؤشر في مكان الإدراج ثم اضغط على المتغير:</p>
             <div className="flex flex-wrap gap-1.5">
               {TEMPLATE_VARS.map((v) => (
                 <button
@@ -211,19 +442,15 @@ function TemplateEditorDialog({
             </div>
           </div>
 
-          {/* Content sections */}
-          {SECTIONS.map((section) => (
-            <div key={section.key} className="space-y-1">
-              <label className="text-xs font-semibold text-muted-foreground">{section.label}</label>
-              <Textarea
-                data-field={section.key}
-                placeholder={`اكتب ${section.label} هنا...`}
-                className="min-h-[90px] text-sm resize-y leading-relaxed"
-                value={form[section.key]}
-                onChange={(e) => setField(section.key, e.target.value)}
-              />
-            </div>
-          ))}
+          {/* Rich Text Editor - Single field */}
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-muted-foreground">اشتراطات العقد</label>
+            <RichTextEditor
+              value={form.content}
+              onChange={(html) => setField("content", html)}
+              onInsertVar={(fn) => { insertVarFnRef.current = fn as unknown as (v: string) => void; }}
+            />
+          </div>
         </div>
 
         <DialogFooter className="flex gap-2 pt-2">
@@ -250,23 +477,11 @@ function TemplateEditorDialog({
                 <Badge variant="outline" className="text-[10px]">{form.buildingType}</Badge>
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 text-sm">
-              {SECTIONS.map((section) => {
-                const text = form[section.key]?.trim();
-                if (!text) return null;
-                return (
-                  <div key={section.key}>
-                    <h4 className="font-bold text-xs mb-1.5 pb-1 border-b"
-                      style={{ color: "oklch(0.30 0.05 250)" }}>
-                      {section.label}
-                    </h4>
-                    <p className="text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
-                      {applyPreview(text)}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
+            <div
+              className="text-sm leading-relaxed"
+              dir="rtl"
+              dangerouslySetInnerHTML={{ __html: applyPreview(form.content) }}
+            />
             <DialogFooter>
               <Button variant="outline" size="sm" onClick={() => setShowPreview(false)}>إغلاق</Button>
             </DialogFooter>
@@ -279,6 +494,7 @@ function TemplateEditorDialog({
 
 // ── Template View Dialog ──────────────────────────────────────────────────
 function TemplateViewDialog({ template, onClose }: { template: ContractTemplate; onClose: () => void }) {
+  const htmlContent = templateToHtml(template);
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" style={{ direction: "rtl" }}>
@@ -289,21 +505,11 @@ function TemplateViewDialog({ template, onClose }: { template: ContractTemplate;
             <Badge variant="secondary" className="text-[10px]">{template.serviceType}</Badge>
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 text-sm">
-          {SECTIONS.map((section) => {
-            const text = template[section.key]?.trim();
-            if (!text) return null;
-            return (
-              <div key={section.key}>
-                <h4 className="font-bold text-xs mb-1.5 pb-1 border-b"
-                  style={{ color: "oklch(0.30 0.05 250)" }}>
-                  {section.label}
-                </h4>
-                <p className="text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">{text}</p>
-              </div>
-            );
-          })}
-        </div>
+        <div
+          className="text-sm leading-relaxed"
+          dir="rtl"
+          dangerouslySetInnerHTML={{ __html: htmlContent || "<p class='text-muted-foreground'>لا يوجد محتوى</p>" }}
+        />
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>إغلاق</Button>
         </DialogFooter>
@@ -386,6 +592,7 @@ export default function Contracts() {
       open: true, mode: "edit", id: t.id,
       data: {
         name: t.name, buildingType: t.buildingType, serviceType: t.serviceType,
+        content: t.content || templateToHtml(t),
         scopeOfWork: t.scopeOfWork || "", terms: t.terms || "",
         party1Obligations: t.party1Obligations || "", party2Obligations: t.party2Obligations || "",
         paymentSchedule: t.paymentSchedule || "", duration: t.duration || "", notes: t.notes || "",
@@ -398,6 +605,7 @@ export default function Contracts() {
       open: true, mode: "create", id: null,
       data: {
         name: `${t.name} (نسخة)`, buildingType: t.buildingType, serviceType: t.serviceType,
+        content: t.content || templateToHtml(t),
         scopeOfWork: t.scopeOfWork || "", terms: t.terms || "",
         party1Obligations: t.party1Obligations || "", party2Obligations: t.party2Obligations || "",
         paymentSchedule: t.paymentSchedule || "", duration: t.duration || "", notes: t.notes || "",
@@ -708,29 +916,17 @@ export default function Contracts() {
                           )}
                         </div>
                       </div>
-                      <span className="text-xs font-mono px-1.5 py-0.5 bg-muted rounded text-muted-foreground shrink-0">{countSections(t)}/7</span>
+                      <span className="text-xs font-mono px-1.5 py-0.5 bg-muted rounded text-muted-foreground shrink-0">
+                        {(t.content && t.content.trim()) ? "✓" : `${countSections(t)}/7`}
+                      </span>
                     </div>
 
-                    {/* Sections preview */}
-                    <div className="space-y-1">
-                      {[
-                        { key: "preamble", label: "الديباجة" },
-                        { key: "scope", label: "نطاق العمل" },
-                        { key: "fees", label: "الأتعاب" },
-                        { key: "payment", label: "الدفع" },
-                        { key: "duration", label: "المدة" },
-                        { key: "obligations", label: "الالتزامات" },
-                        { key: "termination", label: "الإنهاء" },
-                      ].map((sec) => (
-                        <div key={sec.key} className="flex items-center gap-1.5 text-xs">
-                          {(t as unknown as Record<string, unknown>)[sec.key] ? (
-                            <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0" />
-                          ) : (
-                            <div className="w-3 h-3 rounded-full border border-muted-foreground/30 shrink-0" />
-                          )}
-                          <span className={(t as unknown as Record<string, unknown>)[sec.key] ? "text-foreground" : "text-muted-foreground"}>{sec.label}</span>
-                        </div>
-                      ))}
+                    {/* Content preview */}
+                    <div className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
+                      {t.content
+                        ? t.content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 120) + "..."
+                        : [t.scopeOfWork, t.terms, t.party1Obligations].filter(Boolean).join(" · ").slice(0, 120) + "..."
+                      }
                     </div>
 
                     {/* Action Buttons */}

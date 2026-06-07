@@ -323,6 +323,7 @@ export const contractTemplates = mysqlTable("contract_templates", {
   paymentSchedule: text("payment_schedule").default(""),
   duration: varchar("duration", { length: 64 }).default(""),
   notes: text("notes").default(""),
+  content: text("content").default(""),
   createdAt: varchar("created_at", { length: 32 }).notNull(),
   isDefault: tinyint("is_default").default(0),
 });
