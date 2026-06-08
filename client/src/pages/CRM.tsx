@@ -36,7 +36,7 @@ import {
   useCrmLeads, useCreateCrmLead, useUpdateCrmLead, useDeleteCrmLead,
   useCreateClient, useCreateProject, useCreateContract, useUpdateContract,
   useCreateInvoice, useContracts, useContractsByLead, useProjects, useContractTemplates,
-  useAppointmentsByLead, useCreateAppointment, useDeleteAppointment,
+  useAppointmentsByLead, useCreateAppointment, useDeleteAppointment, useAppointments,
   useEmployees, usePackages,
 } from "@/lib/api";
 import { exportQuotationPdf, exportContractPdf, downloadQuotationPdf } from "@/lib/pdf";
@@ -1097,8 +1097,14 @@ export default function CRM() {
   const [editForm, setEditForm] = useState(emptyForm);
   const [editActiveTab, setEditActiveTab] = useState<"basic" | "details" | "notes">("basic");
   const [signingBusy, setSigningBusy] = useState(false);
-  const [appointmentTarget, setAppointmentTarget] = useState<Lead | null>(null);
-
+    const [appointmentTarget, setAppointmentTarget] = useState<Lead | null>(null);
+  const { data: allAppointments = [] } = useAppointments();
+  // Build a Set of leadIds that have upcoming appointments
+  const leadsWithAppointments = new Set(
+    allAppointments
+      .filter(a => a.leadId && a.status !== 'ملغي')
+      .map(a => a.leadId)
+  );
   const data = stageTemplates.map((t) => ({
     ...t,
     leads: (leadsData || []).filter((l) => l.stage === t.title) as Lead[],
@@ -1477,6 +1483,11 @@ export default function CRM() {
                           <div className="flex items-center gap-2">
                             <h4 className="text-sm font-bold truncate">{lead.name}</h4>
                             {priorityStars(lead.priority || 0)}
+                            {leadsWithAppointments.has(lead.id) && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200 shrink-0">
+                                <Calendar className="w-2.5 h-2.5" />موعد
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                             <span dir="ltr">{lead.phone}</span>
