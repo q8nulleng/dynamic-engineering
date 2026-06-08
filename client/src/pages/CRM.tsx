@@ -1725,16 +1725,14 @@ export default function CRM() {
                                   setEditTarget(lead);
                                 }}
                               ><Pencil className="w-3 h-3 ml-1" />تعديل</Button>
-                              {si === 0 && (
-                                <Button size="sm" variant="outline" className="text-xs h-7 text-red-600 border-red-200"
-                                  onClick={async () => {
-                                    if (!window.confirm(`هل تريد حذف فرصة "${lead.name}" نهائياً؟`)) return;
-                                    await deleteLead.mutateAsync(lead.id);
-                                    setSelectedLead(null);
-                                    toast.success(`تم حذف فرصة "${lead.name}"`);
-                                  }}
-                                ><Trash2 className="w-3 h-3 ml-1" />حذف</Button>
-                              )}
+                              <Button size="sm" variant="outline" className="text-xs h-7 text-red-600 border-red-200"
+                                onClick={async () => {
+                                  if (!window.confirm(`هل تريد حذف فرصة "${lead.name}" نهائياً؟`)) return;
+                                  await deleteLead.mutateAsync(lead.id);
+                                  setSelectedLead(null);
+                                  toast.success(`تم حذف فرصة "${lead.name}"`);
+                                }}
+                              ><Trash2 className="w-3 h-3 ml-1" />حذف</Button>
                             </>)}
                           </div>
                         </div>
