@@ -74,7 +74,7 @@ function officialFooter(): string {
 }
 
 // ── Full A4 page wrapper ──────────────────────────────────────────────────
-function buildPage(body: string, title: string): string {
+export function buildPage(body: string, title: string): string {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -238,7 +238,7 @@ function parseAndRenderTerms(termsText: string, contractAmount: number): string 
 }
 
 // ── Contract HTML body — formal legal format matching original DOCX ──────
-function contractBody(c: Contract): string {
+export function contractBody(c: Contract): string {
   const amt = parseFloat(c.amount || "0");
   const hasTermsJson = (() => {
     try { JSON.parse(c.termsText || ""); return true; } catch { return false; }

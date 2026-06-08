@@ -6,11 +6,11 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import {
-  useContracts, useUpdateContract, useCreateContract, useClients,
+  useContracts, useUpdateContract, useCreateContract, useClients, useProjects,
   useContractTemplates, useCreateContractTemplate, useUpdateContractTemplate, useDeleteContractTemplate,
   type ContractTemplate, type Contract, type Client,
 } from "@/lib/api";
-import { exportContractPdf } from "@/lib/pdf";
+import { exportContractPdf, buildPage, contractBody } from "@/lib/pdf";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import {
   ChevronDown, ChevronUp, Loader2, ExternalLink,
   Pencil, Copy, Trash2, Save,
   Bold, Underline, AlignRight, AlignLeft, AlignCenter,
-  Palette, Type,
+  Palette, Type, MessageSquare, Building2,
 } from "lucide-react";
 
 const statusConfig: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
@@ -522,15 +522,21 @@ export default function Contracts() {
   const { data: contracts = [], isLoading } = useContracts();
   const { data: templates = [], isLoading: templatesLoading } = useContractTemplates();
   const { data: clients = [] } = useClients();
+  const { data: projects = [] } = useProjects();
   const updateContract = useUpdateContract();
   const createContract = useCreateContract();
   const createTemplate = useCreateContractTemplate();
   const updateTemplate = useUpdateContractTemplate();
   const deleteTemplate = useDeleteContractTemplate();
   const [view, setView] = useState<"list" | "templates">("list");
+  // Preview state
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  // Notify state
+  const [notifyContract, setNotifyContract] = useState<Contract | null>(null);
   const [showNewContract, setShowNewContract] = useState(false);
   const [newContractForm, setNewContractForm] = useState({
     clientId: "",
+    projectId: "",
     selectedTemplateId: 0,
     civilId: "",
     area: "",
@@ -564,7 +570,7 @@ export default function Contracts() {
         client: selectedClient?.name || "",
         clientId: newContractForm.clientId || null,
         quotationId: null,
-        projectId: null,
+        projectId: newContractForm.projectId || null,
         type: selectedTemplate?.buildingType || "",
         service: selectedTemplate?.serviceType || "",
         package: "",
@@ -583,7 +589,7 @@ export default function Contracts() {
       });
       toast.success("تم إنشاء العقد بنجاح");
       setShowNewContract(false);
-      setNewContractForm({ clientId: "", selectedTemplateId: 0, civilId: "", area: "", block: "", plot: "", amount: "", signingDate: new Date().toISOString().slice(0, 10) });
+      setNewContractForm({ clientId: "", projectId: "", selectedTemplateId: 0, civilId: "", area: "", block: "", plot: "", amount: "", signingDate: new Date().toISOString().slice(0, 10) });
     } catch {
       toast.error("فشل إنشاء العقد");
     } finally {
@@ -644,6 +650,30 @@ export default function Contracts() {
     } finally {
       setActivatingId(null);
     }
+  }
+
+  function handlePreviewContract(e: React.MouseEvent, contract: Contract) {
+    e.stopPropagation();
+    const html = buildPage(contractBody(contract), `عقد ${contract.id}`);
+    // Remove auto-print script for preview
+    const previewHtmlClean = html.replace(/<script>[\s\S]*?<\/script>/g, '');
+    setPreviewHtml(previewHtmlClean);
+  }
+
+  function handleNotifyWhatsApp(e: React.MouseEvent, contract: Contract) {
+    e.stopPropagation();
+    const client = clients.find(cl => cl.id === contract.clientId);
+    const phone = client?.phone?.replace(/[^0-9]/g, '') || '';
+    const intlPhone = phone.startsWith('965') ? phone : `965${phone}`;
+    const msg = encodeURIComponent(
+      `السلام عليكم ${contract.client || ''}،\n` +
+      `نود إشعاركم بأنه تم إعداد عقد الخدمات الهندسية رقم (${contract.id}) الخاص بكم.\n` +
+      `نوع العقد: ${contract.templateType || contract.template || contract.type || ''}\n` +
+      `قيمة العقد: ${contract.amount} دينار كويتي\n` +
+      `يرجى التواصل معنا لمراجعة العقد والتوقيع.\n` +
+      `مكتب ديناميك للاستشارات الهندسية`
+    );
+    window.open(`https://wa.me/${intlPhone}?text=${msg}`, '_blank');
   }
 
   function openCreateTemplate() {
@@ -815,13 +845,20 @@ export default function Contracts() {
                             </td>
                             <td className="py-3 px-4">
                               <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" title="عرض"><Eye className="w-3.5 h-3.5" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" title="معاينة العقد"
+                                  onClick={(e) => handlePreviewContract(e, c)}>
+                                  <Eye className="w-3.5 h-3.5" />
+                                </Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" title="تصدير PDF"
                                   disabled={exportingId === c.id}
                                   onClick={(e) => handleExportPdf(e, c)}>
                                   {exportingId === c.id
                                     ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                     : <Download className="w-3.5 h-3.5" />}
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600" title="إشعار واتساب"
+                                  onClick={(e) => handleNotifyWhatsApp(e, c)}>
+                                  <MessageSquare className="w-3.5 h-3.5" />
                                 </Button>
                               </div>
                             </td>
@@ -1087,6 +1124,24 @@ export default function Contracts() {
                   </SelectContent>
                 </Select>
               </div>
+              {/* Project Link */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5" />ربط بمشروع (اختياري)</label>
+                <Select
+                  value={newContractForm.projectId || "none"}
+                  onValueChange={(v) => setNewContractForm(p => ({ ...p, projectId: v === "none" ? "" : v }))}
+                >
+                  <SelectTrigger><SelectValue placeholder="اختر مشروعاً (اختياري)..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— بدون مشروع</SelectItem>
+                    {projects.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        <span className="text-muted-foreground text-xs ml-1">{p.id}</span> {p.name || p.client}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               {/* Civil ID + Amount */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
@@ -1129,6 +1184,24 @@ export default function Contracts() {
                 إنشاء العقد
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ── Contract Preview Dialog ── */}
+      {previewHtml && (
+        <Dialog open onOpenChange={() => setPreviewHtml(null)}>
+          <DialogContent className="max-w-4xl w-full p-0 overflow-hidden" style={{ height: '90vh' }}>
+            <DialogHeader className="px-4 py-3 border-b flex-row items-center justify-between">
+              <DialogTitle className="text-sm font-semibold">معاينة العقد</DialogTitle>
+              <Button variant="outline" size="sm" onClick={() => setPreviewHtml(null)}>إغلاق</Button>
+            </DialogHeader>
+            <iframe
+              srcDoc={previewHtml}
+              className="w-full border-0"
+              style={{ height: 'calc(90vh - 60px)' }}
+              title="معاينة العقد"
+            />
           </DialogContent>
         </Dialog>
       )}
