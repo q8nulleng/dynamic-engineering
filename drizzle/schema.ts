@@ -78,6 +78,9 @@ export const crmLeads = mysqlTable("crm_leads", {
   plotNumber: varchar("plot_number", { length: 32 }).default(""),
   landArea: float("land_area").default(0),
   assignedTo: varchar("assigned_to", { length: 64 }).default(""),
+  isArchived: tinyint("is_archived").default(0),
+  archivedAt: varchar("archived_at", { length: 32 }).default(""),
+  archivedReason: varchar("archived_reason", { length: 255 }).default(""),
 });
 
 export const projects = mysqlTable("projects", {

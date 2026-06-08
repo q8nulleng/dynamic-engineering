@@ -26,7 +26,7 @@ import {
   Calendar, FileText, Trophy, X, ChevronDown, ChevronUp,
   Building, Percent, Tag, Save,
   ClipboardList, MessageCircle, Activity, Users, MapPin, Loader2,
-  Pencil, Trash2, Eye, CheckCircle, Hash, Ruler, ArrowRightLeft,
+  Pencil, Trash2, Eye, CheckCircle, Hash, Ruler, ArrowRightLeft, Archive,
   Clock, UserCheck, CalendarPlus, Bell, Briefcase,
 } from "lucide-react";
 import { Link } from "wouter";
@@ -34,6 +34,7 @@ import { kuwaitGovernorates } from "./Clients";
 import {
   useCreateQuotation, useUpdateQuotation, useDeleteQuotation, useQuotationsByLead, useQuotations,
   useCrmLeads, useCreateCrmLead, useUpdateCrmLead, useDeleteCrmLead,
+  useArchiveCrmLead, useRestoreCrmLead, useArchivedCrmLeads,
   useCreateClient, useCreateProject, useCreateContract, useUpdateContract,
   useCreateInvoice, useContracts, useContractsByLead, useProjects, useContractTemplates,
   useAppointmentsByLead, useCreateAppointment, useDeleteAppointment, useAppointments,
@@ -1078,6 +1079,9 @@ export default function CRM() {
   const createLead = useCreateCrmLead();
   const updateLead = useUpdateCrmLead();
   const deleteLead = useDeleteCrmLead();
+  const archiveLead = useArchiveCrmLead();
+  const restoreLead = useRestoreCrmLead();
+  const { data: archivedLeads = [] } = useArchivedCrmLeads();
   const createClient = useCreateClient();
   const createProject = useCreateProject();
   const createContract = useCreateContract();
@@ -1098,6 +1102,7 @@ export default function CRM() {
   const [editActiveTab, setEditActiveTab] = useState<"basic" | "details" | "notes">("basic");
   const [signingBusy, setSigningBusy] = useState(false);
     const [appointmentTarget, setAppointmentTarget] = useState<Lead | null>(null);
+  const [showArchive, setShowArchive] = useState(false);
   const { data: allAppointments = [] } = useAppointments();
   // Build a Set of leadIds that have upcoming appointments
   const leadsWithAppointments = new Set(
@@ -1391,10 +1396,16 @@ export default function CRM() {
       {/* Header - Simple */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">تتبع العملاء من الاستفسار حتى التعاقد</p>
-        <Button onClick={() => setShowNewDialog(true)} style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>
-          <Plus className="w-4 h-4 ml-2" />
-          فرصة جديدة
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowArchive(true)} className="text-amber-700 border-amber-300">
+            <Archive className="w-4 h-4 ml-2" />
+            الأرشيف ({archivedLeads.length})
+          </Button>
+          <Button onClick={() => setShowNewDialog(true)} style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>
+            <Plus className="w-4 h-4 ml-2" />
+            فرصة جديدة
+          </Button>
+        </div>
       </div>
 
       {/* Summary Row - Compact */}
@@ -1695,17 +1706,17 @@ export default function CRM() {
                                   toast.success(`"${lead.name}" → استفسار جديد (استعادة)`);
                                 }}
                               ><ChevronUp className="w-3 h-3 ml-1" />استعادة</Button>
-                              <Button size="sm" variant="outline" className="text-xs h-7 text-red-600 border-red-200"
+                              <Button size="sm" variant="outline" className="text-xs h-7 text-amber-600 border-amber-200"
                                 onClick={async () => {
-                                  if (!window.confirm(`هل تريد حذف فرصة "${lead.name}" نهائياً؟`)) return;
-                                  await deleteLead.mutateAsync(lead.id);
+                                  if (!window.confirm(`هل تريد أرشفة فرصة "${lead.name}"\u061f يمكن استعادتها لاحقاً.`)) return;
+                                  await archiveLead.mutateAsync({ id: lead.id });
                                   setSelectedLead(null);
-                                  toast.success(`تم حذف فرصة "${lead.name}"`);
+                                  toast.success(`تم أرشفة فرصة "${lead.name}"`);
                                 }}
-                              ><Trash2 className="w-3 h-3 ml-1" />حذف</Button>
+                              ><Archive className="w-3 h-3 ml-1" />أرشفة</Button>
                             </>)}
 
-                            {/* Edit + Delete always visible except archived/lost */}
+                            {/* Edit + Archive always visible except archived/lost */}
                             {si < 5 && (<>
                               <Button size="sm" variant="outline" className="text-xs h-7"
                                 onClick={() => {
@@ -1725,14 +1736,14 @@ export default function CRM() {
                                   setEditTarget(lead);
                                 }}
                               ><Pencil className="w-3 h-3 ml-1" />تعديل</Button>
-                              <Button size="sm" variant="outline" className="text-xs h-7 text-red-600 border-red-200"
+                              <Button size="sm" variant="outline" className="text-xs h-7 text-amber-600 border-amber-200"
                                 onClick={async () => {
-                                  if (!window.confirm(`هل تريد حذف فرصة "${lead.name}" نهائياً؟`)) return;
-                                  await deleteLead.mutateAsync(lead.id);
+                                  if (!window.confirm(`هل تريد أرشفة فرصة "${lead.name}"\u061f يمكن استعادتها لاحقاً.`)) return;
+                                  await archiveLead.mutateAsync({ id: lead.id });
                                   setSelectedLead(null);
-                                  toast.success(`تم حذف فرصة "${lead.name}"`);
+                                  toast.success(`تم أرشفة فرصة "${lead.name}"`);
                                 }}
-                              ><Trash2 className="w-3 h-3 ml-1" />حذف</Button>
+                              ><Archive className="w-3 h-3 ml-1" />أرشفة</Button>
                             </>)}
                           </div>
                         </div>
@@ -2337,6 +2348,52 @@ export default function CRM() {
               )}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== Archive Dialog ===== */}
+      <Dialog open={showArchive} onOpenChange={setShowArchive}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Archive className="w-5 h-5 text-amber-600" />
+              أرشيف الفرص ({archivedLeads.length})
+            </DialogTitle>
+          </DialogHeader>
+          {archivedLeads.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <Archive className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>لا توجد فرص مؤرشفة</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {archivedLeads.map((lead) => (
+                <div key={lead.id} className="border rounded-lg p-4 bg-muted/30">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold">{lead.name}</span>
+                        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{lead.stage}</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground space-y-0.5">
+                        <div>هاتف: {lead.phone} · نوع: {lead.type}</div>
+                        <div>تاريخ الأرشفة: {lead.archivedAt || "—"}</div>
+                        {lead.archivedReason && <div>السبب: {lead.archivedReason}</div>}
+                      </div>
+                    </div>
+                    <Button size="sm" variant="outline" className="text-green-700 border-green-300 shrink-0"
+                      onClick={async () => {
+                        await restoreLead.mutateAsync(lead.id);
+                        toast.success(`تم استعادة فرصة "${lead.name}"`);
+                      }}
+                    >
+                      <ChevronUp className="w-3 h-3 ml-1" />استعادة
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

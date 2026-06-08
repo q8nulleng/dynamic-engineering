@@ -515,6 +515,9 @@ export interface CrmLead {
   plotNumber: string;
   landArea: number;
   assignedTo: string;
+  isArchived: number;
+  archivedAt: string;
+  archivedReason: string;
 }
 
 export function useCrmLeads() {
@@ -547,6 +550,37 @@ export function useDeleteCrmLead() {
   return useMutation({
     mutationFn: (id: string) => request(`/api/crm-leads/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["crm-leads"] }),
+  });
+}
+
+export function useArchivedCrmLeads() {
+  return useQuery<CrmLead[]>({
+    queryKey: ["crm-leads-archived"],
+    queryFn: () => request("/api/crm-leads-archived"),
+  });
+}
+
+export function useArchiveCrmLead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      request(`/api/crm-leads/${id}/archive`, { method: "POST", body: JSON.stringify({ reason: reason || "" }) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm-leads"] });
+      qc.invalidateQueries({ queryKey: ["crm-leads-archived"] });
+    },
+  });
+}
+
+export function useRestoreCrmLead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      request<CrmLead>(`/api/crm-leads/${id}/restore`, { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm-leads"] });
+      qc.invalidateQueries({ queryKey: ["crm-leads-archived"] });
+    },
   });
 }
 

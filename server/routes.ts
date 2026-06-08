@@ -935,8 +935,40 @@ const parseLead = (r: typeof crmLeads.$inferSelect) => ({ ...r, tags: JSON.parse
 apiRouter.get("/api/crm-leads", async (_req, res) => {
   try {
     const db = getDb();
-    const rows = await db.select().from(crmLeads).orderBy(desc(crmLeads.date));
+    const rows = await db.select().from(crmLeads)
+      .where(eq(crmLeads.isArchived, 0))
+      .orderBy(desc(crmLeads.date));
     res.json(rows.map(parseLead));
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Archived leads ──────────────────────────────────────────────────────────
+apiRouter.get("/api/crm-leads-archived", async (_req, res) => {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(crmLeads)
+      .where(eq(crmLeads.isArchived, 1))
+      .orderBy(desc(crmLeads.archivedAt));
+    res.json(rows.map(parseLead));
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post("/api/crm-leads/:id/archive", async (req, res) => {
+  try {
+    const db = getDb();
+    const now = new Date().toISOString().slice(0, 10);
+    const reason = req.body.reason || "";
+    await db.update(crmLeads).set({ isArchived: 1, archivedAt: now, archivedReason: reason }).where(eq(crmLeads.id, req.params.id));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post("/api/crm-leads/:id/restore", async (req, res) => {
+  try {
+    const db = getDb();
+    await db.update(crmLeads).set({ isArchived: 0, archivedAt: "", archivedReason: "" }).where(eq(crmLeads.id, req.params.id));
+    const [row] = await db.select().from(crmLeads).where(eq(crmLeads.id, req.params.id));
+    res.json(parseLead(row));
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
