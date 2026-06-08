@@ -473,26 +473,6 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
             </div>
             {expandedGroup === "tech" && (
               <div className="px-3 pb-4 pt-3 space-y-3 border-t">
-                {/* ── مهام الفحوصات من قاعدة البيانات ── */}
-                {techTasks.map(task => (
-                  <div key={task.id} className="flex items-center justify-between py-1.5">
-                    <div className="flex items-center gap-2">
-                      <button
-                        className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0"
-                        style={{
-                          borderColor: task.status === "done" ? "oklch(0.55 0.15 150)" : "hsl(var(--border))",
-                          backgroundColor: task.status === "done" ? "oklch(0.55 0.15 150)" : "transparent",
-                        }}
-                        onClick={() => onTaskUpdate(task.id, task.status === "done" ? "pending" : "done")}
-                      >
-                        {task.status === "done" && <Check className="w-2.5 h-2.5 text-white" />}
-                      </button>
-                      <span className={`text-xs font-medium ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>{task.name}</span>
-                    </div>
-                    <TaskStatusBadge status={task.status} />
-                  </div>
-                ))}
-
                 {/* ── صفوف الفحوصات: checkbox + تاريخ تلقائي ── */}
                 <div className="space-y-1 py-1">
                   {/* طلب فحص التربة */}
