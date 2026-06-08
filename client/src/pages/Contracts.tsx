@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import {
   useContracts, useUpdateContract, useCreateContract, useClients, useProjects,
   useContractTemplates, useCreateContractTemplate, useUpdateContractTemplate, useDeleteContractTemplate,
+  useCreateClient,
   type ContractTemplate, type Contract, type Client,
 } from "@/lib/api";
 import { exportContractPdf, buildPage, contractBody } from "@/lib/pdf";
@@ -525,6 +526,7 @@ export default function Contracts() {
   const { data: projects = [] } = useProjects();
   const updateContract = useUpdateContract();
   const createContract = useCreateContract();
+  const createClient = useCreateClient();
   const createTemplate = useCreateContractTemplate();
   const updateTemplate = useUpdateContractTemplate();
   const deleteTemplate = useDeleteContractTemplate();
@@ -546,14 +548,42 @@ export default function Contracts() {
     signingDate: new Date().toISOString().slice(0, 10),
   });
   const [newContractBusy, setNewContractBusy] = useState(false);
+  // New client inline form
+  const [isNewClient, setIsNewClient] = useState(false);
+  const [newClientForm, setNewClientForm] = useState({
+    name: "", phone: "", civilId: "", area: "", block: "", plot: "",
+  });
 
   const handleCreateContract = async () => {
-    if (!newContractForm.civilId.trim()) { toast.error("يرجى إدخال الرقم المدني"); return; }
+    if (isNewClient && !newClientForm.name.trim()) { toast.error("يرجى إدخال اسم العميل"); return; }
+    if (!newContractForm.civilId.trim() && !newClientForm.civilId.trim()) { toast.error("يرجى إدخال الرقم المدني"); return; }
     if (!newContractForm.selectedTemplateId) { toast.error("يرجى اختيار قالب العقد"); return; }
     setNewContractBusy(true);
     try {
       const selectedTemplate = templates.find(t => t.id === newContractForm.selectedTemplateId);
-      const selectedClient = clients.find(c => c.id === newContractForm.clientId);
+      // Create new client if needed
+      let selectedClient: Client | undefined = clients.find(c => c.id === newContractForm.clientId);
+      let finalClientId = newContractForm.clientId;
+      if (isNewClient && newClientForm.name.trim()) {
+        const created = await createClient.mutateAsync({
+          name: newClientForm.name,
+          phone: newClientForm.phone,
+          civilId: newClientForm.civilId,
+          area: newClientForm.area,
+          block: newClientForm.block,
+          plot: newClientForm.plot,
+          status: "active",
+        });
+        selectedClient = created;
+        finalClientId = created.id;
+        // Auto-fill contract fields from new client
+        if (!newContractForm.civilId && newClientForm.civilId) {
+          newContractForm.civilId = newClientForm.civilId;
+        }
+        if (!newContractForm.area && newClientForm.area) newContractForm.area = newClientForm.area;
+        if (!newContractForm.block && newClientForm.block) newContractForm.block = newClientForm.block;
+        if (!newContractForm.plot && newClientForm.plot) newContractForm.plot = newClientForm.plot;
+      }
       const termsText = selectedTemplate
         ? JSON.stringify({
             scopeOfWork: selectedTemplate.scopeOfWork,
@@ -567,8 +597,8 @@ export default function Contracts() {
           })
         : "";
       await createContract.mutateAsync({
-        client: selectedClient?.name || "",
-        clientId: newContractForm.clientId || null,
+        client: selectedClient?.name || (isNewClient ? newClientForm.name : ""),
+        clientId: finalClientId || null,
         quotationId: null,
         projectId: newContractForm.projectId || null,
         type: selectedTemplate?.buildingType || "",
@@ -589,6 +619,8 @@ export default function Contracts() {
       });
       toast.success("تم إنشاء العقد بنجاح");
       setShowNewContract(false);
+      setIsNewClient(false);
+      setNewClientForm({ name: "", phone: "", civilId: "", area: "", block: "", plot: "" });
       setNewContractForm({ clientId: "", projectId: "", selectedTemplateId: 0, civilId: "", area: "", block: "", plot: "", amount: "", signingDate: new Date().toISOString().slice(0, 10) });
     } catch {
       toast.error("فشل إنشاء العقد");
@@ -1088,24 +1120,88 @@ export default function Contracts() {
               {/* Client */}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">العميل</label>
-                <Select value={newContractForm.clientId} onValueChange={(v) => {
-                  const cl = clients.find(c => c.id === v);
-                  setNewContractForm(p => ({
-                    ...p,
-                    clientId: v,
-                    civilId: cl?.civilId || p.civilId,
-                    area: cl?.area || p.area,
-                    block: cl?.block || p.block,
-                    plot: cl?.plot || p.plot,
-                  }));
-                }}>
+                <Select
+                  value={isNewClient ? "__new__" : newContractForm.clientId}
+                  onValueChange={(v) => {
+                    if (v === "__new__") {
+                      setIsNewClient(true);
+                      setNewContractForm(p => ({ ...p, clientId: "", civilId: "", area: "", block: "", plot: "" }));
+                    } else {
+                      setIsNewClient(false);
+                      const cl = clients.find(c => c.id === v);
+                      setNewContractForm(p => ({
+                        ...p,
+                        clientId: v,
+                        civilId: cl?.civilId || p.civilId,
+                        area: cl?.area || p.area,
+                        block: cl?.block || p.block,
+                        plot: cl?.plot || p.plot,
+                      }));
+                    }
+                  }}
+                >
                   <SelectTrigger><SelectValue placeholder="اختر العميل..." /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__new__" className="text-primary font-medium">+ عميل جديد</SelectItem>
                     {clients.map(c => (
                       <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {/* Inline new client form */}
+                {isNewClient && (
+                  <div className="border border-primary/30 rounded-lg p-3 space-y-3 bg-primary/5 mt-2">
+                    <p className="text-xs font-medium text-primary">بيانات العميل الجديد</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1 col-span-2">
+                        <label className="text-xs text-muted-foreground">الاسم <span className="text-red-500">*</span></label>
+                        <Input placeholder="اسم العميل" value={newClientForm.name}
+                          onChange={e => setNewClientForm(p => ({ ...p, name: e.target.value }))} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">رقم الهاتف</label>
+                        <Input placeholder="5XXXXXXXX" dir="ltr" value={newClientForm.phone}
+                          onChange={e => setNewClientForm(p => ({ ...p, phone: e.target.value }))} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">الرقم المدني</label>
+                        <Input placeholder="2XXXXXXXXXX" dir="ltr" value={newClientForm.civilId}
+                          onChange={e => {
+                            const v = e.target.value;
+                            setNewClientForm(p => ({ ...p, civilId: v }));
+                            setNewContractForm(p => ({ ...p, civilId: v }));
+                          }} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">المنطقة</label>
+                        <Input placeholder="المنطقة" value={newClientForm.area}
+                          onChange={e => {
+                            const v = e.target.value;
+                            setNewClientForm(p => ({ ...p, area: v }));
+                            setNewContractForm(p => ({ ...p, area: v }));
+                          }} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">القطعة</label>
+                        <Input placeholder="رقم القطعة" value={newClientForm.block}
+                          onChange={e => {
+                            const v = e.target.value;
+                            setNewClientForm(p => ({ ...p, block: v }));
+                            setNewContractForm(p => ({ ...p, block: v }));
+                          }} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">القسيمة</label>
+                        <Input placeholder="رقم القسيمة" value={newClientForm.plot}
+                          onChange={e => {
+                            const v = e.target.value;
+                            setNewClientForm(p => ({ ...p, plot: v }));
+                            setNewContractForm(p => ({ ...p, plot: v }));
+                          }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               {/* Template */}
               <div className="space-y-1.5">
