@@ -651,8 +651,10 @@ function ContractDialog({ lead, onClose, onSaved }: {
     try {
       const now = new Date().toISOString().slice(0, 10);
       // Snapshot of template sections at time of contract creation
+      // If template has HTML content field, include it; otherwise use structured fields
       const termsText = selectedTemplate
         ? JSON.stringify({
+            content: selectedTemplate.content || "",
             scopeOfWork: selectedTemplate.scopeOfWork,
             terms: selectedTemplate.terms,
             party1Obligations: selectedTemplate.party1Obligations,
@@ -1103,6 +1105,7 @@ export default function CRM() {
   const [signingBusy, setSigningBusy] = useState(false);
     const [appointmentTarget, setAppointmentTarget] = useState<Lead | null>(null);
   const [showArchive, setShowArchive] = useState(false);
+  const [wonDialogLead, setWonDialogLead] = useState<Lead | null>(null);
   const { data: allAppointments = [] } = useAppointments();
   // Build a Set of leadIds that have upcoming appointments
   const leadsWithAppointments = new Set(
@@ -1641,11 +1644,7 @@ export default function CRM() {
                                 onClick={() => setViewQuoteTarget(lead)}
                               ><Eye className="w-3 h-3 ml-1" />عرض عرض السعر</Button>
                               <Button size="sm" className="text-xs h-7" style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
-                                onClick={async () => {
-                                  await updateLead.mutateAsync({ id: lead.id, stage: "بانتظار التعاقد" });
-                                  setOpenStage(3); setSelectedLead(null);
-                                  toast.success(`"${lead.name}" → بانتظار التعاقد`);
-                                }}
+                                onClick={() => setWonDialogLead(lead)}
                               ><Trophy className="w-3 h-3 ml-1" />فوز</Button>
                               <Button size="sm" variant="outline" className="text-xs h-7 text-red-600 border-red-200"
                                 onClick={async () => {

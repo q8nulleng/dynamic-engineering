@@ -24,7 +24,7 @@ import {
   ChevronDown, ChevronUp, Loader2, ExternalLink,
   Pencil, Copy, Trash2, Save,
   Bold, Underline, AlignRight, AlignLeft, AlignCenter,
-  Palette, Type, MessageSquare, Building2,
+  Palette, Type, MessageSquare, Building2, RefreshCw,
 } from "lucide-react";
 
 const statusConfig: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
@@ -548,6 +548,7 @@ export default function Contracts() {
     signingDate: new Date().toISOString().slice(0, 10),
   });
   const [newContractBusy, setNewContractBusy] = useState(false);
+  const [syncingTemplateId, setSyncingTemplateId] = useState<string | null>(null);
   // New client inline form
   const [isNewClient, setIsNewClient] = useState(false);
   const [newClientForm, setNewClientForm] = useState({
@@ -681,6 +682,32 @@ export default function Contracts() {
       toast.error("فشل تفعيل العقد");
     } finally {
       setActivatingId(null);
+    }
+  }
+
+  async function handleSyncTemplate(e: React.MouseEvent, contract: Contract) {
+    e.stopPropagation();
+    // Find the matching template by name
+    const tmpl = templates.find(t => t.name === (contract.templateType || contract.template));
+    if (!tmpl) { toast.error("لم يتم العثور على القالب المرتبط بهذا العقد"); return; }
+    setSyncingTemplateId(contract.id);
+    try {
+      const newTermsText = JSON.stringify({
+        content: (tmpl as any).content || "",
+        scopeOfWork: tmpl.scopeOfWork,
+        terms: tmpl.terms,
+        party1Obligations: tmpl.party1Obligations,
+        party2Obligations: tmpl.party2Obligations,
+        paymentSchedule: tmpl.paymentSchedule,
+        duration: tmpl.duration,
+        notes: tmpl.notes,
+      });
+      await updateContract.mutateAsync({ id: contract.id, termsText: newTermsText });
+      toast.success("تم تحديث نص العقد من القالب بنجاح");
+    } catch {
+      toast.error("فشل تحديث نص العقد");
+    } finally {
+      setSyncingTemplateId(null);
     }
   }
 
@@ -891,6 +918,13 @@ export default function Contracts() {
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600" title="إشعار واتساب"
                                   onClick={(e) => handleNotifyWhatsApp(e, c)}>
                                   <MessageSquare className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-500" title="تحديث نص العقد من القالب"
+                                  disabled={syncingTemplateId === c.id}
+                                  onClick={(e) => handleSyncTemplate(e, c)}>
+                                  {syncingTemplateId === c.id
+                                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    : <RefreshCw className="w-3.5 h-3.5" />}
                                 </Button>
                               </div>
                             </td>

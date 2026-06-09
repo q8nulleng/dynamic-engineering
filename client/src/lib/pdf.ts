@@ -173,6 +173,7 @@ function renderSection(heading: string, content: string): string {
 
 // ── Parse termsText JSON and render structured sections ─────────────────────
 interface TemplateFields {
+  content?: string;           // Full HTML content (new templates)
   scopeOfWork?: string;
   duration?: string;
   paymentSchedule?: string;
@@ -195,6 +196,11 @@ function parseAndRenderTerms(termsText: string, contractAmount: number): string 
   <div class="article-heading">المادة (1): نطاق الخدمات والشروط</div>
   ${formatTextContent(termsText)}
 </div>`;
+  }
+
+  // ── NEW: If template has full HTML content, render it directly ──
+  if (fields.content && fields.content.trim().length > 0) {
+    return `<div style="font-size:12px;line-height:2;direction:rtl;" class="template-content">${fields.content}</div>`;
   }
   
   let html = "";
