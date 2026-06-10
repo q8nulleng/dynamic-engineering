@@ -110,6 +110,10 @@ function QuotationDialog({ lead, onClose, onSaved }: {
   const [selectedPkg, setSelectedPkg] = useState<PkgType | null>(null);
   const [generating, setGenerating] = useState(false);
   const [agreedPrice, setAgreedPrice] = useState("");
+  const [editableFeatures, setEditableFeatures] = useState<string[]>([]);
+  const [newFeature, setNewFeature] = useState("");
+  const [editingFeatureIdx, setEditingFeatureIdx] = useState<number | null>(null);
+  const [editingFeatureText, setEditingFeatureText] = useState("");
 
   const { data: dynamicPackages = {} } = usePackages();
   const allFlat = Object.values(dynamicPackages).flat();
@@ -166,9 +170,10 @@ function QuotationDialog({ lead, onClose, onSaved }: {
     setGenerating(true);
     const tid = toast.loading("جاري إنشاء PDF...");
     try {
-      const pkgForPdf = agreedPrice.trim()
-        ? { ...selectedPkg, price: agreedPrice.trim() }
-        : selectedPkg;
+      const pkgForPdf = {
+        ...(agreedPrice.trim() ? { ...selectedPkg, price: agreedPrice.trim() } : selectedPkg),
+        features: editableFeatures,
+      };
       await exportQuotationPdf(lead, pkgForPdf);
       toast.success("تم فتح نافذة الطباعة", { id: tid });
     } catch (err: unknown) {
@@ -229,7 +234,17 @@ function QuotationDialog({ lead, onClose, onSaved }: {
               {packages.map((pkg, i) => (
                 <button
                   key={i}
-                  onClick={() => setSelectedPkg(pkg === selectedPkg ? null : pkg)}
+                  onClick={() => {
+                    if (pkg === selectedPkg) {
+                      setSelectedPkg(null);
+                      setEditableFeatures([]);
+                    } else {
+                      setSelectedPkg(pkg);
+                      setEditableFeatures([...pkg.features]);
+                      setNewFeature("");
+                      setEditingFeatureIdx(null);
+                    }
+                  }}
                   className={`w-full p-3 rounded-lg border text-right transition-all ${
                     selectedPkg === pkg
                       ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
@@ -248,9 +263,83 @@ function QuotationDialog({ lead, onClose, onSaved }: {
                     </div>
                   </div>
                   {selectedPkg === pkg && (
-                    <ul className="mt-2 text-xs text-muted-foreground space-y-1 text-right">
-                      {pkg.features.map((f, fi) => <li key={fi}>• {f}</li>)}
-                    </ul>
+                    <div className="mt-3 space-y-2" onClick={e => e.stopPropagation()}>
+                      <div className="text-xs font-semibold text-right mb-1" style={{ color: "oklch(0.55 0.15 250)" }}>✏️ وصف الخدمات (قابل للتعديل)</div>
+                      {editableFeatures.map((f, fi) => (
+                        <div key={fi} className="flex items-center gap-1">
+                          {editingFeatureIdx === fi ? (
+                            <>
+                              <input
+                                className="flex-1 text-xs border rounded px-2 py-1 text-right bg-white text-black"
+                                value={editingFeatureText}
+                                onChange={e => setEditingFeatureText(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === "Enter") {
+                                    const updated = [...editableFeatures];
+                                    updated[fi] = editingFeatureText.trim() || f;
+                                    setEditableFeatures(updated);
+                                    setEditingFeatureIdx(null);
+                                  } else if (e.key === "Escape") {
+                                    setEditingFeatureIdx(null);
+                                  }
+                                }}
+                                autoFocus
+                              />
+                              <button
+                                className="text-xs px-2 py-1 rounded bg-green-500 text-white"
+                                onClick={() => {
+                                  const updated = [...editableFeatures];
+                                  updated[fi] = editingFeatureText.trim() || f;
+                                  setEditableFeatures(updated);
+                                  setEditingFeatureIdx(null);
+                                }}
+                              >✓</button>
+                              <button
+                                className="text-xs px-2 py-1 rounded bg-gray-300 text-black"
+                                onClick={() => setEditingFeatureIdx(null)}
+                              >✕</button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="flex-1 text-xs text-right text-muted-foreground">• {f}</span>
+                              <button
+                                className="text-xs px-1.5 py-0.5 rounded border border-blue-300 text-blue-600 hover:bg-blue-50"
+                                onClick={() => { setEditingFeatureIdx(fi); setEditingFeatureText(f); }}
+                              >تعديل</button>
+                              <button
+                                className="text-xs px-1.5 py-0.5 rounded border border-red-300 text-red-500 hover:bg-red-50"
+                                onClick={() => setEditableFeatures(editableFeatures.filter((_, i) => i !== fi))}
+                              >حذف</button>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                      {/* Add new feature */}
+                      <div className="flex items-center gap-1 pt-1">
+                        <input
+                          className="flex-1 text-xs border rounded px-2 py-1 text-right bg-white text-black placeholder:text-gray-400"
+                          placeholder="+ أضف خدمة جديدة..."
+                          value={newFeature}
+                          onChange={e => setNewFeature(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter" && newFeature.trim()) {
+                              setEditableFeatures([...editableFeatures, newFeature.trim()]);
+                              setNewFeature("");
+                            }
+                          }}
+                        />
+                        <button
+                          className="text-xs px-2 py-1 rounded bg-blue-500 text-white disabled:opacity-40"
+                          disabled={!newFeature.trim()}
+                          onClick={() => {
+                            if (newFeature.trim()) {
+                              setEditableFeatures([...editableFeatures, newFeature.trim()]);
+                              setNewFeature("");
+                            }
+                          }}
+                        >إضافة</button>
+                      </div>
+                    </div>
                   )}
                 </button>
               ))}
@@ -311,7 +400,7 @@ function QuotationDialog({ lead, onClose, onSaved }: {
                   </div>
                 </div>
                 <div style={{ borderTop: "1px solid #ccc", paddingTop: "8px" }}>
-                  {selectedPkg.features.map((f, fi) => (
+                  {editableFeatures.map((f, fi) => (
                     <div key={fi} style={{ display: "flex", gap: "6px", marginBottom: "4px", fontSize: "10px", color: "#000" }}>
                       <span style={{ fontWeight: 700, flexShrink: 0 }}>✓</span>
                       <span>{f}</span>
