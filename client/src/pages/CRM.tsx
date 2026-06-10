@@ -273,7 +273,9 @@ function QuotationDialog({ lead, onClose, onSaved }: {
                                 className="flex-1 text-xs border rounded px-2 py-1 text-right bg-white text-black"
                                 value={editingFeatureText}
                                 onChange={e => setEditingFeatureText(e.target.value)}
+                                onClick={e => e.stopPropagation()}
                                 onKeyDown={e => {
+                                  e.stopPropagation();
                                   if (e.key === "Enter") {
                                     const updated = [...editableFeatures];
                                     updated[fi] = editingFeatureText.trim() || f;
@@ -321,7 +323,9 @@ function QuotationDialog({ lead, onClose, onSaved }: {
                           placeholder="+ أضف خدمة جديدة..."
                           value={newFeature}
                           onChange={e => setNewFeature(e.target.value)}
+                          onClick={e => e.stopPropagation()}
                           onKeyDown={e => {
+                            e.stopPropagation();
                             if (e.key === "Enter" && newFeature.trim()) {
                               setEditableFeatures([...editableFeatures, newFeature.trim()]);
                               setNewFeature("");
