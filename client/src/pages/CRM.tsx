@@ -1819,10 +1819,17 @@ export default function CRM() {
                                     probability: String(lead.probability || ""),
                                     expectedClosing: lead.expectedClosing || "",
                                     priority: String(lead.priority || ""),
-                                    governorate: lead.governorate || "", area: lead.area || "",
+                                    governorate: lead.governorate || "",
+                                    area: (() => {
+                                      const govAreas = kuwaitGovernorates[lead.governorate || ""] || [];
+                                      return govAreas.includes(lead.area || "") ? (lead.area || "") : (lead.area ? "أخرى" : "");
+                                    })(),
                                     notes: lead.notes || "",
                                     plotNumber: lead.plotNumber || "", landArea: String(lead.landArea || ""),
-                                    customArea: "",
+                                    customArea: (() => {
+                                      const govAreas = kuwaitGovernorates[lead.governorate || ""] || [];
+                                      return govAreas.includes(lead.area || "") ? "" : (lead.area || "");
+                                    })(),
                                   });
                                   setEditActiveTab("basic");
                                   setEditTarget(lead);
@@ -2148,7 +2155,7 @@ export default function CRM() {
                       type: editForm.type,
                       serviceType: editForm.serviceType,
                       governorate: editForm.governorate,
-                      area: editForm.area,
+                      area: editForm.area === "أخرى" && (editForm as any).customArea?.trim() ? (editForm as any).customArea.trim() : editForm.area,
 
                       expectedRevenue: editForm.expectedRevenue || "0",
                       probability: Number(editForm.probability) || 10,
