@@ -64,6 +64,10 @@ export function initDb() {
   addCol("ALTER TABLE crm_leads ADD COLUMN plot_number TEXT DEFAULT ''");
   addCol("ALTER TABLE crm_leads ADD COLUMN land_area REAL DEFAULT 0");
   addCol("ALTER TABLE crm_leads ADD COLUMN assigned_to TEXT DEFAULT ''");
+  addCol("ALTER TABLE crm_leads ADD COLUMN referral_name TEXT DEFAULT ''");
+  addCol("ALTER TABLE crm_leads ADD COLUMN is_archived INTEGER DEFAULT 0");
+  addCol("ALTER TABLE crm_leads ADD COLUMN archived_at TEXT DEFAULT ''");
+  addCol("ALTER TABLE crm_leads ADD COLUMN archived_reason TEXT DEFAULT ''");
 
   // quotations — Issue #9
   addCol("ALTER TABLE quotations ADD COLUMN lead_id TEXT DEFAULT ''");

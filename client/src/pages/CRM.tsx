@@ -50,6 +50,7 @@ interface Lead {
   email?: string;
   type: string;
   source: string;
+  referralName?: string;
   date: string;
   expectedRevenue: string;
   probability: number;
@@ -68,6 +69,9 @@ interface Lead {
   landArea?: number;
   assignedTo?: string;
   stage?: string;
+  isArchived?: number;
+  archivedAt?: string;
+  archivedReason?: string;
 }
 
 const stageTemplates = [
@@ -1722,7 +1726,7 @@ export default function CRM() {
                                   setEditForm({
                                     name: lead.name || "", phone: lead.phone || "",
                                     type: lead.type || "", serviceType: lead.serviceType || "",
-                                    source: lead.source || "", referralName: "", expectedRevenue: lead.expectedRevenue || "",
+                                    source: lead.source || "", referralName: lead.referralName || "", expectedRevenue: lead.expectedRevenue || "",
                                     probability: String(lead.probability || ""),
                                     expectedClosing: lead.expectedClosing || "",
                                     priority: String(lead.priority || ""),
@@ -2051,6 +2055,7 @@ export default function CRM() {
                       name: editForm.name,
                       phone: editForm.phone,
                       source: editForm.source,
+                      referralName: editForm.referralName || "",
                       type: editForm.type,
                       serviceType: editForm.serviceType,
                       governorate: editForm.governorate,

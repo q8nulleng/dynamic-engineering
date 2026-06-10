@@ -498,6 +498,7 @@ export interface CrmLead {
   phone: string;
   type: string;
   source: string;
+  referralName: string;
   serviceType: string;
   governorate: string;
   area: string;

@@ -39,6 +39,7 @@ export const crmLeads = sqliteTable("crm_leads", {
   phone: text("phone").default(""),
   type: text("type").default(""),
   source: text("source").default(""),          // whatsapp|call|instagram|referral|visit
+  referralName: text("referral_name").default(""),
   serviceType: text("service_type").default(""),
   governorate: text("governorate").default(""),
   area: text("area").default(""),

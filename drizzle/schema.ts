@@ -61,6 +61,7 @@ export const crmLeads = mysqlTable("crm_leads", {
   phone: varchar("phone", { length: 32 }).default(""),
   type: varchar("type", { length: 64 }).default(""),
   source: varchar("source", { length: 64 }).default(""),
+  referralName: varchar("referral_name", { length: 128 }).default(""),
   serviceType: varchar("service_type", { length: 64 }).default(""),
   governorate: varchar("governorate", { length: 64 }).default(""),
   area: varchar("area", { length: 128 }).default(""),
