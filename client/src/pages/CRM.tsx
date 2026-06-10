@@ -2380,14 +2380,25 @@ export default function CRM() {
                         {lead.archivedReason && <div>السبب: {lead.archivedReason}</div>}
                       </div>
                     </div>
-                    <Button size="sm" variant="outline" className="text-green-700 border-green-300 shrink-0"
-                      onClick={async () => {
-                        await restoreLead.mutateAsync(lead.id);
-                        toast.success(`تم استعادة فرصة "${lead.name}"`);
-                      }}
-                    >
-                      <ChevronUp className="w-3 h-3 ml-1" />استعادة
-                    </Button>
+                    <div className="flex gap-2 shrink-0">
+                      <Button size="sm" variant="outline" className="text-green-700 border-green-300"
+                        onClick={async () => {
+                          await restoreLead.mutateAsync(lead.id);
+                          toast.success(`تم استعادة فرصة "${lead.name}"`);
+                        }}
+                      >
+                        <ChevronUp className="w-3 h-3 ml-1" />استعادة
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50"
+                        onClick={async () => {
+                          if (!window.confirm(`هل تريد حذف فرصة "${lead.name}" نهائياً؟`)) return;
+                          await deleteLead.mutateAsync(lead.id);
+                          toast.success(`تم حذف فرصة "${lead.name}" نهائياً`);
+                        }}
+                      >
+                        <Trash2 className="w-3 h-3 ml-1" />حذف
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
