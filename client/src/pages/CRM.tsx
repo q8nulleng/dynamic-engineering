@@ -2455,6 +2455,79 @@ export default function CRM() {
         </DialogContent>
       </Dialog>
 
+      {/* ===== Won Dialog ===== */}
+      {wonDialogLead && (
+        <Dialog open={true} onOpenChange={(open) => { if (!open) setWonDialogLead(null); }}>
+          <DialogContent className="max-w-md" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg">
+                <Trophy className="w-5 h-5 text-yellow-500" />
+                تهانينا! تم الفوز بالعقد 🎉
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-right">
+                <p className="font-semibold text-green-800 mb-1">العميل: {wonDialogLead.name}</p>
+                <p className="text-green-700">الخطوة التالية: طلب الأوراق المطلوبة لتجهيز العقد ودراسة المخططات</p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-right">الأوراق المطلوبة:</p>
+                <ul className="text-sm text-right space-y-1 text-muted-foreground">
+                  <li>📄 وثيقة الملكية</li>
+                  <li>🪪 البطاقة المدنية للملاك</li>
+                  <li>🏗️ رخصة البناء (إن وُجدت)</li>
+                  <li>📐 المخطط المرخص</li>
+                </ul>
+              </div>
+
+              <div className="bg-gray-50 border rounded-lg p-3">
+                <p className="text-xs font-semibold text-right mb-2 text-muted-foreground">رسالة واتساب جاهزة:</p>
+                <p className="text-sm text-right leading-relaxed" dir="rtl">
+                  السلام عليكم {wonDialogLead.name} 👋
+                  <br />بناءً على موافقتكم على عرض السعر، نحتاج منكم الأوراق التالية لتجهيز العقد ودراسة المخططات:
+                  <br />1️⃣ وثيقة الملكية
+                  <br />2️⃣ البطاقة المدنية للملاك
+                  <br />3️⃣ رخصة البناء (إن وُجدت)
+                  <br />4️⃣ المخطط المرخص
+                  <br />شكراً لثقتكم 🙏
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <Button
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => {
+                    const msg = encodeURIComponent(
+                      `السلام عليكم ${wonDialogLead.name} 👋\nبناءً على موافقتكم على عرض السعر، نحتاج منكم الأوراق التالية لتجهيز العقد ودراسة المخططات:\n1️⃣ وثيقة الملكية\n2️⃣ البطاقة المدنية للملاك\n3️⃣ رخصة البناء (إن وُجدت)\n4️⃣ المخطط المرخص\nشكراً لثقتكم 🙏`
+                    );
+                    const phone = wonDialogLead.phone.replace(/[^0-9]/g, "");
+                    const intlPhone = phone.startsWith("965") ? phone : `965${phone}`;
+                    window.open(`https://wa.me/${intlPhone}?text=${msg}`, "_blank");
+                  }}
+                >
+                  <MessageCircle className="w-4 h-4 ml-1" />
+                  إرسال عبر واتساب
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={async () => {
+                    await updateLead.mutateAsync({ id: wonDialogLead.id, stage: "بانتظار التعاقد" });
+                    setWonDialogLead(null);
+                    setSelectedLead(null);
+                    toast.success(`🏆 "${wonDialogLead.name}" → بانتظار التعاقد`);
+                  }}
+                >
+                  <Trophy className="w-4 h-4 ml-1" />
+                  تأكيد الفوز
+                </Button>
+              </div>
+              <Button variant="outline" className="w-full" onClick={() => setWonDialogLead(null)}>إلغاء</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* ===== Archive Dialog ===== */}
       <Dialog open={showArchive} onOpenChange={setShowArchive}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" dir="rtl">
