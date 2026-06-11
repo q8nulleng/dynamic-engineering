@@ -891,11 +891,11 @@ function ContractDialog({ lead, onClose, onSaved }: {
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-muted-foreground" />القطعة</label>
-              <Input placeholder="رقم القطعة" value={form.plot} onChange={(e) => setForm(p => ({ ...p, plot: e.target.value }))} />
+              <Input placeholder="رقم القطعة" value={form.block} onChange={(e) => setForm(p => ({ ...p, block: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-muted-foreground" />القسيمة</label>
-              <Input placeholder="رقم القسيمة" value={form.block} onChange={(e) => setForm(p => ({ ...p, block: e.target.value }))} />
+              <Input placeholder="رقم القسيمة" value={form.plot} onChange={(e) => setForm(p => ({ ...p, plot: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-muted-foreground" />تاريخ التوقيع</label>

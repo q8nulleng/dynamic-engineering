@@ -1291,13 +1291,13 @@ export default function Contracts() {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">القطعة</label>
-                  <Input placeholder="رقم القطعة" value={newContractForm.plot}
-                    onChange={(e) => setNewContractForm(p => ({ ...p, plot: e.target.value }))} />
+                  <Input placeholder="رقم القطعة" value={newContractForm.block}
+                    onChange={(e) => setNewContractForm(p => ({ ...p, block: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">القسيمة</label>
-                  <Input placeholder="رقم القسيمة" value={newContractForm.block}
-                    onChange={(e) => setNewContractForm(p => ({ ...p, block: e.target.value }))} />
+                  <Input placeholder="رقم القسيمة" value={newContractForm.plot}
+                    onChange={(e) => setNewContractForm(p => ({ ...p, plot: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">تاريخ التوقيع</label>
