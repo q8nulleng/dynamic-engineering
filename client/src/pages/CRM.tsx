@@ -741,12 +741,13 @@ function ContractDialog({ lead, onClose, onSaved }: {
   const leadService = lead.serviceType || "";
   const leadType = lead.type || "";
   const matchedServices = serviceMatchMap[leadService] || [];
-  // فلترة القوالب: تطابق نوع الخدمة أولاً، ثم نوع المبنى إذا أمكن
+  // فلترة القوالب: تطابق نوع الخدمة + نوع المبنى
   const filteredTemplates = apiTemplates.filter(t => {
     if (matchedServices.length === 0) return true; // لا فلترة إذا لم يُعرَّف نوع الخدمة
     const serviceMatch = matchedServices.includes(t.serviceType || "");
     if (!serviceMatch) return false;
-    // إذا تطابق نوع المبنى أيضاً → أولوية (لكن نعرض الكل المطابق للخدمة)
+    // فلترة حسب نوع المبنى إذا محدد في الفرصة
+    if (leadType && t.buildingType && t.buildingType !== leadType) return false;
     return true;
   });
   // ترتيب: نوع المبنى المطابق أولاً
