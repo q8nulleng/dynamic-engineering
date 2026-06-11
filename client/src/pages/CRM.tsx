@@ -727,6 +727,34 @@ function ContractDialog({ lead, onClose, onSaved }: {
     setAmountSynced(true);
   }
 
+  // خريطة تطابق serviceType بين الفرص والقوالب
+  const serviceMatchMap: Record<string, string[]> = {
+    "إشراف": ["إشراف"],
+    "تعديل وإضافة": ["تعديل وإضافة", "تعديل وإضافة (مسك)"],
+    "تعديل": ["تعديل وإضافة", "تعديل وإضافة (مسك)"],
+    "إضافة": ["تعديل وإضافة", "تعديل وإضافة (مسك)"],
+    "بناء جديد": ["تصميم وترخيص وإشراف", "تصميم وترخيص وإشراف (مسك)"],
+    "هدم": ["هدم"],
+    "رخصة زراعة": ["رخصة زراعة"],
+    "رخصة مظلة": ["رخصة مظلة"],
+  };
+  const leadService = lead.serviceType || "";
+  const leadType = lead.type || "";
+  const matchedServices = serviceMatchMap[leadService] || [];
+  // فلترة القوالب: تطابق نوع الخدمة أولاً، ثم نوع المبنى إذا أمكن
+  const filteredTemplates = apiTemplates.filter(t => {
+    if (matchedServices.length === 0) return true; // لا فلترة إذا لم يُعرَّف نوع الخدمة
+    const serviceMatch = matchedServices.includes(t.serviceType || "");
+    if (!serviceMatch) return false;
+    // إذا تطابق نوع المبنى أيضاً → أولوية (لكن نعرض الكل المطابق للخدمة)
+    return true;
+  });
+  // ترتيب: نوع المبنى المطابق أولاً
+  const sortedTemplates = [
+    ...filteredTemplates.filter(t => t.buildingType === leadType),
+    ...filteredTemplates.filter(t => t.buildingType !== leadType),
+  ];
+
   const selectedTemplate = apiTemplates.find(t => t.id === form.selectedTemplateId) ?? null;
 
   const handleTemplateChange = (idStr: string) => {
@@ -818,9 +846,17 @@ function ContractDialog({ lead, onClose, onSaved }: {
                 <SelectValue placeholder={templatesLoading ? "جاري التحميل..." : "اختر قالب العقد الهندسي..."} />
               </SelectTrigger>
               <SelectContent>
-                {apiTemplates.map(t => (
+                {sortedTemplates.length === 0 && (
+                  <SelectItem value="__none__" disabled>
+                    لا توجد قوالب مطابقة لنوع الخدمة
+                  </SelectItem>
+                )}
+                {sortedTemplates.map((t, idx) => (
                   <SelectItem key={t.id} value={String(t.id)}>
-                    <span className="text-muted-foreground text-xs ml-1">{t.id}.</span> {t.name}
+                    <span className="text-muted-foreground text-xs ml-1">{idx + 1}.</span> {t.name}
+                    {t.buildingType === leadType && (
+                      <span className="mr-1 text-xs text-emerald-600">✓</span>
+                    )}
                   </SelectItem>
                 ))}
               </SelectContent>
