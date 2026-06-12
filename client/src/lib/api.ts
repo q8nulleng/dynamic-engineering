@@ -349,6 +349,14 @@ export function useContracts() {
   });
 }
 
+export function useContractsByProject(projectId: string | undefined) {
+  return useQuery<Contract[]>({
+    queryKey: ["contracts", { projectId }],
+    queryFn: () => request(`/api/contracts?projectId=${projectId}`),
+    enabled: !!projectId,
+  });
+}
+
 export function useCreateContract() {
   const qc = useQueryClient();
   return useMutation({

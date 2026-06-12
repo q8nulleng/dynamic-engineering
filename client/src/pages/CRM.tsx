@@ -29,7 +29,7 @@ import {
   Pencil, Trash2, Eye, CheckCircle, Hash, Ruler, ArrowRightLeft, Archive,
   Clock, UserCheck, CalendarPlus, Bell, Briefcase,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { kuwaitGovernorates } from "./Clients";
 import {
   useCreateQuotation, useUpdateQuotation, useDeleteQuotation, useQuotationsByLead, useQuotations,
@@ -999,7 +999,7 @@ function LeadContractSection({
           onClick={onSigned}
         >
           {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <CheckCircle className="w-3 h-3 ml-1" />}
-          تم التعاقد
+          تم قبول العقد وفتح مشروع
         </Button>
       </div>
     </div>
@@ -1208,6 +1208,7 @@ function AppointmentDialog({ lead, onClose }: { lead: Lead; onClose: () => void 
 }
 
 export default function CRM() {
+  const [, navigate] = useLocation();
   const { data: leadsData } = useCrmLeads();
   const { data: contractsData } = useContracts();
   const { data: allProjects = [] } = useProjects();
@@ -1383,8 +1384,9 @@ export default function CRM() {
       await updateLead.mutateAsync({ id: lead.id, stage: "تم التعاقد" });
 
       setSelectedLead(null);
-      setOpenStage(stageTemplates.findIndex((s) => s.title === "تم التعاقد"));
-      toast.success(`🎉 تم التعاقد مع "${lead.name}" — تم إنشاء العميل والمشروع والفاتورة الأولى`);
+      toast.success(`🎉 تم قبول العقد مع "${lead.name}" — جاري فتح المشروع...`);
+      // الانتقال التلقائي لصفحة المشروع
+      setTimeout(() => navigate(`/projects/${projectId}`), 800);
     } catch (err) {
       toast.error("حدث خطأ أثناء إتمام التعاقد — تحقق من البيانات وحاول مجدداً");
       console.error(err);
@@ -1819,9 +1821,9 @@ export default function CRM() {
                                   disabled={signingBusy}
                                   onClick={() => handleContractSigned(lead)}
                                 >
-                                  {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <CheckCircle className="w-3 h-3 ml-1" />}
-                                  إتمام التعاقد
-                                </Button>
+                  {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <CheckCircle className="w-3 h-3 ml-1" />}
+                  تم قبول العقد وفتح مشروع
+                </Button>
                               </div>
                             )}
 
@@ -1933,7 +1935,7 @@ export default function CRM() {
           onClose={() => setContractTarget(null)}
           onSaved={async () => {
             setContractTarget(null);
-            toast.success("تم إنشاء العقد — يمكنك الآن الضغط على 'تم التعاقد'");
+            toast.success("تم إنشاء العقد — يمكنك الآن الضغط على 'تم قبول العقد وفتح مشروع'");
           }}
         />
       )}

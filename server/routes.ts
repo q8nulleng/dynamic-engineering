@@ -548,9 +548,11 @@ apiRouter.delete("/api/quotations/:id", async (req, res) => {
 apiRouter.get("/api/contracts", async (req, res) => {
   try {
     const db = getDb();
-    const { leadId } = req.query as Record<string, string>;
+    const { leadId, projectId } = req.query as Record<string, string>;
     const rows = leadId
       ? await db.select().from(contracts).where(eq(contracts.leadId, leadId)).orderBy(desc(contracts.date))
+      : projectId
+      ? await db.select().from(contracts).where(eq(contracts.projectId, projectId)).orderBy(desc(contracts.date))
       : await db.select().from(contracts).orderBy(desc(contracts.date));
     res.json(rows);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
