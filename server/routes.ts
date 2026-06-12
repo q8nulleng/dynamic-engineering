@@ -168,125 +168,8 @@ apiRouter.post("/api/projects", async (req, res) => {
     });
     await db.update(projects).set({ contractId }).where(eq(projects.id, id));
 
-    // ── 4. إنشاء مراحل العمل حسب نوع المشروع ──
-    if (!Array.isArray(phasesData) || phasesData.length === 0) {
-      const projectType = projectData.type || "";
-      let phaseDefs: { title: string; subtitle?: string }[] = [];
-
-      if (projectType === "مبنى صناعي" || projectType === "صناعي" || projectType === "مستودع" || projectType === "مصنع") {
-        phaseDefs = [
-          { title: "تجهيز الملف",          subtitle: "جمع الوثائق والملفات" },
-          { title: "التصميم المعماري",      subtitle: "الكروكي والواجهات" },
-          { title: "التصميم الإنشائي",     subtitle: "الحسابات الإنشائية" },
-          { title: "الرسم والإخراج",       subtitle: "إخراج المخططات" },
-          { title: "تقديم البلدية",        subtitle: "المراجعة والاعتماد" },
-          { title: "الإشراف",             subtitle: "الإشراف على التنفيذ" },
-        ];
-      } else if (projectType === "سكن خاص") {
-        // تطبيق خطة العمل الكاملة (7 مراحل، 36 مهمة) من قاعدة البيانات
-        const serviceType = projectData.serviceType || "";
-        if (serviceType === "بناء جديد") {
-          // ابحث عن خطة العمل المحفوظة للسكن الخاص - بناء جديد
-          const [workPlan] = await db.select().from(workPlans)
-            .where(eq(workPlans.projectType, "سكن خاص"));
-          if (workPlan) {
-            const planPhases = await db.select().from(workPlanPhases)
-              .where(eq(workPlanPhases.workPlanId, workPlan.id))
-              .orderBy(workPlanPhases.order);
-            for (let i = 0; i < planPhases.length; i++) {
-              const ph = planPhases[i];
-              await db.insert(phases).values({
-                projectId: id,
-                order: i,
-                title: ph.title,
-                subtitle: ph.subtitle || "",
-              });
-              // MySQL autoincrement - get the last inserted phase for this project at this order
-              const [newPhase] = await db.select().from(phases)
-                .where(eq(phases.projectId, id))
-                .orderBy(desc(phases.id))
-                .limit(1);
-              const planTasks = await db.select().from(workPlanTasks)
-                .where(eq(workPlanTasks.workPlanPhaseId, ph.id))
-                .orderBy(workPlanTasks.order);
-              for (let j = 0; j < planTasks.length; j++) {
-                const t = planTasks[j];
-                await db.insert(tasks).values({
-                  phaseId: newPhase.id,
-                  name: t.name,
-                  status: j === 0 ? "in_progress" : "pending",
-                  assignee: t.assignee || "سكرتير",
-                  estimatedDays: t.estimatedDays || 1,
-                  autoCreated: 1,
-                  order: j,
-                });
-              }
-            }
-            // Skip the default phase creation below
-            const [project] = await db.select().from(projects).where(eq(projects.id, id));
-            return res.status(201).json({ ...project, clientId, contractId });
-          }
-        }
-        // Fallback: مراحل افتراضية
-        phaseDefs = [
-          { title: "تجهيز الملف",          subtitle: "جمع الوثائق والملفات" },
-          { title: "التصميم المعماري",      subtitle: "الكروكي والواجهات" },
-          { title: "التصميم الإنشائي",     subtitle: "الحسابات الإنشائية" },
-          { title: "الرسم والإخراج",       subtitle: "إخراج المخططات" },
-          { title: "تقديم البلدية",        subtitle: "المراجعة والاعتماد" },
-          { title: "المخططات التفصيلية",   subtitle: "صحي وكهربائي" },
-          { title: "الإشراف",             subtitle: "الإشراف على التنفيذ" },
-        ];
-      } else if (projectType === "سكن استثماري" || projectType === "تجاري") {
-        phaseDefs = [
-          { title: "تجهيز الملف",          subtitle: "جمع الوثائق والملفات" },
-          { title: "التصميم المعماري",      subtitle: "الكروكي والواجهات" },
-          { title: "التصميم الإنشائي",     subtitle: "الحسابات الإنشائية" },
-          { title: "الرسم والإخراج",       subtitle: "إخراج المخططات" },
-          { title: "تقديم البلدية",        subtitle: "المراجعة والاعتماد" },
-          { title: "الإشراف",             subtitle: "الإشراف على التنفيذ" },
-        ];
-      } else {
-        phaseDefs = [
-          { title: "تجهيز الملف",    subtitle: "جمع الوثائق" },
-          { title: "التصميم",        subtitle: "التصميم والرسم" },
-          { title: "التقديم",        subtitle: "تقديم الجهات" },
-          { title: "الإشراف",       subtitle: "متابعة التنفيذ" },
-        ];
-      }
-
-      for (let i = 0; i < phaseDefs.length; i++) {
-        await db.insert(phases).values({
-          projectId: id,
-          order: i,
-          title: phaseDefs[i].title,
-          subtitle: phaseDefs[i].subtitle || "",
-        });
-      }
-
-      // مهام أولية للمرحلة الأولى
-      const [firstPhase] = await db.select().from(phases)
-        .where(eq(phases.projectId, id))
-        .orderBy(phases.order);
-      if (firstPhase) {
-        const initialTasks = [
-          { name: "تجميع مستندات العميل", assignee: "سكرتير", estimatedDays: 3, status: "in_progress" },
-          { name: "طلب تقرير تربة",       assignee: "سكرتير", estimatedDays: 5, status: "in_progress" },
-          { name: "تعبئة نماذج البلدية",  assignee: "سكرتير", estimatedDays: 2, status: "pending" },
-        ];
-        for (let j = 0; j < initialTasks.length; j++) {
-          await db.insert(tasks).values({
-            phaseId: firstPhase.id,
-            name: initialTasks[j].name,
-            status: initialTasks[j].status,
-            assignee: initialTasks[j].assignee,
-            estimatedDays: initialTasks[j].estimatedDays,
-            autoCreated: 1,
-            order: j,
-          });
-        }
-      }
-    } else {
+    // ── 4. إنشاء مراحل العمل حسب نوع المشروع (يُفوّض لـ auto-tasks) ──
+    if (Array.isArray(phasesData) && phasesData.length > 0) {
       for (let i = 0; i < phasesData.length; i++) {
         const { tasks: tasksData, ...phaseData } = phasesData[i];
         await db.insert(phases).values({ ...phaseData, projectId: id, order: i });
@@ -425,15 +308,30 @@ apiRouter.post("/api/projects/:id/auto-tasks", async (req, res) => {
     }
     await db.delete(phases).where(eq(phases.projectId, projectId));
 
-    const phaseDefs = [
-      { title: "تجهيز الملف",          subtitle: "جمع الوثائق والملفات" },
-      { title: "التصميم المعماري",     subtitle: "الكروكي والتصاميم" },
-      { title: "التصميم الإنشائي",     subtitle: "الحسابات الإنشائية" },
-      { title: "الرسم والإخراج",       subtitle: "إخراج المخططات" },
-      { title: "تقديم البلدية",        subtitle: "المراجعة والاعتماد" },
-      { title: "المخططات التفصيلية",   subtitle: "صحي وكهربائي" },
-      { title: "الإشراف",             subtitle: "الإشراف على التنفيذ" },
-    ];
+    // ── تحديد نوع المشروع والخدمة ──
+    const projectType = project.type || "سكن خاص";       // سكن خاص | صناعي | تجاري | استثماري
+    const serviceType = project.serviceType || "بناء جديد"; // بناء جديد | تعديل وإضافة
+    const isModification = serviceType.includes("تعديل") || serviceType.includes("إضافة");
+    const isPrivateResidential = projectType === "سكن خاص";
+    const needsFireDept = !isPrivateResidential && !isModification; // بناء جديد لغير السكن الخاص
+    const needsFullSupervision = needsFireDept; // إشراف كامل لنفس الحالة
+
+    // ── بناء المراحل حسب النوع ──
+    const phaseDefs: { title: string; subtitle: string }[] = [];
+
+    if (isModification) {
+      phaseDefs.push({ title: "رفع الملفات المرجعية", subtitle: "المخططات السابقة وصور الموقع" });
+    }
+    phaseDefs.push({ title: "تجهيز الملف",          subtitle: "جمع الوثائق والملفات" });
+    phaseDefs.push({ title: "التصميم المعماري",     subtitle: "الكروكي والتصاميم" });
+    phaseDefs.push({ title: "التصميم الإنشائي",     subtitle: "الحسابات الإنشائية" });
+    phaseDefs.push({ title: "الرسم والإخراج",       subtitle: "إخراج المخططات" });
+    phaseDefs.push({ title: "تقديم البلدية",        subtitle: "المراجعة والاعتماد" });
+    if (needsFireDept) {
+      phaseDefs.push({ title: "المطافي",            subtitle: "رخصة الإطفاء" });
+    }
+    phaseDefs.push({ title: "المخططات التفصيلية",   subtitle: "صحي وكهربائي" });
+    phaseDefs.push({ title: "الإشراف",             subtitle: needsFullSupervision ? "إشراف كامل على المبنى" : "الإشراف على التنفيذ" });
 
     const phaseMap: Record<string, number> = {};
     let nextOrder = 0;
@@ -446,25 +344,72 @@ apiRouter.post("/api/projects/:id/auto-tasks", async (req, res) => {
       phaseMap[pd.title] = ph.id;
     }
 
-    const taskDefs: { name: string; phase: string; assignee: string; depIdx: number; estimatedDays: number; status: string }[] = [
-      { name: "تجميع مستندات العميل",    phase: "تجهيز الملف",          assignee: "سكرتير",   depIdx: -1, estimatedDays: 3,  status: "in_progress" },
-      { name: "طلب تقرير تربة",          phase: "تجهيز الملف",          assignee: "سكرتير",   depIdx: -1, estimatedDays: 5,  status: "in_progress" },
-      { name: "تعبئة نماذج البلدية",     phase: "تجهيز الملف",          assignee: "سكرتير",   depIdx: 0,  estimatedDays: 2,  status: "pending" },
-      { name: "جلسة كروكي مع المالك",    phase: "التصميم المعماري",     assignee: "م. مصطفى", depIdx: 0,  estimatedDays: 1,  status: "pending" },
-      { name: "إعداد الكروكي المبدئي",   phase: "التصميم المعماري",     assignee: "م. مصطفى", depIdx: 3,  estimatedDays: 5,  status: "pending" },
-      { name: "اعتماد الكروكي من المالك",phase: "التصميم المعماري",     assignee: "م. مصطفى", depIdx: 4,  estimatedDays: 3,  status: "pending" },
-      { name: "تصميم الواجهات",          phase: "التصميم المعماري",     assignee: "عفيف",     depIdx: 5,  estimatedDays: 5,  status: "pending" },
-      { name: "التصميم الإنشائي",        phase: "التصميم الإنشائي",     assignee: "م. أمين",  depIdx: 5,  estimatedDays: 7,  status: "pending" },
-      { name: "رسم مخططات البلدية",      phase: "الرسم والإخراج",       assignee: "عرفان",    depIdx: 7,  estimatedDays: 5,  status: "pending" },
-      { name: "مراجعة المخططات",         phase: "الرسم والإخراج",       assignee: "م. مصطفى", depIdx: 8,  estimatedDays: 2,  status: "pending" },
-      { name: "تقديم للبلدية",           phase: "تقديم البلدية",        assignee: "سكرتير",   depIdx: 9,  estimatedDays: 1,  status: "pending" },
-      { name: "متابعة البلدية",          phase: "تقديم البلدية",        assignee: "سكرتير",   depIdx: 10, estimatedDays: 30, status: "pending" },
-      { name: "رسم مخططات صحي",         phase: "المخططات التفصيلية",   assignee: "عرفان",    depIdx: 9,  estimatedDays: 3,  status: "pending" },
-      { name: "رسم مخططات كهربائي",     phase: "المخططات التفصيلية",   assignee: "عرفان",    depIdx: 9,  estimatedDays: 3,  status: "pending" },
-      { name: "زيارة إشراف",             phase: "الإشراف",             assignee: "م. خالد",  depIdx: 11, estimatedDays: 0,  status: "pending" },
-      { name: "تقرير زيارة",             phase: "الإشراف",             assignee: "م. خالد",  depIdx: 14, estimatedDays: 1,  status: "pending" },
-      { name: "خطاب بنك",                phase: "الإشراف",             assignee: "سكرتير",   depIdx: 14, estimatedDays: 0,  status: "pending" },
-    ];
+    // ── بناء المهام حسب النوع ──
+    const taskDefs: { name: string; phase: string; assignee: string; depIdx: number; estimatedDays: number; status: string }[] = [];
+
+    // مرحلة رفع الملفات المرجعية (تعديل وإضافة فقط)
+    if (isModification) {
+      taskDefs.push({ name: "رفع المخططات السابقة",     phase: "رفع الملفات المرجعية", assignee: "سكرتير",   depIdx: -1, estimatedDays: 2, status: "in_progress" });
+      taskDefs.push({ name: "رفع صور الموقع",           phase: "رفع الملفات المرجعية", assignee: "سكرتير",   depIdx: -1, estimatedDays: 2, status: "in_progress" });
+    }
+
+    // مرحلة تجهيز الملف
+    const filePhaseStart = taskDefs.length;
+    taskDefs.push({ name: "تجميع مستندات العميل",    phase: "تجهيز الملف", assignee: "سكرتير",   depIdx: isModification ? 0 : -1, estimatedDays: 3, status: isModification ? "pending" : "in_progress" });
+    if (!isModification) {
+      // بناء جديد فقط يحتاج تقرير تربة
+      taskDefs.push({ name: "طلب تقرير تربة",        phase: "تجهيز الملف", assignee: "سكرتير",   depIdx: -1, estimatedDays: 5, status: "in_progress" });
+    }
+    taskDefs.push({ name: "تعبئة نماذج البلدية",     phase: "تجهيز الملف", assignee: "سكرتير",   depIdx: filePhaseStart, estimatedDays: 2, status: "pending" });
+
+    // مرحلة التصميم المعماري
+    const archStart = taskDefs.length;
+    taskDefs.push({ name: "جلسة كروكي مع المالك",    phase: "التصميم المعماري", assignee: "م. مصطفى", depIdx: filePhaseStart, estimatedDays: 1, status: "pending" });
+    taskDefs.push({ name: "إعداد الكروكي المبدئي",   phase: "التصميم المعماري", assignee: "م. مصطفى", depIdx: archStart,     estimatedDays: 5, status: "pending" });
+    taskDefs.push({ name: "اعتماد الكروكي من المالك", phase: "التصميم المعماري", assignee: "م. مصطفى", depIdx: archStart + 1, estimatedDays: 3, status: "pending" });
+    taskDefs.push({ name: "تصميم الواجهات",          phase: "التصميم المعماري", assignee: "عفيف",     depIdx: archStart + 2, estimatedDays: 5, status: "pending" });
+
+    // مرحلة التصميم الإنشائي
+    const structStart = taskDefs.length;
+    taskDefs.push({ name: "التصميم الإنشائي",        phase: "التصميم الإنشائي", assignee: "م. أمين",  depIdx: archStart + 2, estimatedDays: 7, status: "pending" });
+
+    // مرحلة الرسم والإخراج
+    const drawStart = taskDefs.length;
+    taskDefs.push({ name: "رسم مخططات البلدية",      phase: "الرسم والإخراج", assignee: "عرفان",    depIdx: structStart,   estimatedDays: 5, status: "pending" });
+    taskDefs.push({ name: "مراجعة المخططات",         phase: "الرسم والإخراج", assignee: "م. مصطفى", depIdx: drawStart,     estimatedDays: 2, status: "pending" });
+
+    // مرحلة تقديم البلدية
+    const muniStart = taskDefs.length;
+    taskDefs.push({ name: "تقديم للبلدية",           phase: "تقديم البلدية", assignee: "سكرتير",   depIdx: drawStart + 1, estimatedDays: 1,  status: "pending" });
+    taskDefs.push({ name: "متابعة البلدية",          phase: "تقديم البلدية", assignee: "سكرتير",   depIdx: muniStart,     estimatedDays: 30, status: "pending" });
+
+    // مرحلة المطافي (بناء جديد لغير السكن الخاص)
+    let fireStart = taskDefs.length;
+    if (needsFireDept) {
+      taskDefs.push({ name: "تجهيز ملف المطافي",      phase: "المطافي", assignee: "سكرتير",   depIdx: drawStart + 1, estimatedDays: 3,  status: "pending" });
+      taskDefs.push({ name: "تقديم طلب رخصة إطفاء",   phase: "المطافي", assignee: "سكرتير",   depIdx: fireStart,     estimatedDays: 1,  status: "pending" });
+      taskDefs.push({ name: "متابعة المطافي",          phase: "المطافي", assignee: "سكرتير",   depIdx: fireStart + 1, estimatedDays: 21, status: "pending" });
+    }
+
+    // مرحلة المخططات التفصيلية
+    const detailStart = taskDefs.length;
+    taskDefs.push({ name: "رسم مخططات صحي",         phase: "المخططات التفصيلية", assignee: "عرفان", depIdx: drawStart + 1, estimatedDays: 3, status: "pending" });
+    taskDefs.push({ name: "رسم مخططات كهربائي",     phase: "المخططات التفصيلية", assignee: "عرفان", depIdx: drawStart + 1, estimatedDays: 3, status: "pending" });
+
+    // مرحلة الإشراف
+    const supervisionStart = taskDefs.length;
+    if (needsFullSupervision) {
+      // إشراف كامل للمباني غير السكن الخاص (بناء جديد)
+      taskDefs.push({ name: "الإشراف الكامل على المبنى", phase: "الإشراف", assignee: "م. خالد",  depIdx: muniStart + 1, estimatedDays: 0,  status: "pending" });
+      taskDefs.push({ name: "تقرير إشراف دوري",         phase: "الإشراف", assignee: "م. خالد",  depIdx: supervisionStart, estimatedDays: 7, status: "pending" });
+      taskDefs.push({ name: "تقرير إنجاز مرحلي",        phase: "الإشراف", assignee: "م. خالد",  depIdx: supervisionStart, estimatedDays: 14, status: "pending" });
+      taskDefs.push({ name: "خطاب بنك",                  phase: "الإشراف", assignee: "سكرتير",   depIdx: supervisionStart, estimatedDays: 0, status: "pending" });
+    } else {
+      // إشراف زيارات للسكن الخاص
+      taskDefs.push({ name: "زيارة إشراف",             phase: "الإشراف", assignee: "م. خالد",  depIdx: muniStart + 1, estimatedDays: 0, status: "pending" });
+      taskDefs.push({ name: "تقرير زيارة",             phase: "الإشراف", assignee: "م. خالد",  depIdx: supervisionStart, estimatedDays: 1, status: "pending" });
+      taskDefs.push({ name: "خطاب بنك",                phase: "الإشراف", assignee: "سكرتير",   depIdx: supervisionStart, estimatedDays: 0, status: "pending" });
+    }
 
     const taskIds: number[] = [];
     const orderByPhase: Record<string, number> = {};
