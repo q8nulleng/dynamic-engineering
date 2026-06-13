@@ -313,7 +313,10 @@ export function useUpdateQuotation() {
   return useMutation({
     mutationFn: ({ id, ...data }: Partial<Quotation> & { id: string }) =>
       request<Quotation>(`/api/quotations/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["quotations"] }),
+    onSuccess: () => {
+      // إبطال جميع queries المرتبطة بالعروض (بما فيها sub-queries بـ leadId)
+      qc.invalidateQueries({ queryKey: ["quotations"], exact: false });
+    },
   });
 }
 

@@ -3,6 +3,7 @@
  * Each stage is a clickable button that expands to show leads
  */
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -715,6 +716,7 @@ function QuotationEditDialog({ lead, quote, onClose, onSaved }: {
   onSaved: () => void;
 }) {
   const updateQuotation = useUpdateQuotation();
+  const qc = useQueryClient();
   const { data: dynamicPackages = {} } = usePackages();
   const allFlat = Object.values(dynamicPackages).flat() as PkgType[];
 
@@ -751,6 +753,9 @@ function QuotationEditDialog({ lead, quote, onClose, onSaved }: {
         status,
         type: lead.type || quote.type,
       });
+      // إبطال query الخاصة بهذه الفرصة مباشرةً
+      await qc.invalidateQueries({ queryKey: ["quotations", { leadId: lead.id }] });
+      await qc.invalidateQueries({ queryKey: ["quotations"] });
       toast.success("تم تحديث عرض السعر بنجاح");
       onSaved();
     } finally {
