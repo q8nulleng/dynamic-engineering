@@ -232,8 +232,10 @@ function QuotationDialog({ lead, onClose, onSaved }: {
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {packages.map((pkg, i) => (
-                <button
+                <div
                   key={i}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => {
                     if (pkg === selectedPkg) {
                       setSelectedPkg(null);
@@ -245,7 +247,21 @@ function QuotationDialog({ lead, onClose, onSaved }: {
                       setEditingFeatureIdx(null);
                     }
                   }}
-                  className={`w-full p-3 rounded-lg border text-right transition-all ${
+                  onKeyDown={e => {
+                    if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+                      e.preventDefault();
+                      if (pkg === selectedPkg) {
+                        setSelectedPkg(null);
+                        setEditableFeatures([]);
+                      } else {
+                        setSelectedPkg(pkg);
+                        setEditableFeatures([...pkg.features]);
+                        setNewFeature("");
+                        setEditingFeatureIdx(null);
+                      }
+                    }
+                  }}
+                  className={`w-full p-3 rounded-lg border text-right transition-all cursor-pointer ${
                     selectedPkg === pkg
                       ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
                       : "border-border hover:border-blue-300"
@@ -345,7 +361,7 @@ function QuotationDialog({ lead, onClose, onSaved }: {
                       </div>
                     </div>
                   )}
-                </button>
+                </div>
               ))}
             </div>
           )}
