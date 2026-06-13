@@ -554,51 +554,50 @@ function buildPageNoPrint(body: string, title: string): string {
 // ── Download quotation as actual PDF file ──────────────────────────────────
 export async function downloadQuotationPdf(lead: QuotationLead, pkg: QuotationPackage): Promise<string> {
   const fileName = `عرض-سعر-${lead.name.replace(/\s+/g, "-")}.pdf`;
-  const htmlContent = buildPageNoPrint(quotationBody(lead, pkg), `عرض سعر — ${lead.name}`);
+  const body = quotationBody(lead, pkg);
 
-  // Create hidden iframe to render HTML then capture as PDF
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.left = "-9999px";
-  iframe.style.top = "0";
-  iframe.style.width = "794px";
-  iframe.style.height = "1123px";
-  document.body.appendChild(iframe);
+  // Create hidden container in main document (avoids iframe CORS issues)
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.left = "-9999px";
+  container.style.top = "0";
+  container.style.width = "794px";
+  container.style.zIndex = "-1";
+  container.style.background = "#fff";
+  container.style.fontFamily = "'Noto Naskh Arabic','Noto Kufi Arabic','Simplified Arabic',Arial,sans-serif";
+  container.style.direction = "rtl";
+  container.style.fontSize = "13px";
+  container.style.lineHeight = "1.9";
+  container.style.color = "#111";
+  container.innerHTML = `<div class="page" style="padding:30px 35px 100px;max-width:794px;margin:0 auto;">${body}</div>`;
+  document.body.appendChild(container);
 
-  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-  if (!iframeDoc) {
-    document.body.removeChild(iframe);
-    throw new Error("Cannot access iframe document");
-  }
-
-  iframeDoc.open();
-  iframeDoc.write(htmlContent);
-  iframeDoc.close();
-
-  // Wait for fonts and content to load
+  // Wait for images and fonts to load
   await new Promise<void>(resolve => {
-    const checkReady = () => {
-      if (iframeDoc.fonts) {
-        iframeDoc.fonts.ready.then(() => setTimeout(resolve, 500));
-      } else {
-        setTimeout(resolve, 1000);
-      }
-    };
-    if (iframe.contentWindow) {
-      iframe.contentWindow.onload = checkReady;
+    const images = container.querySelectorAll("img");
+    let loaded = 0;
+    const total = images.length;
+    if (total === 0) {
+      setTimeout(resolve, 500);
+      return;
     }
-    setTimeout(checkReady, 1500);
+    images.forEach(img => {
+      if (img.complete) {
+        loaded++;
+        if (loaded >= total) setTimeout(resolve, 300);
+      } else {
+        img.onload = () => { loaded++; if (loaded >= total) setTimeout(resolve, 300); };
+        img.onerror = () => { loaded++; if (loaded >= total) setTimeout(resolve, 300); };
+      }
+    });
+    setTimeout(resolve, 3000); // fallback timeout
   });
 
   // Use html2canvas + jsPDF to generate real PDF
   const { default: html2canvas } = await import("html2canvas");
   const { default: jsPDF } = await import("jspdf");
 
-  const pageEl = iframeDoc.querySelector(".page") as HTMLElement;
-  if (!pageEl) {
-    document.body.removeChild(iframe);
-    throw new Error("Cannot find page element");
-  }
+  const pageEl = container.querySelector(".page") as HTMLElement;
 
   const canvas = await html2canvas(pageEl, {
     scale: 2,
@@ -617,10 +616,21 @@ export async function downloadQuotationPdf(lead: QuotationLead, pkg: QuotationPa
   const pdfWidth = pdf.internal.pageSize.getWidth();
   const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-  pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
-  pdf.save(fileName);
+  // Handle multi-page if content is longer than one page
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  if (pdfHeight <= pageHeight) {
+    pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+  } else {
+    let position = 0;
+    while (position < pdfHeight) {
+      pdf.addImage(imgData, "JPEG", 0, -position, pdfWidth, pdfHeight);
+      position += pageHeight;
+      if (position < pdfHeight) pdf.addPage();
+    }
+  }
 
-  document.body.removeChild(iframe);
+  pdf.save(fileName);
+  document.body.removeChild(container);
   return fileName;
 }
 
@@ -632,48 +642,49 @@ export async function printQuotationPdf(lead: QuotationLead, pkg: QuotationPacka
 // ── Download contract as actual PDF file ──────────────────────────────────
 export async function downloadContractPdf(contract: Contract): Promise<string> {
   const fileName = `عقد-${contract.id}.pdf`;
-  const htmlContent = buildPageNoPrint(contractBody(contract), `عقد ${contract.id}`);
+  const body = contractBody(contract);
 
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.left = "-9999px";
-  iframe.style.top = "0";
-  iframe.style.width = "794px";
-  iframe.style.height = "1123px";
-  document.body.appendChild(iframe);
+  // Create hidden container in main document (avoids iframe CORS issues)
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.left = "-9999px";
+  container.style.top = "0";
+  container.style.width = "794px";
+  container.style.zIndex = "-1";
+  container.style.background = "#fff";
+  container.style.fontFamily = "'Noto Naskh Arabic','Noto Kufi Arabic','Simplified Arabic',Arial,sans-serif";
+  container.style.direction = "rtl";
+  container.style.fontSize = "13px";
+  container.style.lineHeight = "1.9";
+  container.style.color = "#111";
+  container.innerHTML = `<div class="page" style="padding:30px 35px 100px;max-width:794px;margin:0 auto;">${body}</div>`;
+  document.body.appendChild(container);
 
-  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-  if (!iframeDoc) {
-    document.body.removeChild(iframe);
-    throw new Error("Cannot access iframe document");
-  }
-
-  iframeDoc.open();
-  iframeDoc.write(htmlContent);
-  iframeDoc.close();
-
+  // Wait for images and fonts to load
   await new Promise<void>(resolve => {
-    const checkReady = () => {
-      if (iframeDoc.fonts) {
-        iframeDoc.fonts.ready.then(() => setTimeout(resolve, 500));
-      } else {
-        setTimeout(resolve, 1000);
-      }
-    };
-    if (iframe.contentWindow) {
-      iframe.contentWindow.onload = checkReady;
+    const images = container.querySelectorAll("img");
+    let loaded = 0;
+    const total = images.length;
+    if (total === 0) {
+      setTimeout(resolve, 500);
+      return;
     }
-    setTimeout(checkReady, 1500);
+    images.forEach(img => {
+      if (img.complete) {
+        loaded++;
+        if (loaded >= total) setTimeout(resolve, 300);
+      } else {
+        img.onload = () => { loaded++; if (loaded >= total) setTimeout(resolve, 300); };
+        img.onerror = () => { loaded++; if (loaded >= total) setTimeout(resolve, 300); };
+      }
+    });
+    setTimeout(resolve, 3000); // fallback timeout
   });
 
   const { default: html2canvas } = await import("html2canvas");
   const { default: jsPDF } = await import("jspdf");
 
-  const pageEl = iframeDoc.querySelector(".page") as HTMLElement;
-  if (!pageEl) {
-    document.body.removeChild(iframe);
-    throw new Error("Cannot find page element");
-  }
+  const pageEl = container.querySelector(".page") as HTMLElement;
 
   const canvas = await html2canvas(pageEl, {
     scale: 2,
@@ -710,6 +721,6 @@ export async function downloadContractPdf(contract: Contract): Promise<string> {
   }
 
   pdf.save(fileName);
-  document.body.removeChild(iframe);
+  document.body.removeChild(container);
   return fileName;
 }
