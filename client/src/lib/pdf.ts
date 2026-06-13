@@ -1,10 +1,12 @@
 import type { Contract, Invoice } from "./api";
 
+import { LOGO_BASE64 } from "./logoBase64";
+
 const NAVY = "#1B4965";
 const GOLD = "#C4956A";
 
-// Logo URL for deployed site
-const LOGO_URL = "/manus-storage/logo-dynamic_d0ccb9d7.jpeg";
+// Logo: use base64 to avoid CORS issues in html2canvas
+const LOGO_URL = LOGO_BASE64;
 
 function formatAmount(v: string | number) {
   const n = typeof v === "string" ? parseFloat(v) || 0 : v;
@@ -599,11 +601,45 @@ export async function downloadQuotationPdf(lead: QuotationLead, pkg: QuotationPa
 
   const pageEl = container.querySelector(".page") as HTMLElement;
 
+  // Fix oklch colors (Tailwind 4) that html2canvas can't parse:
+  // Override all computed styles on the container and its children to use explicit hex colors
+  const allEls = [container, ...Array.from(container.querySelectorAll("*"))] as HTMLElement[];
+  allEls.forEach(el => {
+    const cs = window.getComputedStyle(el);
+    const bg = cs.backgroundColor;
+    const color = cs.color;
+    const border = cs.borderColor;
+    // Replace oklch with safe fallbacks
+    if (bg && bg.includes("oklch")) el.style.backgroundColor = "transparent";
+    if (color && color.includes("oklch")) el.style.color = "#111111";
+    if (border && border.includes("oklch")) el.style.borderColor = "#cccccc";
+  });
+
   const canvas = await html2canvas(pageEl, {
     scale: 2,
     useCORS: true,
     allowTaint: true,
     backgroundColor: "#ffffff",
+    logging: false,
+    onclone: (clonedDoc) => {
+      // Remove all Tailwind/app stylesheets from cloned doc to prevent oklch
+      const sheets = Array.from(clonedDoc.querySelectorAll("link[rel='stylesheet'], style"));
+      sheets.forEach(s => s.remove());
+      // Apply base styles directly
+      const style = clonedDoc.createElement("style");
+      style.textContent = `
+        * { box-sizing: border-box; }
+        body, div, span, p, td, th, table { 
+          font-family: 'Noto Naskh Arabic','Noto Kufi Arabic','Simplified Arabic',Arial,sans-serif !important;
+          direction: rtl;
+          color: #111;
+          background-color: transparent;
+        }
+        img { max-width: 100%; }
+        table { border-collapse: collapse; }
+      `;
+      clonedDoc.head.appendChild(style);
+    },
   });
 
   const imgData = canvas.toDataURL("image/jpeg", 0.95);
@@ -686,11 +722,38 @@ export async function downloadContractPdf(contract: Contract): Promise<string> {
 
   const pageEl = container.querySelector(".page") as HTMLElement;
 
+  // Fix oklch colors (Tailwind 4) that html2canvas can't parse
+  const allEls2 = [container, ...Array.from(container.querySelectorAll("*"))] as HTMLElement[];
+  allEls2.forEach(el => {
+    const cs = window.getComputedStyle(el);
+    if (cs.backgroundColor?.includes("oklch")) el.style.backgroundColor = "transparent";
+    if (cs.color?.includes("oklch")) el.style.color = "#111111";
+    if (cs.borderColor?.includes("oklch")) el.style.borderColor = "#cccccc";
+  });
+
   const canvas = await html2canvas(pageEl, {
     scale: 2,
     useCORS: true,
     allowTaint: true,
     backgroundColor: "#ffffff",
+    logging: false,
+    onclone: (clonedDoc) => {
+      const sheets = Array.from(clonedDoc.querySelectorAll("link[rel='stylesheet'], style"));
+      sheets.forEach(s => s.remove());
+      const style = clonedDoc.createElement("style");
+      style.textContent = `
+        * { box-sizing: border-box; }
+        body, div, span, p, td, th, table {
+          font-family: 'Noto Naskh Arabic','Noto Kufi Arabic','Simplified Arabic',Arial,sans-serif !important;
+          direction: rtl;
+          color: #111;
+          background-color: transparent;
+        }
+        img { max-width: 100%; }
+        table { border-collapse: collapse; }
+      `;
+      clonedDoc.head.appendChild(style);
+    },
   });
 
   const imgData = canvas.toDataURL("image/jpeg", 0.95);

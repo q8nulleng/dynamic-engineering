@@ -193,7 +193,8 @@ function QuotationDialog({ lead, onClose, onSaved }: {
       };
       await downloadQuotationPdf(lead, pkgForPdf);
       toast.success("تم تحميل PDF بنجاح", { id: tid });
-    } catch {
+    } catch (err) {
+      console.error("[PDF Error]", err);
       toast.error("فشل تحميل PDF", { id: tid });
     } finally {
       setGenerating(false);
@@ -574,7 +575,8 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
       };
       await downloadQuotationPdf(leadForPdf, pkgForPdf);
       toast.success("تم تحميل PDF بنجاح", { id: tid });
-    } catch {
+    } catch (err) {
+      console.error("[PDF Error]", err);
       toast.error("فشل إنشاء PDF", { id: tid });
     } finally {
       setSendingPdf(false);
