@@ -657,13 +657,22 @@ export default function Contracts() {
 
   const buildingTypes = [...new Set(templates.map((t) => t.buildingType))];
 
+  // Helper: check if HTML content has meaningful text (not just empty tags)
+  function hasRealHtmlContent(html: string): boolean {
+    if (!html || !html.trim()) return false;
+    // Strip HTML tags and check if there's actual text
+    const stripped = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+    return stripped.length > 0;
+  }
+
   // Helper: get contract with latest template content
   async function getContractWithLatestTemplate(contract: typeof contracts[0]) {
-    // Check if termsText has empty content
+    // Check if termsText has meaningful content (not just empty HTML tags)
     let hasContent = false;
     try {
       const parsed = JSON.parse(contract.termsText || "");
-      hasContent = !!(parsed.content && parsed.content.trim().length > 0);
+      // Check content field - must have real text, not just empty HTML like <p><br></p>
+      hasContent = !!(parsed.content && hasRealHtmlContent(parsed.content));
     } catch { hasContent = !!(contract.termsText && contract.termsText.trim().length > 0); }
     if (hasContent) return contract;
     // Try to find matching template and update termsText
