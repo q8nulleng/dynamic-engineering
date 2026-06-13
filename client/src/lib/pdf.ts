@@ -105,6 +105,42 @@ export function buildPage(body: string, title: string): string {
     position:relative;
   }
   .bold-line{font-weight:700;color:#000;}
+  /* ── Word template content cleanup ── */
+  .template-content p{
+    font-family:'Noto Naskh Arabic','Noto Kufi Arabic',Arial,sans-serif;
+    font-size:12px;
+    line-height:2;
+    color:#222;
+    margin:4px 0;
+    direction:rtl;
+    text-align:justify;
+  }
+  .template-content span{
+    font-family:'Noto Naskh Arabic','Noto Kufi Arabic',Arial,sans-serif !important;
+    font-size:12px !important;
+    line-height:2 !important;
+  }
+  .template-content li{
+    font-family:'Noto Naskh Arabic','Noto Kufi Arabic',Arial,sans-serif;
+    font-size:12px;
+    line-height:2;
+    color:#222;
+    margin:3px 0;
+    direction:rtl;
+  }
+  .template-content strong, .template-content b{
+    font-weight:700;
+    color:#000;
+  }
+  .template-content ul, .template-content ol{
+    padding-right:20px;
+    padding-left:0;
+    margin:4px 0;
+  }
+  /* Remove Word-specific list styles */
+  .template-content [style*="margin-right"]{
+    margin-right:0 !important;
+  }
   .print-btn{
     position:fixed;bottom:20px;left:20px;background:${NAVY};color:#fff;
     border:none;padding:10px 24px;border-radius:8px;font-size:15px;
@@ -173,6 +209,71 @@ function renderSection(heading: string, content: string): string {
 </div>`;
 }
 
+// ── Clean MS Word HTML — strip mso-* styles, Word tags, conditional comments ──
+function cleanWordHtml(html: string): string {
+  if (!html) return "";
+  
+  // Remove Word conditional comments <!--[if ...]-->...<!--[endif]-->
+  let clean = html.replace(/<!--\[if[^\]]*\]>[\s\S]*?<!--\[endif\]-->/gi, "");
+  clean = html.replace(/<!--\[if[^>]*>.*?<!\[endif\]-->/gis, "");
+  
+  // Remove <o:p> tags (Word paragraph markers)
+  clean = clean.replace(/<o:p[^>]*>[\s\S]*?<\/o:p>/gi, "");
+  clean = clean.replace(/<o:p[^>]*\/>/gi, "");
+  
+  // Remove Word-specific XML namespace tags
+  clean = clean.replace(/<w:[^>]*>[\s\S]*?<\/w:[^>]*>/gi, "");
+  clean = clean.replace(/<m:[^>]*>[\s\S]*?<\/m:[^>]*>/gi, "");
+  
+  // Remove mso-list and mso-* inline styles from style attributes
+  // Replace entire style attribute with cleaned version
+  clean = clean.replace(/style="([^"]*)"/gi, (_match: string, styleVal: string) => {
+    const cleaned = styleVal
+      .split(';')
+      .map((s: string) => s.trim())
+      .filter((s: string) => {
+        if (!s) return false;
+        const prop = s.split(':')[0].trim().toLowerCase();
+        // Remove Word/MSO specific properties
+        if (prop.startsWith('mso-')) return false;
+        if (prop === 'text-kashida') return false;
+        if (prop === 'text-justify') return false;
+        if (prop === 'text-indent' && s.includes('-.')) return false; // negative indent
+        // Convert inch-based margins to simpler values
+        return true;
+      })
+      .map((s: string) => {
+        // Convert 0in margins to 0
+        return s.replace(/(\d+\.?\d*)in/g, (_m: string, n: string) => {
+          const px = Math.round(parseFloat(n) * 96);
+          return px + 'px';
+        });
+      })
+      .join('; ');
+    return cleaned ? `style="${cleaned}"` : '';
+  });
+  
+  // Remove class attributes that are Word-specific (MsoListParagraph, etc.)
+  clean = clean.replace(/class="Mso[^"]*"/gi, '');
+  clean = clean.replace(/class="Body[^"]*"/gi, '');
+  
+  // Remove dir="RTL" on individual elements (we set it globally)
+  // but keep it on the container
+  
+  // Remove empty spans
+  clean = clean.replace(/<span[^>]*>\s*<\/span>/gi, '');
+  
+  // Remove font-family Times New Roman and replace with inherit
+  clean = clean.replace(/font-family:&quot;Times New Roman&quot;[^;"]*;?/gi, '');
+  clean = clean.replace(/font-family:"Times New Roman"[^;"]*;?/gi, '');
+  
+  // Clean up multiple spaces and empty paragraphs
+  clean = clean.replace(/<p[^>]*>\s*<\/p>/gi, '');
+  clean = clean.replace(/&nbsp;\s*&nbsp;\s*&nbsp;/g, ' ');
+  
+  return clean;
+}
+
 // ── Parse termsText JSON and render structured sections ─────────────────────
 interface TemplateFields {
   content?: string;           // Full HTML content (new templates)
@@ -202,7 +303,8 @@ function parseAndRenderTerms(termsText: string, contractAmount: number): string 
 
   // ── NEW: If template has full HTML content, render it directly ──
   if (fields.content && fields.content.trim().length > 0) {
-    return `<div style="font-size:12px;line-height:2;direction:rtl;" class="template-content">${fields.content}</div>`;
+    const cleanedContent = cleanWordHtml(fields.content);
+    return `<div style="font-size:12px;line-height:2;direction:rtl;font-family:'Noto Naskh Arabic','Noto Kufi Arabic',Arial,sans-serif;" class="template-content">${cleanedContent}</div>`;
   }
   
   let html = "";
