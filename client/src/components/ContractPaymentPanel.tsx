@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileSignature, CreditCard, Plus, X, FileText, Printer, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { FileSignature, CreditCard, Plus, X, FileText, Printer, Download, CheckCircle2, Clock, AlertCircle, Loader2 } from "lucide-react";
 import { useContractsByProject, useInvoices } from "@/lib/api";
-import { exportContractPdf } from "@/lib/pdf";
+import { exportContractPdf, downloadContractPdf } from "@/lib/pdf";
 import type { Contract } from "@/lib/api";
 
 interface ContractPaymentPanelProps {
@@ -95,16 +95,33 @@ export default function ContractPaymentPanel({ open, onClose, projectName, proje
                       )}
                     </div>
 
-                    {/* Print Button */}
-                    <Button
-                      size="sm"
-                      className="w-full text-xs h-8 gap-1.5"
-                      style={{ backgroundColor: "oklch(0.30 0.05 250)" }}
-                      onClick={() => exportContractPdf(contract)}
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      طباعة / حفظ PDF العقد
-                    </Button>
+                    {/* Print & Download Buttons */}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs h-8 gap-1.5"
+                        onClick={() => exportContractPdf(contract)}
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        طباعة
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1 text-xs h-8 gap-1.5"
+                        style={{ backgroundColor: "oklch(0.30 0.05 250)" }}
+                        onClick={async () => {
+                          try {
+                            await downloadContractPdf(contract);
+                          } catch {
+                            // handled silently
+                          }
+                        }}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        تحميل PDF
+                      </Button>
+                    </div>
 
                     {/* Signed file if exists */}
                     {contract.signedFileUrl && (

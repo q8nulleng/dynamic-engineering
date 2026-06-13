@@ -24,7 +24,7 @@ import {
 import {
   Plus, Phone, Mail, Star, DollarSign, User,
   Calendar, FileText, Trophy, X, ChevronDown, ChevronUp,
-  Building, Percent, Tag, Save,
+  Building, Percent, Tag, Save, Printer, Download,
   ClipboardList, MessageCircle, Activity, Users, MapPin, Loader2,
   Pencil, Trash2, Eye, CheckCircle, Hash, Ruler, ArrowRightLeft, Archive,
   Clock, UserCheck, CalendarPlus, Bell, Briefcase,
@@ -40,7 +40,7 @@ import {
   useAppointmentsByLead, useCreateAppointment, useDeleteAppointment, useAppointments,
   useEmployees, usePackages,
 } from "@/lib/api";
-import { exportQuotationPdf, exportContractPdf, downloadQuotationPdf } from "@/lib/pdf";
+import { exportQuotationPdf, exportContractPdf, downloadQuotationPdf, printQuotationPdf } from "@/lib/pdf";
 import { toast } from "sonner";
 
 interface Lead {
@@ -165,23 +165,36 @@ function QuotationDialog({ lead, onClose, onSaved }: {
     onSaved(q.id);
   };
 
-  const handleGeneratePDF = async () => {
+  const handlePrintQuote = async () => {
     if (!selectedPkg) return;
-    setGenerating(true);
-    const tid = toast.loading("جاري إنشاء PDF...");
     try {
       const pkgForPdf = {
         ...(agreedPrice.trim() ? { ...selectedPkg, price: agreedPrice.trim() } : selectedPkg),
         features: editableFeatures,
       };
       await exportQuotationPdf(lead, pkgForPdf);
-      toast.success("تم فتح نافذة الطباعة", { id: tid });
     } catch (err: unknown) {
       const isBlocked = err instanceof Error && err.message === "popup_blocked";
       toast.error(
-        isBlocked ? "السماح بالنوافذ المنبثقة مطلوب — اضغط على الأيقونة في شريط العنوان" : "فشل إنشاء PDF",
-        { id: tid }
+        isBlocked ? "السماح بالنوافذ المنبثقة مطلوب — اضغط على الأيقونة في شريط العنوان"
+        : "فشل فتح نافذة الطباعة"
       );
+    }
+  };
+
+  const handleDownloadQuote = async () => {
+    if (!selectedPkg) return;
+    setGenerating(true);
+    const tid = toast.loading("جاري تحميل PDF...");
+    try {
+      const pkgForPdf = {
+        ...(agreedPrice.trim() ? { ...selectedPkg, price: agreedPrice.trim() } : selectedPkg),
+        features: editableFeatures,
+      };
+      await downloadQuotationPdf(lead, pkgForPdf);
+      toast.success("تم تحميل PDF بنجاح", { id: tid });
+    } catch {
+      toast.error("فشل تحميل PDF", { id: tid });
     } finally {
       setGenerating(false);
     }
@@ -486,12 +499,20 @@ function QuotationDialog({ lead, onClose, onSaved }: {
             اعتماد العرض
           </Button>
           <Button
+            disabled={!selectedPkg}
+            onClick={handlePrintQuote}
+            variant="outline"
+          >
+            <Printer className="w-3 h-3 ml-1" />
+            طباعة
+          </Button>
+          <Button
             disabled={!selectedPkg || generating}
-            onClick={handleGeneratePDF}
+            onClick={handleDownloadQuote}
             style={{ backgroundColor: "oklch(0.30 0.05 250)" }}
           >
-            {generating ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <FileText className="w-3 h-3 ml-1" />}
-            {generating ? "جاري الإنشاء..." : "تحميل PDF"}
+            {generating ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Download className="w-3 h-3 ml-1" />}
+            {generating ? "جاري التحميل..." : "تحميل PDF"}
           </Button>
         </div>
       </DialogContent>
@@ -557,6 +578,28 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
       toast.error("فشل إنشاء PDF", { id: tid });
     } finally {
       setSendingPdf(false);
+    }
+  };
+
+  const handlePrintPdf = async () => {
+    if (!quote) return;
+    try {
+      const allFlat = Object.values(allPkgsDb).flat();
+      const matchedPkg = allFlat.find(p => p.name === quote.package);
+      const pkgForPdf = matchedPkg
+        ? { ...matchedPkg, price: quote.amount }
+        : { name: quote.package, price: quote.amount, level: "-", features: [quote.service] };
+      const leadForPdf = {
+        name: lead.name,
+        phone: lead.phone,
+        type: quote.type,
+        serviceType: quote.service,
+        governorate: lead.governorate,
+        area: lead.area,
+      };
+      await printQuotationPdf(leadForPdf, pkgForPdf);
+    } catch {
+      toast.error("فشل فتح نافذة الطباعة");
     }
   };
 
@@ -693,8 +736,12 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
                 <Pencil className="w-3.5 h-3.5 ml-1" />
                 تعديل العرض
               </Button>
+              <Button variant="outline" size="sm" onClick={handlePrintPdf}>
+                <Printer className="w-3.5 h-3.5 ml-1" />
+                طباعة
+              </Button>
               <Button variant="outline" size="sm" disabled={sendingPdf} onClick={handleDownloadPdf}>
-                {sendingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin ml-1" /> : <FileText className="w-3.5 h-3.5 ml-1" />}
+                {sendingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin ml-1" /> : <Download className="w-3.5 h-3.5 ml-1" />}
                 تحميل PDF
               </Button>
               <Button size="sm" disabled={sendingPdf} onClick={handleSendWhatsApp}

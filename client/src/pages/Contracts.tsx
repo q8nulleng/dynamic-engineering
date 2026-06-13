@@ -11,7 +11,7 @@ import {
   useCreateClient,
   type ContractTemplate, type Contract, type Client,
 } from "@/lib/api";
-import { exportContractPdf, buildPage, contractBody } from "@/lib/pdf";
+import { exportContractPdf, downloadContractPdf, buildPage, contractBody } from "@/lib/pdf";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -660,13 +660,12 @@ export default function Contracts() {
   async function handleExportPdf(e: React.MouseEvent, contract: typeof contracts[0]) {
     e.stopPropagation();
     setExportingId(contract.id);
-    const tid = toast.loading("جاري تصدير PDF...");
+    const tid = toast.loading("جاري تحميل PDF...");
     try {
-      await exportContractPdf(contract);
+      await downloadContractPdf(contract);
       toast.success(`تم تحميل عقد ${contract.id}`, { id: tid });
-    } catch (err: unknown) {
-      const isBlocked = err instanceof Error && err.message === "popup_blocked";
-      toast.error(isBlocked ? "السماح بالنوافذ المنبثقة مطلوب" : "فشل تصدير PDF", { id: tid });
+    } catch {
+      toast.error("فشل تحميل PDF", { id: tid });
     } finally {
       setExportingId(null);
     }

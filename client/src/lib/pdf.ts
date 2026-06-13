@@ -522,44 +522,194 @@ export async function exportQuotationPdf(lead: QuotationLead, pkg: QuotationPack
   await openPrintWindow(buildPage(quotationBody(lead, pkg), `عرض سعر — ${lead.name}`));
 }
 
-// ── Download quotation PDF via print dialog (Save as PDF) ──────────────────
+// ── Build page WITHOUT auto-print (for download) ─────────────────────────
+function buildPageNoPrint(body: string, title: string): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<base href="${origin}/">
+<title>${title}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;900&family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Noto Naskh Arabic','Noto Kufi Arabic','Simplified Arabic',Arial,sans-serif;direction:rtl;background:#fff;color:#111;font-size:13px;line-height:1.9;}
+  .page{padding:30px 35px 100px;max-width:794px;margin:0 auto;}
+  table{border-collapse:collapse;}
+  img{max-width:100%;}
+  .article-heading{font-size:14px;font-weight:700;color:#000;border-bottom:2px solid #000;padding-bottom:4px;margin:18px 0 10px;}
+  .article-content{font-size:12px;line-height:2.1;color:#222;padding-right:10px;white-space:pre-line;}
+  .article-item{font-size:12px;line-height:2.1;color:#222;padding-right:10px;position:relative;}
+  .bold-line{font-weight:700;color:#000;}
+</style>
+</head>
+<body>
+<div class="page">${body}</div>
+</body>
+</html>`;
+}
+
+// ── Download quotation as actual PDF file ──────────────────────────────────
 export async function downloadQuotationPdf(lead: QuotationLead, pkg: QuotationPackage): Promise<string> {
   const fileName = `عرض-سعر-${lead.name.replace(/\s+/g, "-")}.pdf`;
-  const htmlContent = buildPage(quotationBody(lead, pkg), `عرض سعر — ${lead.name}`);
+  const htmlContent = buildPageNoPrint(quotationBody(lead, pkg), `عرض سعر — ${lead.name}`);
 
-  // Open in new window and trigger print dialog (user saves as PDF)
-  const win = window.open("", "_blank", "width=900,height=700");
-  if (!win) {
-    // Fallback: open in same tab
-    const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName.replace(".pdf", ".html");
-    a.click();
-    URL.revokeObjectURL(url);
-    return fileName;
+  // Create hidden iframe to render HTML then capture as PDF
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.left = "-9999px";
+  iframe.style.top = "0";
+  iframe.style.width = "794px";
+  iframe.style.height = "1123px";
+  document.body.appendChild(iframe);
+
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!iframeDoc) {
+    document.body.removeChild(iframe);
+    throw new Error("Cannot access iframe document");
   }
 
-  win.document.write(htmlContent);
-  win.document.close();
+  iframeDoc.open();
+  iframeDoc.write(htmlContent);
+  iframeDoc.close();
 
-  // Wait for content to load then trigger print
+  // Wait for fonts and content to load
   await new Promise<void>(resolve => {
-    win.onload = () => {
-      setTimeout(() => {
-        win.focus();
-        win.print();
-        resolve();
-      }, 800);
+    const checkReady = () => {
+      if (iframeDoc.fonts) {
+        iframeDoc.fonts.ready.then(() => setTimeout(resolve, 500));
+      } else {
+        setTimeout(resolve, 1000);
+      }
     };
-    // Fallback if onload already fired
-    setTimeout(() => {
-      win.focus();
-      win.print();
-      resolve();
-    }, 1500);
+    if (iframe.contentWindow) {
+      iframe.contentWindow.onload = checkReady;
+    }
+    setTimeout(checkReady, 1500);
   });
 
+  // Use html2canvas + jsPDF to generate real PDF
+  const { default: html2canvas } = await import("html2canvas");
+  const { default: jsPDF } = await import("jspdf");
+
+  const pageEl = iframeDoc.querySelector(".page") as HTMLElement;
+  if (!pageEl) {
+    document.body.removeChild(iframe);
+    throw new Error("Cannot find page element");
+  }
+
+  const canvas = await html2canvas(pageEl, {
+    scale: 2,
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: "#ffffff",
+  });
+
+  const imgData = canvas.toDataURL("image/jpeg", 0.95);
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+  pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+  pdf.save(fileName);
+
+  document.body.removeChild(iframe);
+  return fileName;
+}
+
+// ── Print quotation (opens print dialog) ──────────────────────────────────
+export async function printQuotationPdf(lead: QuotationLead, pkg: QuotationPackage): Promise<void> {
+  await openPrintWindow(buildPage(quotationBody(lead, pkg), `عرض سعر — ${lead.name}`));
+}
+
+// ── Download contract as actual PDF file ──────────────────────────────────
+export async function downloadContractPdf(contract: Contract): Promise<string> {
+  const fileName = `عقد-${contract.id}.pdf`;
+  const htmlContent = buildPageNoPrint(contractBody(contract), `عقد ${contract.id}`);
+
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.left = "-9999px";
+  iframe.style.top = "0";
+  iframe.style.width = "794px";
+  iframe.style.height = "1123px";
+  document.body.appendChild(iframe);
+
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!iframeDoc) {
+    document.body.removeChild(iframe);
+    throw new Error("Cannot access iframe document");
+  }
+
+  iframeDoc.open();
+  iframeDoc.write(htmlContent);
+  iframeDoc.close();
+
+  await new Promise<void>(resolve => {
+    const checkReady = () => {
+      if (iframeDoc.fonts) {
+        iframeDoc.fonts.ready.then(() => setTimeout(resolve, 500));
+      } else {
+        setTimeout(resolve, 1000);
+      }
+    };
+    if (iframe.contentWindow) {
+      iframe.contentWindow.onload = checkReady;
+    }
+    setTimeout(checkReady, 1500);
+  });
+
+  const { default: html2canvas } = await import("html2canvas");
+  const { default: jsPDF } = await import("jspdf");
+
+  const pageEl = iframeDoc.querySelector(".page") as HTMLElement;
+  if (!pageEl) {
+    document.body.removeChild(iframe);
+    throw new Error("Cannot find page element");
+  }
+
+  const canvas = await html2canvas(pageEl, {
+    scale: 2,
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: "#ffffff",
+  });
+
+  const imgData = canvas.toDataURL("image/jpeg", 0.95);
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+  // Handle multi-page if content is longer than A4
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  if (pdfHeight > pageHeight) {
+    let position = 0;
+    let remaining = pdfHeight;
+    let first = true;
+    while (remaining > 0) {
+      if (!first) pdf.addPage();
+      pdf.addImage(imgData, "JPEG", 0, -position, pdfWidth, pdfHeight);
+      position += pageHeight;
+      remaining -= pageHeight;
+      first = false;
+    }
+  } else {
+    pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+  }
+
+  pdf.save(fileName);
+  document.body.removeChild(iframe);
   return fileName;
 }

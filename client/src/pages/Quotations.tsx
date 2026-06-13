@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQuotations, useUpdateQuotation, useCreateQuotation, useClients, usePackages, useCreatePackage, useUpdatePackage, useDeletePackage } from "@/lib/api";
-import { exportQuotationPdf } from "@/lib/pdf";
+import { downloadQuotationPdf } from "@/lib/pdf";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -237,11 +237,11 @@ export default function Quotations() {
       const pkg = flatPackages.find(p => p.name === q.package) ?? {
         name: q.package, price: q.amount, features: [], level: "-",
       };
-      await exportQuotationPdf(
+      await downloadQuotationPdf(
         { name: q.client, phone: "—", type: q.type, serviceType: q.service, governorate: q.governorate, area: q.area },
         pkg,
       );
-      toast.success("تم فتح نافذة الطباعة", { id: tid });
+      toast.success("تم تحميل PDF بنجاح", { id: tid });
     } catch (err: unknown) {
       const blocked = err instanceof Error && err.message === "popup_blocked";
       toast.error(blocked ? "السماح بالنوافذ المنبثقة مطلوب" : "فشل إنشاء PDF", { id: tid });
