@@ -622,23 +622,39 @@ export async function downloadQuotationPdf(lead: QuotationLead, pkg: QuotationPa
     backgroundColor: "#ffffff",
     logging: false,
     onclone: (clonedDoc) => {
-      // Remove all Tailwind/app stylesheets from cloned doc to prevent oklch
-      const sheets = Array.from(clonedDoc.querySelectorAll("link[rel='stylesheet'], style"));
-      sheets.forEach(s => s.remove());
-      // Apply base styles directly
-      const style = clonedDoc.createElement("style");
-      style.textContent = `
-        * { box-sizing: border-box; }
-        body, div, span, p, td, th, table { 
-          font-family: 'Noto Naskh Arabic','Noto Kufi Arabic','Simplified Arabic',Arial,sans-serif !important;
-          direction: rtl;
-          color: #111;
-          background-color: transparent;
+      // DO NOT remove stylesheets - that breaks Arabic word spacing.
+      // Instead, only override oklch colors with safe hex fallbacks.
+      const fixStyle = clonedDoc.createElement("style");
+      fixStyle.textContent = `
+        /* Replace oklch colors that html2canvas cannot parse */
+        * {
+          --background: #ffffff !important;
+          --foreground: #111111 !important;
+          --border: #cccccc !important;
+          --ring: #cccccc !important;
+          --primary: #1a3a5c !important;
+          --primary-foreground: #ffffff !important;
+          --secondary: #f5f5f5 !important;
+          --secondary-foreground: #111111 !important;
+          --muted: #f5f5f5 !important;
+          --muted-foreground: #666666 !important;
+          --accent: #f0f4f8 !important;
+          --accent-foreground: #111111 !important;
+          --destructive: #cc0000 !important;
+          --card: #ffffff !important;
+          --card-foreground: #111111 !important;
+          --popover: #ffffff !important;
+          --popover-foreground: #111111 !important;
         }
-        img { max-width: 100%; }
-        table { border-collapse: collapse; }
+        /* Ensure Arabic text renders with proper spacing */
+        body, div, span, p, td, th, h1, h2, h3, h4, h5, h6 {
+          font-family: 'Noto Naskh Arabic','Noto Kufi Arabic','Simplified Arabic',Arial,sans-serif !important;
+          word-spacing: normal !important;
+          letter-spacing: normal !important;
+          text-rendering: auto !important;
+        }
       `;
-      clonedDoc.head.appendChild(style);
+      clonedDoc.head.appendChild(fixStyle);
     },
   });
 
@@ -738,21 +754,39 @@ export async function downloadContractPdf(contract: Contract): Promise<string> {
     backgroundColor: "#ffffff",
     logging: false,
     onclone: (clonedDoc) => {
-      const sheets = Array.from(clonedDoc.querySelectorAll("link[rel='stylesheet'], style"));
-      sheets.forEach(s => s.remove());
-      const style = clonedDoc.createElement("style");
-      style.textContent = `
-        * { box-sizing: border-box; }
-        body, div, span, p, td, th, table {
-          font-family: 'Noto Naskh Arabic','Noto Kufi Arabic','Simplified Arabic',Arial,sans-serif !important;
-          direction: rtl;
-          color: #111;
-          background-color: transparent;
+      // DO NOT remove stylesheets - that breaks Arabic word spacing.
+      // Instead, only override oklch colors with safe hex fallbacks.
+      const fixStyle = clonedDoc.createElement("style");
+      fixStyle.textContent = `
+        /* Replace oklch colors that html2canvas cannot parse */
+        * {
+          --background: #ffffff !important;
+          --foreground: #111111 !important;
+          --border: #cccccc !important;
+          --ring: #cccccc !important;
+          --primary: #1a3a5c !important;
+          --primary-foreground: #ffffff !important;
+          --secondary: #f5f5f5 !important;
+          --secondary-foreground: #111111 !important;
+          --muted: #f5f5f5 !important;
+          --muted-foreground: #666666 !important;
+          --accent: #f0f4f8 !important;
+          --accent-foreground: #111111 !important;
+          --destructive: #cc0000 !important;
+          --card: #ffffff !important;
+          --card-foreground: #111111 !important;
+          --popover: #ffffff !important;
+          --popover-foreground: #111111 !important;
         }
-        img { max-width: 100%; }
-        table { border-collapse: collapse; }
+        /* Ensure Arabic text renders with proper spacing */
+        body, div, span, p, td, th, h1, h2, h3, h4, h5, h6 {
+          font-family: 'Noto Naskh Arabic','Noto Kufi Arabic','Simplified Arabic',Arial,sans-serif !important;
+          word-spacing: normal !important;
+          letter-spacing: normal !important;
+          text-rendering: auto !important;
+        }
       `;
-      clonedDoc.head.appendChild(style);
+      clonedDoc.head.appendChild(fixStyle);
     },
   });
 

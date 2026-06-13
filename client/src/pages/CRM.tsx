@@ -524,25 +524,10 @@ function QuotationDialog({ lead, onClose, onSaved }: {
 // ── View Quote Dialog ────────────────────────────────────────────────────
 function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   const { data: quotes, isLoading } = useQuotationsByLead(lead.id);
-  const updateQuotation = useUpdateQuotation();
   const deleteQuotation = useDeleteQuotation();
   const quote = quotes?.[0];
-  const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ amount: "", service: "", package: "", status: "", type: "" });
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-
-  const startEdit = () => {
-    if (!quote) return;
-    setEditForm({ amount: quote.amount, service: quote.service, package: quote.package, status: quote.status, type: quote.type });
-    setEditing(true);
-  };
-
-  const saveEdit = async () => {
-    if (!quote) return;
-    await updateQuotation.mutateAsync({ id: quote.id, ...editForm });
-    toast.success("تم تحديث عرض السعر بنجاح");
-    setEditing(false);
-  };
 
   const handleDelete = async () => {
     if (!quote) return;
@@ -642,6 +627,7 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
   };
 
   return (
+    <>
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
@@ -651,54 +637,6 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
           <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
         ) : !quote ? (
           <div className="text-center py-8 text-muted-foreground text-sm">لا يوجد عرض سعر مربوط بهذه الفرصة</div>
-        ) : editing ? (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">المبلغ (د.ك)</label>
-                <Input value={editForm.amount} onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))} dir="ltr" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">الحالة</label>
-                <select value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
-                  className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
-                  {["مسودة", "مرسل", "مقبول", "مرفوض", "عقد", "تم التعاقد", "منتهي"].map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">نوع المشروع</label>
-                <select value={editForm.type} onChange={e => setEditForm(f => ({ ...f, type: e.target.value }))}
-                  className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
-                  {["سكن خاص", "استثماري", "تجاري", "صناعي"].map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">نوع الخدمة</label>
-                <select value={editForm.service} onChange={e => setEditForm(f => ({ ...f, service: e.target.value }))}
-                  className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
-                  {["بناء جديد", "تعديل", "إضافة", "تعديل وإضافة", "إضافة مبنى قائم", "هدم", "إشراف"].map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">اسم الباقة</label>
-              <Input value={editForm.package} onChange={e => setEditForm(f => ({ ...f, package: e.target.value }))} />
-            </div>
-            <div className="flex gap-2 justify-end pt-1">
-              <Button variant="outline" size="sm" onClick={() => setEditing(false)}>إلغاء</Button>
-              <Button size="sm" disabled={updateQuotation.isPending} onClick={saveEdit}
-                style={{ backgroundColor: "oklch(0.55 0.15 150)" }}>
-                {updateQuotation.isPending ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Save className="w-3 h-3 ml-1" />}
-                حفظ التعديل
-              </Button>
-            </div>
-          </div>
         ) : (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm border rounded-lg p-4 bg-muted/30">
@@ -734,7 +672,7 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
                 <Trash2 className="w-3.5 h-3.5 ml-1" />
                 حذف العرض
               </Button>
-              <Button variant="outline" size="sm" onClick={startEdit}>
+              <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)}>
                 <Pencil className="w-3.5 h-3.5 ml-1" />
                 تعديل العرض
               </Button>
@@ -754,6 +692,293 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
             </div>
           </div>
         )}
+      </DialogContent>
+    </Dialog>
+    {/* نافذة التعديل الكاملة — تفتح QuotationEditDialog */}
+    {showEditDialog && quote && (
+      <QuotationEditDialog
+        lead={lead}
+        quote={quote}
+        onClose={() => setShowEditDialog(false)}
+        onSaved={() => { setShowEditDialog(false); }}
+      />
+    )}
+    </>
+  );
+}
+
+// ── Quotation Edit Dialog — نفس نموذج الإنشاء لكن يُحدّث العرض الحالي ──────
+function QuotationEditDialog({ lead, quote, onClose, onSaved }: {
+  lead: Lead;
+  quote: { id: string; amount: string; service: string; package: string; status: string; type: string; expiryDate?: string };
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const updateQuotation = useUpdateQuotation();
+  const { data: dynamicPackages = {} } = usePackages();
+  const allFlat = Object.values(dynamicPackages).flat() as PkgType[];
+
+  // تحميل الباقة الحالية من قاعدة البيانات
+  const initialPkg = allFlat.find(p => p.name === quote.package) || null;
+
+  const [selectedPkg, setSelectedPkg] = useState<PkgType | null>(initialPkg);
+  const [agreedPrice, setAgreedPrice] = useState(quote.amount || "");
+  const [editableFeatures, setEditableFeatures] = useState<string[]>(
+    initialPkg ? [...initialPkg.features] : [quote.service]
+  );
+  const [newFeature, setNewFeature] = useState("");
+  const [editingFeatureIdx, setEditingFeatureIdx] = useState<number | null>(null);
+  const [editingFeatureText, setEditingFeatureText] = useState("");
+  const [status, setStatus] = useState(quote.status || "مرسل");
+  const [saving, setSaving] = useState(false);
+
+  const byType = lead.type ? (dynamicPackages[lead.type] || allFlat) : allFlat;
+  const packages: PkgType[] = lead.serviceType
+    ? (byType.filter(p => p.serviceType === lead.serviceType).length > 0
+        ? byType.filter(p => p.serviceType === lead.serviceType)
+        : byType)
+    : byType;
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const finalAmount = agreedPrice.trim() ? agreedPrice.trim() : (selectedPkg?.price || quote.amount);
+      await updateQuotation.mutateAsync({
+        id: quote.id,
+        amount: finalAmount,
+        service: lead.serviceType || quote.service,
+        package: selectedPkg?.name || quote.package,
+        status,
+        type: lead.type || quote.type,
+      });
+      toast.success("تم تحديث عرض السعر بنجاح");
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-bold">تعديل عرض السعر — {lead.name}</DialogTitle>
+        </DialogHeader>
+
+        {/* بيانات العميل */}
+        <div className="grid grid-cols-2 gap-2 p-3 bg-muted/50 rounded-lg text-sm">
+          <div><span className="text-muted-foreground">الهاتف: </span><span className="font-medium">{lead.phone}</span></div>
+          <div><span className="text-muted-foreground">النوع: </span><span className="font-medium">{lead.type}</span></div>
+          {lead.serviceType && <div><span className="text-muted-foreground">الخدمة: </span><span className="font-medium">{lead.serviceType}</span></div>}
+          {lead.governorate && <div><span className="text-muted-foreground">المحافظة: </span><span className="font-medium">{lead.governorate}</span></div>}
+          {lead.area && <div><span className="text-muted-foreground">المنطقة: </span><span className="font-medium">{lead.area}</span></div>}
+        </div>
+
+        {/* الحالة */}
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-semibold">حالة العرض:</label>
+          <select value={status} onChange={e => setStatus(e.target.value)}
+            className="border rounded-lg px-3 py-1.5 text-sm bg-white">
+            {["مسودة", "مرسل", "مقبول", "مرفوض", "عقد", "تم التعاقد", "منتهي"].map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* السعر المتفق عليه */}
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <label className="text-sm font-semibold text-amber-800 block mb-1.5">السعر المتفق عليه</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={agreedPrice}
+              onChange={(e) => setAgreedPrice(e.target.value)}
+              placeholder="اتركه فارغًا لاستخدام سعر الباقة..."
+              className="flex-1 border border-amber-300 rounded-lg px-3 py-1.5 text-sm text-right bg-white focus:outline-none focus:ring-2 focus:ring-amber-300"
+              dir="ltr"
+            />
+            <span className="text-sm font-medium text-amber-700">د.ك</span>
+          </div>
+        </div>
+
+        {/* اختيار الباقة */}
+        <div className="space-y-2">
+          <h4 className="font-bold text-sm">الباقات المتاحة ({packages.length})</h4>
+          {packages.length === 0 ? (
+            <p className="text-sm text-muted-foreground p-3 border rounded-lg">لا توجد باقات لهذا النوع/الخدمة</p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {packages.map((pkg, i) => (
+                <div
+                  key={i}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    if (pkg === selectedPkg) {
+                      setSelectedPkg(null);
+                      setEditableFeatures([]);
+                    } else {
+                      setSelectedPkg(pkg);
+                      setEditableFeatures([...pkg.features]);
+                      setNewFeature("");
+                      setEditingFeatureIdx(null);
+                    }
+                  }}
+                  onKeyDown={e => {
+                    if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+                      e.preventDefault();
+                      if (pkg === selectedPkg) { setSelectedPkg(null); setEditableFeatures([]); }
+                      else { setSelectedPkg(pkg); setEditableFeatures([...pkg.features]); setNewFeature(""); setEditingFeatureIdx(null); }
+                    }
+                  }}
+                  className={`w-full p-3 rounded-lg border text-right transition-all cursor-pointer ${
+                    selectedPkg === pkg
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
+                      : "border-border hover:border-blue-300"
+                  }`}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-base" style={{ fontFamily: "'Space Grotesk'" }}>
+                      {pkg.price} د.ك
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm">{pkg.name}</span>
+                      {pkg.level !== "-" && <Badge variant="outline" className="text-[10px]">{pkg.level}</Badge>}
+                    </div>
+                  </div>
+                  {selectedPkg === pkg && (
+                    <div className="mt-3 space-y-2" onClick={e => e.stopPropagation()}>
+                      <div className="text-xs font-semibold text-right mb-1" style={{ color: "oklch(0.55 0.15 250)" }}>✏️ وصف الخدمات (قابل للتعديل)</div>
+                      {editableFeatures.map((f, fi) => (
+                        <div key={fi} className="flex items-center gap-1">
+                          {editingFeatureIdx === fi ? (
+                            <>
+                              <input
+                                className="flex-1 text-xs border rounded px-2 py-1 text-right bg-white text-black"
+                                value={editingFeatureText}
+                                onChange={e => setEditingFeatureText(e.target.value)}
+                                onClick={e => e.stopPropagation()}
+                                onKeyDown={e => {
+                                  e.stopPropagation();
+                                  if (e.key === "Enter") {
+                                    const updated = [...editableFeatures];
+                                    updated[fi] = editingFeatureText.trim() || f;
+                                    setEditableFeatures(updated);
+                                    setEditingFeatureIdx(null);
+                                  } else if (e.key === "Escape") { setEditingFeatureIdx(null); }
+                                }}
+                                autoFocus
+                              />
+                              <button className="text-xs px-2 py-1 rounded bg-green-500 text-white"
+                                onClick={() => { const u = [...editableFeatures]; u[fi] = editingFeatureText.trim() || f; setEditableFeatures(u); setEditingFeatureIdx(null); }}>✓</button>
+                              <button className="text-xs px-2 py-1 rounded bg-gray-300 text-black"
+                                onClick={() => setEditingFeatureIdx(null)}>✕</button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="flex-1 text-xs text-right text-muted-foreground">• {f}</span>
+                              <button className="text-xs px-1.5 py-0.5 rounded border border-blue-300 text-blue-600 hover:bg-blue-50"
+                                onClick={() => { setEditingFeatureIdx(fi); setEditingFeatureText(f); }}>تعديل</button>
+                              <button className="text-xs px-1.5 py-0.5 rounded border border-red-300 text-red-500 hover:bg-red-50"
+                                onClick={() => setEditableFeatures(editableFeatures.filter((_, i) => i !== fi))}>حذف</button>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-1 pt-1">
+                        <input
+                          className="flex-1 text-xs border rounded px-2 py-1 text-right bg-white text-black placeholder:text-gray-400"
+                          placeholder="+ أضف خدمة جديدة..."
+                          value={newFeature}
+                          onChange={e => setNewFeature(e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                          onKeyDown={e => { e.stopPropagation(); if (e.key === "Enter" && newFeature.trim()) { setEditableFeatures([...editableFeatures, newFeature.trim()]); setNewFeature(""); } }}
+                        />
+                        <button
+                          className="text-xs px-2 py-1 rounded bg-blue-500 text-white disabled:opacity-40"
+                          disabled={!newFeature.trim()}
+                          onClick={() => { if (newFeature.trim()) { setEditableFeatures([...editableFeatures, newFeature.trim()]); setNewFeature(""); } }}
+                        >إضافة</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* معاينة PDF */}
+        {selectedPkg && (
+          <div className="border border-gray-300 overflow-hidden bg-white text-black"
+            style={{ fontFamily: "'Noto Kufi Arabic', sans-serif", direction: "rtl" }}>
+            <div className="px-5 pt-4">
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", direction: "rtl", paddingBottom: "8px" }}>
+                <img src="/assets/logo-dynamic.jpeg" style={{ width: "56px", height: "auto", objectFit: "contain" }} alt="Dynamic Logo" />
+                <div style={{ textAlign: "center", flex: 1 }}>
+                  <div style={{ fontSize: "16px", fontWeight: 900, color: "#000" }}>ديناميك للإستشارات الهندسية</div>
+                  <div style={{ fontSize: "10px", fontWeight: 700, color: "#000", letterSpacing: "1.5px", marginTop: "3px", fontFamily: "'Space Grotesk',sans-serif" }}>DYNAMIC ENGINEERING CONSULTANTS</div>
+                </div>
+              </div>
+              <hr style={{ border: "none", borderTop: "1px solid #000", margin: "0 0 4px" }} />
+              <div style={{ textAlign: "center", fontSize: "9px", color: "#555", paddingBottom: "8px" }}>
+                إستشاريون (تصميم وإشراف) - معماري - إنشائي - مباني وإنشاءات - تصميم - إدارة مشاريع
+              </div>
+            </div>
+            <div className="px-5 pb-3">
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ fontSize: "9px", fontWeight: 700, color: "#000", borderBottom: "1px solid #000", paddingBottom: "4px", marginBottom: "6px" }}>بيانات العميل</div>
+                {([
+                  ["الاسم", lead.name],
+                  ["الهاتف", lead.phone],
+                  lead.type ? ["نوع المشروع", lead.type] : null,
+                  lead.serviceType ? ["نوع الخدمة", lead.serviceType] : null,
+                  lead.governorate ? ["المحافظة", lead.governorate] : null,
+                  lead.area ? ["المنطقة", lead.area] : null,
+                ] as ([string, string] | null)[]).filter((r): r is [string, string] => r !== null).map(([label, value], i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: "11px", borderBottom: "1px dotted #ddd" }}>
+                    <span style={{ color: "#555" }}>{label}</span>
+                    <span style={{ fontWeight: 600, color: "#000" }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ border: "2px solid #000", padding: "12px 14px", marginBottom: "10px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <div style={{ fontSize: "22px", fontWeight: 900, color: "#000", fontFamily: "'Space Grotesk',sans-serif" }}>
+                    {agreedPrice.trim() ? agreedPrice.trim() : selectedPkg.price} <span style={{ fontSize: "11px", fontWeight: 600 }}>د.ك</span>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#000" }}>{selectedPkg.name}</div>
+                    {selectedPkg.level !== "-" && <div style={{ fontSize: "9px", color: "#555", marginTop: "2px" }}>{selectedPkg.level}</div>}
+                  </div>
+                </div>
+                <div style={{ borderTop: "1px solid #ccc", paddingTop: "8px" }}>
+                  {editableFeatures.map((f, fi) => (
+                    <div key={fi} style={{ display: "flex", gap: "6px", marginBottom: "4px", fontSize: "10px", color: "#000" }}>
+                      <span style={{ fontWeight: 700, flexShrink: 0 }}>✓</span>
+                      <span>{f}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ textAlign: "center", fontSize: "10px", color: "#555", border: "1px solid #ccc", padding: "6px" }}>
+                هذا العرض ساري لمدة <strong>30 يوماً</strong> من تاريخ الإصدار · {new Date().toISOString().split("T")[0]}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 justify-start pt-2">
+          <Button variant="outline" onClick={onClose}>إلغاء</Button>
+          <Button
+            disabled={saving}
+            onClick={handleSave}
+            style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
+          >
+            {saving ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Save className="w-3 h-3 ml-1" />}
+            حفظ التعديلات
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
