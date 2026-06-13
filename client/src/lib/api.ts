@@ -315,8 +315,8 @@ export function useUpdateQuotation() {
     mutationFn: ({ id, ...data }: Partial<Quotation> & { id: string }) =>
       request<Quotation>(`/api/quotations/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     onSuccess: () => {
-      // إبطال جميع queries المرتبطة بالعروض (بما فيها sub-queries بـ leadId)
-      qc.invalidateQueries({ queryKey: ["quotations"], exact: false });
+      // حذف الـ cache تماماً لإجبار إعادة الجلب من الخادم في كل الحالات
+      qc.removeQueries({ queryKey: ["quotations"], exact: false });
     },
   });
 }

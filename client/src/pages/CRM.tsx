@@ -524,7 +524,7 @@ function QuotationDialog({ lead, onClose, onSaved }: {
 
 // ── View Quote Dialog ────────────────────────────────────────────────────
 function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void }) {
-  const { data: quotes, isLoading } = useQuotationsByLead(lead.id);
+  const { data: quotes, isLoading, refetch } = useQuotationsByLead(lead.id);
   const deleteQuotation = useDeleteQuotation();
   const quote = quotes?.[0];
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -710,7 +710,7 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
         lead={lead}
         quote={quote}
         onClose={() => setShowEditDialog(false)}
-        onSaved={() => { setShowEditDialog(false); }}
+        onSaved={() => { setShowEditDialog(false); refetch(); }}
       />
     )}
     </>
