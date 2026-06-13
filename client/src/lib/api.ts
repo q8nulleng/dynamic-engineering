@@ -526,6 +526,7 @@ export interface CrmLead {
   date: string;
   civilId: string;
   plotNumber: string;
+  parcelNumber: string;
   landArea: number;
   assignedTo: string;
   isArchived: number;

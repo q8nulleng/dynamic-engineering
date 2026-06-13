@@ -67,6 +67,7 @@ interface Lead {
   area?: string;
   likelyContract?: string;
   plotNumber?: string;
+  parcelNumber?: string;
   landArea?: number;
   assignedTo?: string;
   stage?: string;
@@ -97,7 +98,7 @@ const emptyForm = {
   name: "", phone: "", type: "", serviceType: "",
   source: "", referralName: "", expectedRevenue: "", probability: "",
   expectedClosing: "", priority: "", governorate: "", area: "",
-  notes: "", plotNumber: "", landArea: "", customArea: "",
+  notes: "", plotNumber: "", parcelNumber: "", landArea: "", customArea: "",
 };
 
 type PkgType = { name: string; price: string; buildingType: string; serviceType: string; level: string; features: string[] };
@@ -1822,6 +1823,7 @@ export default function CRM() {
       expectedClosing: form.expectedClosing,
       notes: form.notes,
       plotNumber: form.plotNumber,
+      parcelNumber: form.parcelNumber || "",
       landArea: Number(form.landArea) || 0,
       stage: "استفسار جديد",
       tags: [],
@@ -2000,6 +2002,20 @@ export default function CRM() {
                                 <span>{lead.area}</span>
                               </div>
                             )}
+                            {lead.plotNumber && (
+                              <div className="flex items-center gap-2">
+                                <Hash className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span className="text-muted-foreground">قسيمة:</span>
+                                <span dir="ltr">{lead.plotNumber}</span>
+                              </div>
+                            )}
+                            {lead.parcelNumber && (
+                              <div className="flex items-center gap-2">
+                                <Hash className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span className="text-muted-foreground">قطعة:</span>
+                                <span dir="ltr">{lead.parcelNumber}</span>
+                              </div>
+                            )}
                             <div className="flex items-center gap-2">
                               <Activity className="w-3.5 h-3.5 text-muted-foreground" />
                               <span>{lead.source}</span>
@@ -2173,7 +2189,7 @@ export default function CRM() {
                                       return govAreas.includes(lead.area || "") ? (lead.area || "") : (lead.area ? "أخرى" : "");
                                     })(),
                                     notes: lead.notes || "",
-                                    plotNumber: lead.plotNumber || "", landArea: String(lead.landArea || ""),
+                                    plotNumber: lead.plotNumber || "", parcelNumber: lead.parcelNumber || "", landArea: String(lead.landArea || ""),
                                     customArea: (() => {
                                       const govAreas = kuwaitGovernorates[lead.governorate || ""] || [];
                                       return govAreas.includes(lead.area || "") ? "" : (lead.area || "");
@@ -2462,6 +2478,13 @@ export default function CRM() {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5">
+                      <Hash className="w-3.5 h-3.5 text-muted-foreground" />
+                      رقم القطعة
+                    </label>
+                    <Input placeholder="رقم القطعة" dir="ltr" value={editForm.parcelNumber || ""} onChange={(e) => setEditForm(p => ({ ...p, parcelNumber: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium flex items-center gap-1.5">
                       <Ruler className="w-3.5 h-3.5 text-muted-foreground" />
                       مساحة الأرض (م²)
                     </label>
@@ -2511,6 +2534,7 @@ export default function CRM() {
                       expectedClosing: editForm.expectedClosing,
                       notes: editForm.notes,
                       plotNumber: editForm.plotNumber,
+                      parcelNumber: editForm.parcelNumber || "",
                       landArea: Number(editForm.landArea) || 0,
                     });
                     setEditTarget(null);
@@ -2745,6 +2769,13 @@ export default function CRM() {
                       رقم القسيمة
                     </label>
                     <Input placeholder="رقم القسيمة" dir="ltr" value={form.plotNumber} onChange={(e) => handleFormChange("plotNumber", e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium flex items-center gap-1.5">
+                      <Hash className="w-3.5 h-3.5 text-muted-foreground" />
+                      رقم القطعة
+                    </label>
+                    <Input placeholder="رقم القطعة" dir="ltr" value={form.parcelNumber || ""} onChange={(e) => handleFormChange("parcelNumber", e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5">
