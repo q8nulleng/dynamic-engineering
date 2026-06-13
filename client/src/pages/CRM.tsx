@@ -541,16 +541,28 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
 
   const { data: allPkgsDb = {} } = usePackages();
 
+  const buildPkgForPdf = (q: typeof quote) => {
+    if (!q) return null;
+    const allFlat = Object.values(allPkgsDb).flat();
+    const matchedPkg = allFlat.find(p => p.name === q.package);
+    // استخدام الخدمات المعدّلة إن وُجدت، وإلا الخدمات الأصلية من الباقة
+    let customFeatures: string[] | undefined;
+    if (q.featuresJson) {
+      try { customFeatures = JSON.parse(q.featuresJson); } catch {}
+    }
+    if (matchedPkg) {
+      return { ...matchedPkg, price: q.amount, ...(customFeatures ? { features: customFeatures } : {}) };
+    }
+    return { name: q.package, price: q.amount, level: "-", features: customFeatures || [q.service] };
+  };
+
   const handleDownloadPdf = async () => {
     if (!quote) return;
     setSendingPdf(true);
     const tid = toast.loading("جاري إنشاء PDF...");
     try {
-      const allFlat = Object.values(allPkgsDb).flat();
-      const matchedPkg = allFlat.find(p => p.name === quote.package);
-      const pkgForPdf = matchedPkg
-        ? { ...matchedPkg, price: quote.amount }
-        : { name: quote.package, price: quote.amount, level: "-", features: [quote.service] };
+      const pkgForPdf = buildPkgForPdf(quote);
+      if (!pkgForPdf) throw new Error('no package');
       const leadForPdf = {
         name: lead.name,
         phone: lead.phone,
@@ -572,11 +584,8 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
   const handlePrintPdf = async () => {
     if (!quote) return;
     try {
-      const allFlat = Object.values(allPkgsDb).flat();
-      const matchedPkg = allFlat.find(p => p.name === quote.package);
-      const pkgForPdf = matchedPkg
-        ? { ...matchedPkg, price: quote.amount }
-        : { name: quote.package, price: quote.amount, level: "-", features: [quote.service] };
+      const pkgForPdf2 = buildPkgForPdf(quote);
+      if (!pkgForPdf2) throw new Error('no package');
       const leadForPdf = {
         name: lead.name,
         phone: lead.phone,
@@ -585,7 +594,7 @@ function ViewQuoteDialog({ lead, onClose }: { lead: Lead; onClose: () => void })
         governorate: lead.governorate,
         area: lead.area,
       };
-      await printQuotationPdf(leadForPdf, pkgForPdf);
+      await printQuotationPdf(leadForPdf, pkgForPdf2);
     } catch {
       toast.error("فشل فتح نافذة الطباعة");
     }
@@ -752,6 +761,7 @@ function QuotationEditDialog({ lead, quote, onClose, onSaved }: {
         package: selectedPkg?.name || quote.package,
         status,
         type: lead.type || quote.type,
+        featuresJson: JSON.stringify(editableFeatures),
       });
       // إبطال query الخاصة بهذه الفرصة مباشرةً
       await qc.invalidateQueries({ queryKey: ["quotations", { leadId: lead.id }] });

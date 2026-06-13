@@ -112,6 +112,7 @@ export interface Quotation {
   leadId: string;
   validityDays: number;
   expiryDate: string;
+  featuresJson: string;
 }
 
 export interface Contract {

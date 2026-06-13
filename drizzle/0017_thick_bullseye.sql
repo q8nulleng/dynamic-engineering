@@ -1,0 +1,1 @@
+ALTER TABLE `quotations` ADD `features_json` text DEFAULT '';

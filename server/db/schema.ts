@@ -83,6 +83,7 @@ export const quotations = sqliteTable("quotations", {
   leadId: text("lead_id").default(""),         // FK → crm_leads.id
   validityDays: integer("validity_days").default(30),
   expiryDate: text("expiry_date").default(""),
+  featuresJson: text("features_json").default(""), // JSON array of custom features
 });
 
 export const projects = sqliteTable("projects", {

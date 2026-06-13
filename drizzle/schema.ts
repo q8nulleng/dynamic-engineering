@@ -149,6 +149,7 @@ export const quotations = mysqlTable("quotations", {
   leadId: varchar("lead_id", { length: 64 }).default(""),
   validityDays: int("validity_days").default(30),
   expiryDate: varchar("expiry_date", { length: 32 }).default(""),
+  featuresJson: text("features_json").default(""), // JSON array of custom features
 });
 
 export const phases = mysqlTable("phases", {
