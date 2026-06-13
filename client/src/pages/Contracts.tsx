@@ -657,12 +657,43 @@ export default function Contracts() {
 
   const buildingTypes = [...new Set(templates.map((t) => t.buildingType))];
 
+  // Helper: get contract with latest template content
+  async function getContractWithLatestTemplate(contract: typeof contracts[0]) {
+    // Check if termsText has empty content
+    let hasContent = false;
+    try {
+      const parsed = JSON.parse(contract.termsText || "");
+      hasContent = !!(parsed.content && parsed.content.trim().length > 0);
+    } catch { hasContent = !!(contract.termsText && contract.termsText.trim().length > 0); }
+    if (hasContent) return contract;
+    // Try to find matching template and update termsText
+    const contractTemplateName = contract.templateType || contract.template || "";
+    const tmpl = templates.find(t => t.name === contractTemplateName)
+      || templates.find(t => t.serviceType === (contract.service || "") && t.buildingType === (contract.type || ""))
+      || templates.find(t => contractTemplateName.includes(t.serviceType || "") && contractTemplateName.includes(t.buildingType || ""));
+    if (!tmpl || !tmpl.content?.trim()) return contract;
+    const newTermsText = JSON.stringify({
+      content: tmpl.content || "",
+      scopeOfWork: tmpl.scopeOfWork,
+      terms: tmpl.terms,
+      party1Obligations: tmpl.party1Obligations,
+      party2Obligations: tmpl.party2Obligations,
+      paymentSchedule: tmpl.paymentSchedule,
+      duration: tmpl.duration,
+      notes: tmpl.notes,
+    });
+    // Update in DB silently
+    try { await updateContract.mutateAsync({ id: contract.id, termsText: newTermsText }); } catch {}
+    return { ...contract, termsText: newTermsText };
+  }
+
   async function handleExportPdf(e: React.MouseEvent, contract: typeof contracts[0]) {
     e.stopPropagation();
     setExportingId(contract.id);
     const tid = toast.loading("جاري تحميل PDF...");
     try {
-      await downloadContractPdf(contract);
+      const latestContract = await getContractWithLatestTemplate(contract);
+      await downloadContractPdf(latestContract);
       toast.success(`تم تحميل عقد ${contract.id}`, { id: tid });
     } catch {
       toast.error("فشل تحميل PDF", { id: tid });
@@ -686,9 +717,22 @@ export default function Contracts() {
 
   async function handleSyncTemplate(e: React.MouseEvent, contract: Contract) {
     e.stopPropagation();
-    // Find the matching template by name
-    const tmpl = templates.find(t => t.name === (contract.templateType || contract.template));
-    if (!tmpl) { toast.error("لم يتم العثور على القالب المرتبط بهذا العقد"); return; }
+    // Find the matching template by name, or by service+building type
+    const contractTemplateName = contract.templateType || contract.template || "";
+    const tmpl = templates.find(t => t.name === contractTemplateName)
+      || templates.find(t =>
+          t.serviceType === (contract.service || "") &&
+          t.buildingType === (contract.type || "")
+        )
+      || templates.find(t =>
+          contractTemplateName.includes(t.serviceType || "") &&
+          contractTemplateName.includes(t.buildingType || "")
+        );
+    if (!tmpl) {
+      // Show a dialog to let user pick template manually
+      toast.error(`لم يتم العثور على القالب. القالب المرتبط: "${contractTemplateName}" — تأكد من أن اسم القالب يطابق نوع العقد`);
+      return;
+    }
     setSyncingTemplateId(contract.id);
     try {
       const newTermsText = JSON.stringify({
@@ -710,9 +754,10 @@ export default function Contracts() {
     }
   }
 
-  function handlePreviewContract(e: React.MouseEvent, contract: Contract) {
+  async function handlePreviewContract(e: React.MouseEvent, contract: Contract) {
     e.stopPropagation();
-    const html = buildPage(contractBody(contract), `عقد ${contract.id}`);
+    const latestContract = await getContractWithLatestTemplate(contract);
+    const html = buildPage(contractBody(latestContract), `عقد ${contract.id}`);
     // Remove auto-print script for preview
     const previewHtmlClean = html.replace(/<script>[\s\S]*?<\/script>/g, '');
     setPreviewHtml(previewHtmlClean);
