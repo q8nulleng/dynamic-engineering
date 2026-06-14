@@ -634,6 +634,7 @@ export default function Contracts() {
   const [activatingId, setActivatingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("الكل");
+  const [typeFilter, setTypeFilter] = useState("الكل");
 
   // Template states
   const [templateEditor, setTemplateEditor] = useState<{
@@ -646,8 +647,12 @@ export default function Contracts() {
   const filtered = contracts.filter((c) => {
     const matchSearch = !search || c.client.includes(search) || c.id.includes(search) || (c.civilId || "").includes(search);
     const matchStatus = statusFilter === "الكل" || c.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchType = typeFilter === "الكل" || c.type === typeFilter || (c.templateType || "").includes(typeFilter);
+    return matchSearch && matchStatus && matchType;
   });
+
+  // Unique building types from contracts
+  const contractBuildingTypes = ["الكل", ...[...new Set(contracts.map(c => c.type).filter(Boolean))]];
 
   const filteredTemplates = templates.filter((t) => {
     const matchSearch = !tSearch || t.name.includes(tSearch) || t.buildingType.includes(tSearch);
@@ -907,6 +912,14 @@ export default function Contracts() {
                 <SelectItem value="الكل">كل الحالات</SelectItem>
                 {stageFlow.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 <SelectItem value="ملغي">ملغي</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="نوع العقار" /></SelectTrigger>
+              <SelectContent>
+                {contractBuildingTypes.map((t) => (
+                  <SelectItem key={t} value={t}>{t === "الكل" ? "كل الأنواع" : t}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

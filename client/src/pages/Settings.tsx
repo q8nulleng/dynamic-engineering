@@ -2,7 +2,7 @@
  * Settings - صفحة الإعدادات المركزية
  * تجمع: عروض الأسعار (الباقات) | العقود الهندسية (القوالب) | خطط العمل | المناطق والمحافظات
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import {
   Plus, Trash2, Pencil, Save, X, MapPin, FileText, FileSignature, ClipboardList,
-  ChevronDown, ChevronUp, CheckCircle, Loader2, Building2
+  ChevronDown, ChevronUp, CheckCircle, Loader2, Building2,
+  Bold, Underline, AlignRight, AlignLeft, AlignCenter, Type, Palette
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -360,6 +361,156 @@ function ContractTemplatesTab() {
   );
 }
 
+// ── محرر نصي غني للقوالب ──────────────────────────────────────────────────────
+const TEMPLATE_VARS_SETTINGS = [
+  "{اسم_العميل}", "{الرقم_المدني}", "{المنطقة}",
+  "{القطعة}", "{القسيمة}", "{المساحة}",
+  "{قيمة_العقد}", "{تاريخ_التوقيع}", "{رقم_العقد}",
+];
+
+const FONT_SIZES_S = ["12", "14", "16", "18", "20", "22", "24", "28", "32"];
+const TEXT_COLORS_S = [
+  { label: "أسود", value: "#000000" },
+  { label: "رمادي", value: "#6b7280" },
+  { label: "أزرق", value: "#1d4ed8" },
+  { label: "أخضر", value: "#15803d" },
+  { label: "أحمر", value: "#b91c1c" },
+  { label: "بني", value: "#92400e" },
+];
+
+function SettingsRichTextEditor({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (html: string) => void;
+}) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [fontSize, setFontSize] = useState("16");
+  const [textColor, setTextColor] = useState("#000000");
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const savedRangeRef = useRef<Range | null>(null);
+  const initializedRef = useRef(false);
+
+  useEffect(() => {
+    if (editorRef.current && !initializedRef.current) {
+      editorRef.current.innerHTML = value || "";
+      initializedRef.current = true;
+    }
+  }, []);
+
+  const saveRange = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+    }
+  };
+
+  const restoreRange = () => {
+    const sel = window.getSelection();
+    if (sel && savedRangeRef.current) {
+      sel.removeAllRanges();
+      sel.addRange(savedRangeRef.current);
+    }
+  };
+
+  const exec = (cmd: string, val?: string) => {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, val);
+    onChange(editorRef.current?.innerHTML || "");
+  };
+
+  const handleInput = () => {
+    onChange(editorRef.current?.innerHTML || "");
+  };
+
+  const insertVar = useCallback((varText: string) => {
+    restoreRange();
+    editorRef.current?.focus();
+    document.execCommand("insertText", false, varText);
+    onChange(editorRef.current?.innerHTML || "");
+  }, [onChange]);
+
+  return (
+    <div className="border rounded-lg overflow-hidden" dir="rtl">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-1 p-2 border-b bg-muted/20">
+        <button type="button" title="غامق" className="p-1.5 rounded hover:bg-muted transition-colors"
+          onMouseDown={(e) => { e.preventDefault(); exec("bold"); }}>
+          <Bold className="w-4 h-4" />
+        </button>
+        <button type="button" title="تسطير" className="p-1.5 rounded hover:bg-muted transition-colors"
+          onMouseDown={(e) => { e.preventDefault(); exec("underline"); }}>
+          <Underline className="w-4 h-4" />
+        </button>
+        <div className="w-px h-5 bg-border mx-0.5" />
+        <div className="flex items-center gap-1">
+          <Type className="w-3.5 h-3.5 text-muted-foreground" />
+          <select className="text-xs border rounded px-1 py-0.5 bg-background h-7" value={fontSize}
+            onChange={(e) => {
+              setFontSize(e.target.value);
+              const sel = window.getSelection();
+              if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+                const range = sel.getRangeAt(0);
+                const span = document.createElement("span");
+                span.style.fontSize = e.target.value + "px";
+                range.surroundContents(span);
+                onChange(editorRef.current?.innerHTML || "");
+              }
+            }}>
+            {FONT_SIZES_S.map((s) => <option key={s} value={s}>{s}px</option>)}
+          </select>
+        </div>
+        <div className="w-px h-5 bg-border mx-0.5" />
+        <div className="relative">
+          <button type="button" title="لون النص" className="p-1.5 rounded hover:bg-muted transition-colors flex items-center gap-1"
+            onMouseDown={(e) => { e.preventDefault(); saveRange(); setShowColorPicker(v => !v); }}>
+            <Palette className="w-4 h-4" />
+            <div className="w-3 h-1.5 rounded-sm border" style={{ backgroundColor: textColor }} />
+          </button>
+          {showColorPicker && (
+            <div className="absolute top-full right-0 mt-1 z-50 bg-white border rounded-lg shadow-lg p-2 flex flex-wrap gap-1.5 w-36">
+              {TEXT_COLORS_S.map((c) => (
+                <button key={c.value} type="button" title={c.label}
+                  className="w-7 h-7 rounded border-2 border-transparent hover:border-gray-400 transition-colors"
+                  style={{ backgroundColor: c.value }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    restoreRange();
+                    setTextColor(c.value);
+                    exec("foreColor", c.value);
+                    setShowColorPicker(false);
+                  }} />
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="w-px h-5 bg-border mx-0.5" />
+        <button type="button" title="محاذاة يمين" className="p-1.5 rounded hover:bg-muted transition-colors"
+          onMouseDown={(e) => { e.preventDefault(); exec("justifyRight"); }}>
+          <AlignRight className="w-4 h-4" />
+        </button>
+        <button type="button" title="محاذاة وسط" className="p-1.5 rounded hover:bg-muted transition-colors"
+          onMouseDown={(e) => { e.preventDefault(); exec("justifyCenter"); }}>
+          <AlignCenter className="w-4 h-4" />
+        </button>
+        <button type="button" title="محاذاة يسار" className="p-1.5 rounded hover:bg-muted transition-colors"
+          onMouseDown={(e) => { e.preventDefault(); exec("justifyLeft"); }}>
+          <AlignLeft className="w-4 h-4" />
+        </button>
+      </div>
+      {/* Editable Area */}
+      <div ref={editorRef} contentEditable suppressContentEditableWarning dir="rtl"
+        className="min-h-[280px] p-4 text-sm leading-relaxed focus:outline-none"
+        style={{ fontFamily: "inherit", direction: "rtl", textAlign: "right" }}
+        onInput={handleInput} onMouseUp={saveRange} onKeyUp={saveRange} onFocus={saveRange}
+        data-placeholder="اكتب محتوى العقد هنا..."
+      />
+      <style>{`[contenteditable]:empty:before { content: attr(data-placeholder); color: #9ca3af; pointer-events: none; }`}</style>
+    </div>
+  );
+}
+
 function TemplateFormFields({ form, setForm, contractTypes }: {
   form: { name: string; type: string; content: string };
   setForm: (f: any) => void;
@@ -380,13 +531,28 @@ function TemplateFormFields({ form, setForm, contractTypes }: {
           </Select>
         </div>
       </div>
+      {/* متغيرات القالب */}
+      <div className="rounded-lg border p-3 bg-muted/20 space-y-2">
+        <p className="text-xs font-medium text-muted-foreground">إدراج متغير — ضع المؤشر في مكان الإدراج ثم اضغط:</p>
+        <div className="flex flex-wrap gap-1.5">
+          {TEMPLATE_VARS_SETTINGS.map((v) => (
+            <button key={v} type="button"
+              className="text-[11px] px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 rounded font-mono hover:bg-blue-100 transition-colors"
+              onClick={() => {
+                const editor = document.querySelector('[data-template-editor]') as HTMLDivElement;
+                if (editor) { editor.focus(); document.execCommand('insertText', false, v); }
+              }}>
+              {v}
+            </button>
+          ))}
+        </div>
+      </div>
       <div>
-        <label className="text-sm font-medium mb-1 block">محتوى القالب (HTML)</label>
-        <Textarea value={form.content} onChange={e => setForm({ ...form, content: e.target.value })}
-          placeholder="أدخل محتوى القالب هنا..." rows={10} className="font-mono text-xs" dir="ltr" />
-        <p className="text-[11px] text-muted-foreground mt-1">
-          يمكن استخدام المتغيرات: {"{CLIENT_NAME}"} {"{CONTRACT_DATE}"} {"{AMOUNT}"} {"{AREA}"} {"{BLOCK}"} {"{PLOT}"}
-        </p>
+        <label className="text-sm font-medium mb-1 block">محتوى القالب</label>
+        <SettingsRichTextEditor
+          value={form.content}
+          onChange={(html) => setForm({ ...form, content: html })}
+        />
       </div>
     </div>
   );
