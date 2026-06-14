@@ -42,7 +42,7 @@ import {
   useAppointmentsByLead, useCreateAppointment, useDeleteAppointment, useAppointments,
   useEmployees, usePackages,
 } from "@/lib/api";
-import { exportQuotationPdf, exportContractPdf, downloadQuotationPdf, printQuotationPdf } from "@/lib/pdf";
+import { exportQuotationPdf, exportContractPdf, downloadQuotationPdf, printQuotationPdf, downloadContractPdf } from "@/lib/pdf";
 import { toast } from "sonner";
 
 interface Lead {
@@ -1246,6 +1246,7 @@ function LeadContractSection({
   const { data: contracts = [] } = useContractsByLead(lead.id);
   const contract = contracts[0];
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [downloadBusy, setDownloadBusy] = useState(false);
   const [uploadingCivil, setUploadingCivil] = useState(false);
   const [uploadingSigned, setUploadingSigned] = useState(false);
   const [signingStatus, setSigningStatus] = useState(lead.contractSigningStatus || "مسودة");
@@ -1316,6 +1317,20 @@ function LeadContractSection({
       );
     } finally {
       setPdfBusy(false);
+    }
+  };
+
+  const handleDownloadContractPdf = async () => {
+    if (!contract) return;
+    setDownloadBusy(true);
+    const tid = toast.loading("جاري تحميل PDF العقد...");
+    try {
+      await downloadContractPdf(contract);
+      toast.success("تم حفظ العقد في جهازك", { id: tid });
+    } catch {
+      toast.error("فشل تحميل PDF", { id: tid });
+    } finally {
+      setDownloadBusy(false);
     }
   };
 
@@ -1510,6 +1525,15 @@ function LeadContractSection({
                 ? <Loader2 className="w-3 h-3 ml-1 animate-spin" />
                 : <FileText className="w-3 h-3 ml-1" />}
               عرض العقد PDF
+            </Button>
+            <Button size="sm" variant="outline" className="text-xs h-7 text-green-700 border-green-300"
+              disabled={downloadBusy}
+              onClick={handleDownloadContractPdf}
+            >
+              {downloadBusy
+                ? <Loader2 className="w-3 h-3 ml-1 animate-spin" />
+                : <Download className="w-3 h-3 ml-1" />}
+              حفظ العقد PDF
             </Button>
           </>
         )}
