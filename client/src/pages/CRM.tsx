@@ -1352,8 +1352,7 @@ function LeadContractSection({
       )}
 
       {/* ── وثائق التوقيع ── */}
-      {contract && (
-        <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2">
+      <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2">
           <div className="text-xs font-semibold text-amber-800 flex items-center gap-1">
             <ShieldCheck className="w-3.5 h-3.5" />وثائق التوقيع والبدء
           </div>
@@ -1441,7 +1440,6 @@ function LeadContractSection({
             </div>
           )}
         </div>
-      )}
 
       <div className="flex gap-2 flex-wrap">
         {!contract ? (
