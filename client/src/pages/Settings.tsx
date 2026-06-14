@@ -604,7 +604,7 @@ function SettingsRichTextEditor({
       </div>
       {/* Editable Area */}
       <div ref={editorRef} contentEditable suppressContentEditableWarning dir="rtl"
-        className="min-h-[280px] p-4 text-sm leading-relaxed focus:outline-none"
+        className="min-h-[280px] max-h-[400px] overflow-y-auto p-4 text-sm leading-relaxed focus:outline-none"
         style={{ fontFamily: "inherit", direction: "rtl", textAlign: "right", wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-wrap", overflowX: "hidden" }}
         onInput={handleInput} onMouseUp={saveRange} onKeyUp={saveRange} onFocus={saveRange}
         data-placeholder="اكتب محتوى العقد هنا..."

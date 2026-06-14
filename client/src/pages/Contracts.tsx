@@ -318,7 +318,7 @@ function RichTextEditor({
         contentEditable
         suppressContentEditableWarning
         dir="rtl"
-        className="min-h-[320px] p-4 text-sm leading-relaxed focus:outline-none"
+        className="min-h-[320px] max-h-[420px] overflow-y-auto p-4 text-sm leading-relaxed focus:outline-none"
         style={{ fontFamily: "inherit", direction: "rtl", textAlign: "right", wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-wrap", overflowX: "hidden" }}
         onInput={handleInput}
         onMouseUp={saveRange}
