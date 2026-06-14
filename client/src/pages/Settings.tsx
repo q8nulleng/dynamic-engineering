@@ -403,7 +403,7 @@ function ContractTemplatesTab() {
 
       {/* Dialog إضافة */}
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent className="max-w-2xl" dir="rtl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
           <DialogHeader><DialogTitle>قالب عقد جديد</DialogTitle></DialogHeader>
           <TemplateFormFields form={form} setForm={setForm} buildingTypes={BUILDING_TYPES_T} serviceTypes={SERVICE_TYPES_T} />
           <DialogFooter>
@@ -421,7 +421,7 @@ function ContractTemplatesTab() {
 
       {/* Dialog تعديل */}
       <Dialog open={!!editingId} onOpenChange={() => setEditingId(null)}>
-        <DialogContent className="max-w-2xl" dir="rtl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
           <DialogHeader><DialogTitle>تعديل القالب</DialogTitle></DialogHeader>
           <TemplateFormFields form={form} setForm={setForm} buildingTypes={BUILDING_TYPES_T} serviceTypes={SERVICE_TYPES_T} />
           <DialogFooter>
