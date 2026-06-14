@@ -898,7 +898,31 @@ export default function Contracts() {
             })}
           </div>
 
-          {/* Filters */}
+          {/* Building Type Filter Tabs */}
+          <div className="flex gap-2 flex-wrap">
+            {["الكل", "سكن خاص", "استثماري", "تجاري", "صناعي"].map((bt) => {
+              const count = bt === "الكل"
+                ? contracts.length
+                : contracts.filter(c => c.type === bt).length;
+              return (
+                <Button
+                  key={bt}
+                  variant={typeFilter === bt ? "default" : "outline"}
+                  size="sm"
+                  className="text-xs"
+                  style={typeFilter === bt ? { backgroundColor: "oklch(0.30 0.05 250)" } : {}}
+                  onClick={() => setTypeFilter(bt)}
+                >
+                  {bt}
+                  <Badge variant="secondary" className="mr-1.5 text-[10px] px-1.5">
+                    {count}
+                  </Badge>
+                </Button>
+              );
+            })}
+          </div>
+
+          {/* Search + Status Filters */}
           <div className="flex gap-3 flex-wrap">
             <Input
               placeholder="بحث بالاسم أو الرقم المدني..."
@@ -912,14 +936,6 @@ export default function Contracts() {
                 <SelectItem value="الكل">كل الحالات</SelectItem>
                 {stageFlow.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 <SelectItem value="ملغي">ملغي</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-40"><SelectValue placeholder="نوع العقار" /></SelectTrigger>
-              <SelectContent>
-                {contractBuildingTypes.map((t) => (
-                  <SelectItem key={t} value={t}>{t === "الكل" ? "كل الأنواع" : t}</SelectItem>
-                ))}
               </SelectContent>
             </Select>
           </div>
