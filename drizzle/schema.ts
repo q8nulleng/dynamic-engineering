@@ -447,6 +447,17 @@ export const employeeNotifications = mysqlTable("employee_notifications", {
 export type EmployeeNotification = typeof employeeNotifications.$inferSelect;
 export type InsertEmployeeNotification = typeof employeeNotifications.$inferInsert;
 
+// ── Governorates & Areas (المحافظات والمناطق) ─────────────────────────────────
+export const governorateAreas = mysqlTable("governorate_areas", {
+  id: int("id").autoincrement().primaryKey(),
+  governorate: varchar("governorate", { length: 128 }).notNull(),
+  area: varchar("area", { length: 128 }).notNull(),
+  sortOrder: int("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type GovernorateArea = typeof governorateAreas.$inferSelect;
+export type InsertGovernorateArea = typeof governorateAreas.$inferInsert;
+
 // ── Packages (الباقات) ─────────────────────────────────────────────────────────
 export const packages = mysqlTable("packages", {
   id: int("id").autoincrement().primaryKey(),

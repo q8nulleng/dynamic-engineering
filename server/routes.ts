@@ -14,7 +14,7 @@ import {
   workPlans, workPlanPhases, workPlanTasks, projectBriefs, projectMeetings, phaseMeta,
   employees, employeeSessions,
   supervisionVisits, detailedDrawings, municipalitySubmissions,
-  employeeNotifications, packages
+  employeeNotifications, packages, governorateAreas
 } from "../drizzle/schema.js";
 import { nanoid } from "nanoid";
 import { storagePut } from "./storage.js";
@@ -2347,6 +2347,99 @@ apiRouter.delete("/api/packages/:id", async (req, res) => {
   try {
     const db = getDb();
     await db.delete(packages).where(eq(packages.id, parseInt(req.params.id)));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Governorate Areas (المناطق والمحافظات) ─────────────────────────────────────
+
+// GET /api/governorate-areas — جلب كل المناطق مجمّعة حسب المحافظة
+apiRouter.get("/api/governorate-areas", async (_req, res) => {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(governorateAreas)
+      .orderBy(governorateAreas.governorate, governorateAreas.sortOrder);
+    // تجميع حسب المحافظة
+    const grouped: Record<string, string[]> = {};
+    for (const row of rows) {
+      if (!grouped[row.governorate]) grouped[row.governorate] = [];
+      grouped[row.governorate].push(row.area);
+    }
+    res.json({ grouped, rows });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/governorate-areas — إضافة منطقة جديدة
+apiRouter.post("/api/governorate-areas", async (req, res) => {
+  try {
+    const db = getDb();
+    const { governorate, area, sortOrder } = req.body;
+    if (!governorate || !area) return res.status(400).json({ error: "governorate and area are required" });
+    // التحقق من عدم التكرار
+    const existing = await db.select().from(governorateAreas)
+      .where(eq(governorateAreas.governorate, governorate));
+    const duplicate = existing.find((r: any) => r.area === area);
+    if (duplicate) return res.status(400).json({ error: "المنطقة موجودة بالفعل في هذه المحافظة" });
+    await db.insert(governorateAreas).values({
+      governorate,
+      area,
+      sortOrder: sortOrder ?? existing.length + 1,
+    });
+    const [row] = await db.select().from(governorateAreas)
+      .where(eq(governorateAreas.governorate, governorate))
+      .orderBy(desc(governorateAreas.id))
+      .limit(1);
+    res.status(201).json(row);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT /api/governorate-areas/:id — تعديل منطقة
+apiRouter.put("/api/governorate-areas/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    const { governorate, area, sortOrder } = req.body;
+    await db.update(governorateAreas).set({
+      ...(governorate ? { governorate } : {}),
+      ...(area ? { area } : {}),
+      ...(sortOrder !== undefined ? { sortOrder } : {}),
+    }).where(eq(governorateAreas.id, parseInt(req.params.id)));
+    const [row] = await db.select().from(governorateAreas)
+      .where(eq(governorateAreas.id, parseInt(req.params.id)));
+    res.json(row);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/governorate-areas/:id — حذف منطقة
+apiRouter.delete("/api/governorate-areas/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    await db.delete(governorateAreas).where(eq(governorateAreas.id, parseInt(req.params.id)));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/governorate-areas/governorate — إضافة محافظة جديدة كاملة
+apiRouter.post("/api/governorate-areas/governorate", async (req, res) => {
+  try {
+    const db = getDb();
+    const { governorate } = req.body;
+    if (!governorate) return res.status(400).json({ error: "governorate is required" });
+    // التحقق من عدم وجود المحافظة
+    const existing = await db.select().from(governorateAreas)
+      .where(eq(governorateAreas.governorate, governorate));
+    if (existing.length > 0) return res.status(400).json({ error: "المحافظة موجودة بالفعل" });
+    // إضافة المحافظة مع منطقة "أخرى" افتراضية
+    await db.insert(governorateAreas).values({ governorate, area: "أخرى", sortOrder: 99 });
+    res.status(201).json({ success: true, governorate });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/governorate-areas/governorate/:name — حذف محافظة كاملة مع مناطقها
+apiRouter.delete("/api/governorate-areas/governorate/:name", async (req, res) => {
+  try {
+    const db = getDb();
+    const name = decodeURIComponent(req.params.name);
+    await db.delete(governorateAreas).where(eq(governorateAreas.governorate, name));
     res.json({ success: true });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });

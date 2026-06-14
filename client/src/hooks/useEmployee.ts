@@ -51,7 +51,7 @@ export const ROLE_PERMISSIONS: Record<EmployeeRole, {
     label: "سكرتير",
     canViewFinance: false,
     canViewAll: false,
-    navItems: ["/", "/projects", "/tasks", "/documents", "/clients", "/appointments", "/crm", "/quotations", "/contracts", "/work-plans"],
+    navItems: ["/", "/projects", "/tasks", "/documents", "/clients", "/appointments", "/crm", "/quotations", "/contracts", "/work-plans", "/settings"],
   },
   structural: {
     label: "م. إنشائي",

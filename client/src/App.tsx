@@ -23,6 +23,7 @@ import WorkPlans from "./pages/WorkPlans";
 import ClientDocuments from "./pages/ClientDocuments";
 import EmployeeLogin from "./pages/EmployeeLogin";
 import EmployeesAdmin from "./pages/EmployeesAdmin";
+import Settings from "./pages/Settings";
 import DashboardLayout from "./components/DashboardLayout";
 
 function Router() {
@@ -46,6 +47,7 @@ function Router() {
       <Route path="/appointments" component={Appointments} />
       <Route path="/work-plans" component={WorkPlans} />
       <Route path="/employees" component={EmployeesAdmin} />
+      <Route path="/settings" component={Settings} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

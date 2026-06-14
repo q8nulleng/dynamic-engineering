@@ -1178,3 +1178,63 @@ export function useDeletePackage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["packages"] }),
   });
 }
+
+// ── Governorate Areas (المناطق والمحافظات) ─────────────────────────────────────
+export interface GovernorateAreaRow {
+  id: number;
+  governorate: string;
+  area: string;
+  sortOrder: number;
+}
+export interface GovernorateAreasResponse {
+  grouped: Record<string, string[]>;
+  rows: GovernorateAreaRow[];
+}
+export function useGovernorateAreas() {
+  return useQuery<GovernorateAreasResponse>({
+    queryKey: ["governorate-areas"],
+    queryFn: () => request("/api/governorate-areas"),
+    initialData: { grouped: {}, rows: [] },
+    staleTime: 0,
+  });
+}
+export function useAddGovernorateArea() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { governorate: string; area: string; sortOrder?: number }) =>
+      request("/api/governorate-areas", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["governorate-areas"] }),
+  });
+}
+export function useUpdateGovernorateArea() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<GovernorateAreaRow> & { id: number }) =>
+      request(`/api/governorate-areas/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["governorate-areas"] }),
+  });
+}
+export function useDeleteGovernorateArea() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      request(`/api/governorate-areas/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["governorate-areas"] }),
+  });
+}
+export function useAddGovernorate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (governorate: string) =>
+      request("/api/governorate-areas/governorate", { method: "POST", body: JSON.stringify({ governorate }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["governorate-areas"] }),
+  });
+}
+export function useDeleteGovernorate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) =>
+      request(`/api/governorate-areas/governorate/${encodeURIComponent(name)}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["governorate-areas"] }),
+  });
+}

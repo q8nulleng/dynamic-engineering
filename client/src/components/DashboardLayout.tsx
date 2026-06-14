@@ -9,7 +9,6 @@ import { useAllTasks, useInvoices, useClients, useEmployeeNotifications, useMark
 import {
   LayoutDashboard,
   Users,
-  FileText,
   FolderKanban,
   ListChecks,
   FolderOpen,
@@ -24,11 +23,10 @@ import {
   Sun,
   Moon,
   Bell,
-  FileSignature,
   Target,
   CalendarDays,
-  ClipboardList,
   UserCog,
+  Settings2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,11 +42,9 @@ const allNavItems = [
   { path: "/tasks", label: "المهام", icon: ListChecks, badge: 5 },
   { path: "/documents", label: "المستندات", icon: FolderOpen },
   { path: "/payments", label: "الدفعات", icon: CreditCard },
-  { path: "/quotations", label: "عروض الأسعار", icon: FileText, badge: 2 },
-  { path: "/contracts", label: "العقود الهندسية", icon: FileSignature, badge: 1 },
   { path: "/client-portal", label: "حفظ في بوابة العميل", icon: Globe },
-  { path: "/work-plans", label: "خطط العمل", icon: ClipboardList },
   { path: "/reports", label: "التقارير", icon: BarChart3 },
+  { path: "/settings", label: "الإعدادات", icon: Settings2 },
   { path: "/employees", label: "إدارة الموظفين", icon: UserCog, adminOnly: true },
 ];
 
@@ -245,6 +241,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 (location.startsWith("/clients/") ? "ملف العميل" :
                 location.startsWith("/projects/") ? "تفاصيل المشروع" :
                 location === "/employee-login" ? "تسجيل الدخول" :
+                location === "/settings" ? "الإعدادات" :
                 "لوحة التحكم")}
               </h2>
             </div>
