@@ -8,10 +8,10 @@
  *
  * كل رفع يُحفظ في /api/upload ويظهر تلقائياً في صفحة المستندات.
  */
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   X, Upload, FileText, Eye, CheckCircle2, ChevronDown, ChevronUp,
-  User, Phone, Folder, FlaskConical, ClipboardList,
+  User, Phone, Folder, FlaskConical, ClipboardList, ShieldCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -112,6 +112,23 @@ export default function DocumentsTaskPanel({
   const [expanded, setExpanded] = useState<Set<string>>(new Set(SECTIONS.map(s => s.id)));
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingSlotId = useRef<string | null>(null);
+
+  // وثائق العقد المنقولة من CRM
+  const [contractDocs, setContractDocs] = useState<Array<{ id: number; name: string; url: string; category: string }>>([]);
+  const [loadingContractDocs, setLoadingContractDocs] = useState(false);
+
+  useEffect(() => {
+    if (!open || !projectId) return;
+    setLoadingContractDocs(true);
+    fetch(`/api/documents?projectId=${projectId}`)
+      .then(r => r.json())
+      .then((docs: Array<{ id: number; name: string; url: string; category: string }>) => {
+        const filtered = docs.filter(d => d.category === "وثائق العقد");
+        setContractDocs(filtered);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingContractDocs(false));
+  }, [open, projectId]);
 
   if (!open) return null;
 
@@ -317,6 +334,40 @@ export default function DocumentsTaskPanel({
                 </a>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ─── وثائق العقد المنقولة من CRM ─── */}
+        {(contractDocs.length > 0 || loadingContractDocs) && (
+          <div className="border-b">
+            <div className="flex items-center gap-3 px-4 py-3" style={{ backgroundColor: "oklch(0.96 0.03 150)" }}>
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "oklch(0.92 0.06 150)" }}>
+                <ShieldCheck className="w-4 h-4" style={{ color: "oklch(0.45 0.15 150)" }} />
+              </div>
+              <div className="flex-1 text-right">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">وثائق العقد الموقّع</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: "oklch(0.93 0.05 150)", color: "oklch(0.45 0.15 150)" }}>
+                    {contractDocs.length} ملف
+                  </span>
+                </div>
+                <p className="text-[10px] text-muted-foreground text-right">منقولة تلقائياً من العقد</p>
+              </div>
+            </div>
+            <div className="pb-2 px-4 space-y-1">
+              {loadingContractDocs && <p className="text-[10px] text-muted-foreground py-2">جاري التحميل...</p>}
+              {contractDocs.map(doc => (
+                <div key={doc.id} className="flex items-center gap-2 text-[10px] bg-muted/20 rounded-md px-2 py-1.5">
+                  <ShieldCheck className="w-3 h-3 shrink-0" style={{ color: "oklch(0.45 0.15 150)" }} />
+                  <span className="truncate flex-1 font-medium">{doc.name}</span>
+                  {doc.url && (
+                    <a href={doc.url} target="_blank" rel="noreferrer" className="shrink-0 p-0.5 rounded hover:bg-muted transition-colors" title="عرض الملف">
+                      <Eye className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

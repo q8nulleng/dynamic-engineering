@@ -1477,15 +1477,12 @@ function LeadContractSection({
             {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <Briefcase className="w-3 h-3 ml-1" />}
             بدء المشروع
           </Button>
-        ) : (
-          <Button size="sm" className="text-xs h-7 text-white" style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
-            disabled={signingBusy}
-            onClick={onSigned}
-          >
-            {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <CheckCircle className="w-3 h-3 ml-1" />}
-            تم قبول العقد وفتح مشروع
-          </Button>
-        )}
+        ) : contract ? (
+          <div className="text-[10px] text-gray-500 flex items-center gap-1 w-full">
+            <AlertCircle className="w-3 h-3 text-amber-500" />
+            لبدء المشروع، ارفع الوثائق وحدّد الحالة كـ "موقّع"
+          </div>
+        ) : null}
       </div>
     </div>
   );
