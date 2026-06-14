@@ -352,81 +352,98 @@ function ContractTemplatesTab() {
 
   if (isLoading) return <div className="py-16 text-center text-muted-foreground">جاري التحميل...</div>;
 
+  // ألوان لكل نوع عقار
+  const typeColors: Record<string, string> = {
+    "سكن خاص": "oklch(0.30 0.05 250)",
+    "استثماري": "oklch(0.40 0.12 160)",
+    "تجاري": "oklch(0.50 0.14 60)",
+    "صناعي": "oklch(0.45 0.10 20)",
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      {/* فلتر + زر إضافة */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex gap-2 flex-wrap">
+          {["الكل", "سكن خاص", "استثماري", "تجاري", "صناعي"].map((bt) => {
+            const count = bt === "الكل"
+              ? templates.length
+              : templates.filter((t: any) => t.buildingType === bt || t.type === bt).length;
+            const activeColor = bt === "الكل" ? "oklch(0.30 0.05 250)" : (typeColors[bt] || "oklch(0.30 0.05 250)");
+            return (
+              <Button
+                key={bt}
+                variant={selectedBuildingType === bt ? "default" : "outline"}
+                size="sm"
+                className="text-xs"
+                style={selectedBuildingType === bt ? { backgroundColor: activeColor } : {}}
+                onClick={() => setSelectedBuildingType(bt)}
+              >
+                {bt}
+                <Badge variant="secondary" className="mr-1.5 text-[10px] px-1.5">
+                  {count}
+                </Badge>
+              </Button>
+            );
+          })}
+        </div>
         <Button size="sm" style={{ backgroundColor: "oklch(0.30 0.05 250)" }} onClick={() => setShowAdd(true)}>
           <Plus className="w-4 h-4 ml-1" /> قالب جديد
         </Button>
       </div>
 
-      {/* Building Type Filter Tabs */}
-      <div className="flex gap-2 flex-wrap">
-        {["الكل", "سكن خاص", "استثماري", "تجاري", "صناعي"].map((bt) => {
-          const count = bt === "الكل"
-            ? templates.length
-            : templates.filter((t: any) => t.buildingType === bt || t.type === bt).length;
+      {/* شبكة كروت القوالب */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {filteredTemplates.map((t: any) => {
+          const cardColor = typeColors[t.buildingType] || typeColors[t.type] || "oklch(0.30 0.05 250)";
+          const charCount = t.content ? t.content.length : 0;
+          const hasContent = charCount > 0;
           return (
-            <Button
-              key={bt}
-              variant={selectedBuildingType === bt ? "default" : "outline"}
-              size="sm"
-              className="text-xs"
-              style={selectedBuildingType === bt ? { backgroundColor: "oklch(0.30 0.05 250)" } : {}}
-              onClick={() => setSelectedBuildingType(bt)}
-            >
-              {bt}
-              <Badge variant="secondary" className="mr-1.5 text-[10px] px-1.5">
-                {count}
-              </Badge>
-            </Button>
-          );
-        })}
-      </div>
-
-      <div className="space-y-2">
-        {filteredTemplates.map((t: any) => (
-          <Card key={t.id} className="border-0 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <button onClick={() => setExpandedId(expandedId === t.id ? null : t.id)} className="text-muted-foreground">
-                    {expandedId === t.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{t.name}</p>
-                    <div className="flex gap-2 mt-0.5">
-                      <Badge variant="outline" className="text-[10px]">{t.type || "—"}</Badge>
-                      <span className="text-[10px] text-muted-foreground">
-                        {t.content ? `${Math.round(t.content.length / 100) * 100} حرف` : "فارغ"}
-                      </span>
-                    </div>
+            <Card key={t.id} className="border-0 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+              {/* شريط لوني علوي حسب نوع العقار */}
+              <div className="h-1.5 w-full" style={{ backgroundColor: cardColor }} />
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between gap-2">
+                  <CardTitle className="text-sm leading-tight flex-1">{t.name}</CardTitle>
+                  <div className="flex gap-0.5 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-500 hover:text-blue-700" title="معاينة" onClick={() => handlePreviewTemplate(t)}>
+                      <Eye className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(t)}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600" onClick={() => handleDelete(t.id, t.name)}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex gap-1 shrink-0">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500 hover:text-blue-700" title="معاينة" onClick={() => handlePreviewTemplate(t)}>
-                    <Eye className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(t)}>
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:text-red-600"
-                    onClick={() => handleDelete(t.id, t.name)}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                <div className="flex gap-1.5 mt-1 flex-wrap">
+                  <Badge className="text-[10px] text-white" style={{ backgroundColor: cardColor }}>
+                    {t.buildingType || t.type || "—"}
+                  </Badge>
+                  {t.serviceType && (
+                    <Badge variant="secondary" className="text-[10px]">{t.serviceType}</Badge>
+                  )}
                 </div>
-              </div>
-              {expandedId === t.id && t.content && (
-                <div className="mt-3 pt-3 border-t">
-                  <div className="text-xs text-muted-foreground max-h-40 overflow-y-auto leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: t.content.substring(0, 800) + (t.content.length > 800 ? "..." : "") }} />
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="flex items-center gap-2 mt-1">
+                  <FileText className="w-4 h-4 shrink-0" style={{ color: cardColor }} />
+                  <span className="text-xs text-muted-foreground">
+                    {hasContent ? `${(charCount / 1000).toFixed(1)}ك حرف` : "فارغ"}
+                  </span>
+                  {hasContent && (
+                    <Badge variant="outline" className="text-[10px] mr-auto" style={{ color: cardColor, borderColor: cardColor }}>
+                      جاهز
+                    </Badge>
+                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
         {filteredTemplates.length === 0 && (
-          <div className="py-16 text-center text-muted-foreground text-sm">
+          <div className="col-span-full py-16 text-center text-muted-foreground text-sm">
             {selectedBuildingType === "الكل" ? "لا توجد قوالب عقود" : `لا توجد قوالب لنوع "${selectedBuildingType}"`}
           </div>
         )}
