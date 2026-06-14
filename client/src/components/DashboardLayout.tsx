@@ -27,6 +27,7 @@ import {
   CalendarDays,
   UserCog,
   Settings2,
+  FileSignature,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +40,7 @@ const allNavItems = [
   { path: "/appointments", label: "المواعيد", icon: CalendarDays },
   { path: "/clients", label: "العملاء", icon: Users, badge: 5 },
   { path: "/projects", label: "المشاريع", icon: FolderKanban },
+  { path: "/contracts", label: "العقود", icon: FileSignature },
   { path: "/tasks", label: "المهام", icon: ListChecks, badge: 5 },
   { path: "/documents", label: "المستندات", icon: FolderOpen },
   { path: "/payments", label: "الدفعات", icon: CreditCard },

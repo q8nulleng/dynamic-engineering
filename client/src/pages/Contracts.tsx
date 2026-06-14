@@ -852,32 +852,14 @@ export default function Contracts() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex gap-2">
-          <Button variant={view === "list" ? "default" : "outline"} size="sm" onClick={() => setView("list")}
-            style={view === "list" ? { backgroundColor: "oklch(0.30 0.05 250)" } : {}}>
-            العقود
-          </Button>
-          <Button variant={view === "templates" ? "default" : "outline"} size="sm" onClick={() => setView("templates")}
-            style={view === "templates" ? { backgroundColor: "oklch(0.30 0.05 250)" } : {}}>
-            قوالب العقود ({templates.length})
-          </Button>
-        </div>
-        {view === "templates" ? (
-          <Button style={{ backgroundColor: "oklch(0.30 0.05 250)" }} onClick={openCreateTemplate}>
-            <Plus className="w-4 h-4 ml-2" />
-            قالب جديد
-          </Button>
-        ) : (
-          <Button style={{ backgroundColor: "oklch(0.30 0.05 250)" }} onClick={() => setShowNewContract(true)}>
-            <Plus className="w-4 h-4 ml-2" />
-            عقد جديد
-          </Button>
-        )}
+        <h2 className="text-lg font-bold">العقود الهندسية</h2>
+        <Button style={{ backgroundColor: "oklch(0.30 0.05 250)" }} onClick={() => setShowNewContract(true)}>
+          <Plus className="w-4 h-4 ml-2" />
+          عقد جديد
+        </Button>
       </div>
 
-      {view === "list" ? (
-        <>
-          {/* Stats */}
+      {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {stageFlow.map((stage) => {
               const count = contracts.filter((c) => c.status === stage).length;
@@ -1121,93 +1103,8 @@ export default function Contracts() {
               </div>
             </CardContent>
           </Card>
-        </>
-      ) : (
-        /* ── Contract Templates Tab ──────────────────────────────────────── */
-        <>
-          <p className="text-sm text-muted-foreground">
-            {templates.length} قالب عقد هندسي — قابل للتعديل والنسخ
-          </p>
 
-          {/* Template Filters */}
-          <div className="flex gap-3 flex-wrap">
-            <Input
-              placeholder="بحث بالاسم أو نوع العقار..."
-              className="max-w-xs"
-              value={tSearch}
-              onChange={(e) => setTSearch(e.target.value)}
-            />
-            <Select value={tBuildingFilter} onValueChange={setTBuildingFilter}>
-              <SelectTrigger className="w-44"><SelectValue placeholder="نوع العقار" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="الكل">كل الأنواع</SelectItem>
-                {buildingTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Templates Cards Grid */}
-          {templatesLoading ? (
-            <div className="py-12 text-center text-muted-foreground text-sm">جاري التحميل...</div>
-          ) : filteredTemplates.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground text-sm">لا توجد قوالب مطابقة</div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredTemplates.map((t) => (
-                <Card key={t.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
-                  <CardContent className="p-4 space-y-3">
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-1 flex-1 min-w-0">
-                        <p className="font-semibold text-sm leading-tight line-clamp-2">{t.name}</p>
-                        <div className="flex gap-1.5 flex-wrap">
-                          <Badge variant="outline" className="text-[10px]">{t.buildingType}</Badge>
-                          <Badge variant="secondary" className="text-[10px]">{t.serviceType}</Badge>
-                          {t.isDefault === 1 && (
-                            <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-600">افتراضي</Badge>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-xs font-mono px-1.5 py-0.5 bg-muted rounded text-muted-foreground shrink-0">
-                        {(t.content && t.content.trim()) ? "✓" : `${countSections(t)}/7`}
-                      </span>
-                    </div>
-
-                    {/* Content preview */}
-                    <div className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
-                      {t.content
-                        ? t.content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 120) + "..."
-                        : [t.scopeOfWork, t.terms, t.party1Obligations].filter(Boolean).join(" · ").slice(0, 120) + "..."
-                      }
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-1.5 pt-1">
-                      <Button variant="outline" size="sm" className="flex-1 text-xs h-8"
-                        onClick={() => openEditTemplate(t)}>
-                        <Pencil className="w-3 h-3 ml-1" />تعديل
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" title="عرض"
-                        onClick={() => setViewTemplate(t)}>
-                        <Eye className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" title="نسخ"
-                        onClick={() => openCopyTemplate(t)}>
-                        <Copy className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        title="حذف" onClick={() => handleDeleteTemplate(t)}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
+      {/* Dialogs */}
       {/* Template Editor Dialog */}
       {templateEditor.open && (
         <TemplateEditorDialog
