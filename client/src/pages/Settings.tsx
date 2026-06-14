@@ -244,17 +244,18 @@ function ContractTemplatesTab() {
 
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState({ name: "", type: "إشراف", content: "" });
+  const [form, setForm] = useState({ name: "", buildingType: "سكن خاص", serviceType: "إشراف", content: "" });
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  const CONTRACT_TYPES = ["إشراف", "تصميم", "تصميم وإشراف", "استشارة", "أخرى"];
+  const BUILDING_TYPES_T = ["سكن خاص", "استثماري", "تجاري", "صناعي"];
+  const SERVICE_TYPES_T = ["إشراف", "تصميم", "تصميم وإشراف", "بناء جديد", "تعديل وإضافة", "استشارة", "أخرى"];
 
   const handleSaveNew = async () => {
     if (!form.name.trim()) { toast.error("يرجى إدخال اسم القالب"); return; }
-    await createTemplate.mutateAsync(form);
+    await createTemplate.mutateAsync({ ...form, createdAt: new Date().toISOString().slice(0, 10) });
     toast.success("تم إضافة القالب");
     setShowAdd(false);
-    setForm({ name: "", type: "إشراف", content: "" });
+    setForm({ name: "", buildingType: "سكن خاص", serviceType: "إشراف", content: "" });
   };
 
   const handleSaveEdit = async () => {
@@ -272,7 +273,7 @@ function ContractTemplatesTab() {
 
   const openEdit = (t: any) => {
     setEditingId(t.id);
-    setForm({ name: t.name, type: t.type || "إشراف", content: t.content || "" });
+    setForm({ name: t.name, buildingType: t.buildingType || "سكن خاص", serviceType: t.serviceType || "إشراف", content: t.content || "" });
   };
 
   if (isLoading) return <div className="py-16 text-center text-muted-foreground">جاري التحميل...</div>;
@@ -332,7 +333,7 @@ function ContractTemplatesTab() {
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
         <DialogContent className="max-w-2xl" dir="rtl">
           <DialogHeader><DialogTitle>قالب عقد جديد</DialogTitle></DialogHeader>
-          <TemplateFormFields form={form} setForm={setForm} contractTypes={CONTRACT_TYPES} />
+          <TemplateFormFields form={form} setForm={setForm} buildingTypes={BUILDING_TYPES_T} serviceTypes={SERVICE_TYPES_T} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAdd(false)}>إلغاء</Button>
             <Button onClick={handleSaveNew} disabled={createTemplate.isPending}>
@@ -347,7 +348,7 @@ function ContractTemplatesTab() {
       <Dialog open={!!editingId} onOpenChange={() => setEditingId(null)}>
         <DialogContent className="max-w-2xl" dir="rtl">
           <DialogHeader><DialogTitle>تعديل القالب</DialogTitle></DialogHeader>
-          <TemplateFormFields form={form} setForm={setForm} contractTypes={CONTRACT_TYPES} />
+          <TemplateFormFields form={form} setForm={setForm} buildingTypes={BUILDING_TYPES_T} serviceTypes={SERVICE_TYPES_T} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingId(null)}>إلغاء</Button>
             <Button onClick={handleSaveEdit} disabled={updateTemplate.isPending}>
@@ -432,7 +433,7 @@ function SettingsRichTextEditor({
   }, [onChange]);
 
   return (
-    <div className="border rounded-lg overflow-hidden" dir="rtl">
+    <div className="border rounded-lg overflow-hidden" dir="rtl" style={{ overflowX: "hidden", maxWidth: "100%" }}>
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-1 p-2 border-b bg-muted/20">
         <button type="button" title="غامق" className="p-1.5 rounded hover:bg-muted transition-colors"
@@ -502,7 +503,7 @@ function SettingsRichTextEditor({
       {/* Editable Area */}
       <div ref={editorRef} contentEditable suppressContentEditableWarning dir="rtl"
         className="min-h-[280px] p-4 text-sm leading-relaxed focus:outline-none"
-        style={{ fontFamily: "inherit", direction: "rtl", textAlign: "right" }}
+        style={{ fontFamily: "inherit", direction: "rtl", textAlign: "right", wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-wrap", overflowX: "hidden" }}
         onInput={handleInput} onMouseUp={saveRange} onKeyUp={saveRange} onFocus={saveRange}
         data-placeholder="اكتب محتوى العقد هنا..."
       />
@@ -511,23 +512,31 @@ function SettingsRichTextEditor({
   );
 }
 
-function TemplateFormFields({ form, setForm, contractTypes }: {
-  form: { name: string; type: string; content: string };
+function TemplateFormFields({ form, setForm, buildingTypes, serviceTypes }: {
+  form: { name: string; buildingType: string; serviceType: string; content: string };
   setForm: (f: any) => void;
-  contractTypes: string[];
+  buildingTypes: string[];
+  serviceTypes: string[];
 }) {
   return (
     <div className="space-y-3 py-2">
+      <div>
+        <label className="text-sm font-medium mb-1 block">اسم القالب</label>
+        <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="مثال: عقد إشراف - سكن خاص" />
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-sm font-medium mb-1 block">اسم القالب</label>
-          <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="مثال: عقد إشراف - سكن خاص" />
+          <label className="text-sm font-medium mb-1 block">نوع العقار</label>
+          <Select value={form.buildingType} onValueChange={v => setForm({ ...form, buildingType: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{buildingTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+          </Select>
         </div>
         <div>
-          <label className="text-sm font-medium mb-1 block">نوع العقد</label>
-          <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
+          <label className="text-sm font-medium mb-1 block">نوع الخدمة</label>
+          <Select value={form.serviceType} onValueChange={v => setForm({ ...form, serviceType: v })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{contractTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+            <SelectContent>{serviceTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
           </Select>
         </div>
       </div>

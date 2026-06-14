@@ -193,7 +193,7 @@ function RichTextEditor({
   }, [insertVarInEditor]);
 
   return (
-    <div className="border rounded-lg overflow-hidden" dir="rtl">
+    <div className="border rounded-lg overflow-hidden" dir="rtl" style={{ overflowX: "hidden", maxWidth: "100%" }}>
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-1 p-2 border-b bg-muted/20">
         {/* Bold */}
@@ -319,7 +319,7 @@ function RichTextEditor({
         suppressContentEditableWarning
         dir="rtl"
         className="min-h-[320px] p-4 text-sm leading-relaxed focus:outline-none"
-        style={{ fontFamily: "inherit", direction: "rtl", textAlign: "right" }}
+        style={{ fontFamily: "inherit", direction: "rtl", textAlign: "right", wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-wrap", overflowX: "hidden" }}
         onInput={handleInput}
         onMouseUp={saveRange}
         onKeyUp={saveRange}
