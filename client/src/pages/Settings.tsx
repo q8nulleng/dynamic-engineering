@@ -249,6 +249,11 @@ function ContractTemplatesTab() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
+  const [selectedBuildingType, setSelectedBuildingType] = useState("الكل");
+
+  const filteredTemplates = selectedBuildingType === "الكل"
+    ? templates
+    : templates.filter((t: any) => t.buildingType === selectedBuildingType || t.type === selectedBuildingType);
 
   const buildPreviewFromForm = () => {
     const termsText = JSON.stringify({ content: form.content || "" });
@@ -355,8 +360,32 @@ function ContractTemplatesTab() {
         </Button>
       </div>
 
+      {/* Building Type Filter Tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {["الكل", "سكن خاص", "استثماري", "تجاري", "صناعي"].map((bt) => {
+          const count = bt === "الكل"
+            ? templates.length
+            : templates.filter((t: any) => t.buildingType === bt || t.type === bt).length;
+          return (
+            <Button
+              key={bt}
+              variant={selectedBuildingType === bt ? "default" : "outline"}
+              size="sm"
+              className="text-xs"
+              style={selectedBuildingType === bt ? { backgroundColor: "oklch(0.30 0.05 250)" } : {}}
+              onClick={() => setSelectedBuildingType(bt)}
+            >
+              {bt}
+              <Badge variant="secondary" className="mr-1.5 text-[10px] px-1.5">
+                {count}
+              </Badge>
+            </Button>
+          );
+        })}
+      </div>
+
       <div className="space-y-2">
-        {templates.map((t: any) => (
+        {filteredTemplates.map((t: any) => (
           <Card key={t.id} className="border-0 shadow-sm">
             <CardContent className="p-4">
               <div className="flex items-center justify-between gap-3">
@@ -396,8 +425,10 @@ function ContractTemplatesTab() {
             </CardContent>
           </Card>
         ))}
-        {templates.length === 0 && (
-          <div className="py-16 text-center text-muted-foreground text-sm">لا توجد قوالب عقود</div>
+        {filteredTemplates.length === 0 && (
+          <div className="py-16 text-center text-muted-foreground text-sm">
+            {selectedBuildingType === "الكل" ? "لا توجد قوالب عقود" : `لا توجد قوالب لنوع "${selectedBuildingType}"`}
+          </div>
         )}
       </div>
 
