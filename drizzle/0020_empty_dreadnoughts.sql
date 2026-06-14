@@ -1,0 +1,1 @@
+ALTER TABLE `contracts` MODIFY COLUMN `terms_text` longtext DEFAULT '';

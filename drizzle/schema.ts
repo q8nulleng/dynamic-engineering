@@ -1,5 +1,5 @@
 import {
-  int, mysqlEnum, mysqlTable, text, timestamp, varchar,
+  int, mysqlEnum, mysqlTable, text, longtext, timestamp, varchar,
   float, tinyint, bigint
 } from "drizzle-orm/mysql-core";
 
@@ -127,7 +127,7 @@ export const contracts = mysqlTable("contracts", {
   plot: varchar("plot", { length: 32 }).default(""),
   leadId: varchar("lead_id", { length: 64 }).default(""),
   templateType: varchar("template_type", { length: 64 }).default(""),
-  termsText: text("terms_text").default(""),
+  termsText: longtext("terms_text").default(""),
   signingDate: varchar("signing_date", { length: 32 }).default(""),
   signedFileUrl: text("signed_file_url").default(""),
 });
