@@ -2,7 +2,7 @@
  * CRM - Simplified view with collapsible sections
  * Each stage is a clickable button that expands to show leads
  */
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -1249,6 +1249,57 @@ function LeadContractSection({
   const [uploadingCivil, setUploadingCivil] = useState(false);
   const [uploadingSigned, setUploadingSigned] = useState(false);
   const [signingStatus, setSigningStatus] = useState(lead.contractSigningStatus || "مسودة");
+  // ── محرر العقد inline ──
+  const [showEditor, setShowEditor] = useState(false);
+  const [editorSaving, setEditorSaving] = useState(false);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const updateContract = useUpdateContract();
+
+  // استخراج محتوى HTML من termsText
+  const getContractHtml = useCallback(() => {
+    if (!contract?.termsText) return "";
+    try {
+      const parsed = JSON.parse(contract.termsText);
+      return parsed.content || parsed.scopeOfWork || "";
+    } catch {
+      return contract.termsText || "";
+    }
+  }, [contract]);
+
+  const handleOpenEditor = () => {
+    setShowEditor(true);
+    // تأخير بسيط لضمان render المحرر قبل تعيين المحتوى
+    setTimeout(() => {
+      if (editorRef.current) {
+        editorRef.current.innerHTML = getContractHtml();
+      }
+    }, 50);
+  };
+
+  const handleSaveEditor = async () => {
+    if (!contract || !editorRef.current) return;
+    setEditorSaving(true);
+    const tid = toast.loading("جاري حفظ التعديلات...");
+    try {
+      const newContent = editorRef.current.innerHTML;
+      let parsed: Record<string, unknown> = {};
+      try { parsed = JSON.parse(contract.termsText || "{}"); } catch {}
+      parsed.content = newContent;
+      await updateContract.mutateAsync({ id: contract.id, termsText: JSON.stringify(parsed) });
+      toast.success("تم حفظ التعديلات بنجاح", { id: tid });
+      setShowEditor(false);
+      onLeadUpdate();
+    } catch {
+      toast.error("فشل حفظ التعديلات", { id: tid });
+    } finally {
+      setEditorSaving(false);
+    }
+  };
+
+  const execCmd = (cmd: string, value?: string) => {
+    document.execCommand(cmd, false, value);
+    editorRef.current?.focus();
+  };
 
   const handleContractPdf = async () => {
     if (!contract) return;
@@ -1449,7 +1500,7 @@ function LeadContractSection({
         ) : (
           <>
             <Button size="sm" variant="outline" className="text-xs h-7 text-blue-700 border-blue-300"
-              onClick={onCreateContract}
+              onClick={handleOpenEditor}
             ><Pencil className="w-3 h-3 ml-1" />تعديل العقد</Button>
             <Button size="sm" variant="outline" className="text-xs h-7 text-red-700 border-red-300"
               disabled={pdfBusy}
@@ -1482,6 +1533,56 @@ function LeadContractSection({
           </div>
         ) : null}
       </div>
+
+      {/* ── محرر العقد inline ── */}
+      {showEditor && contract && (
+        <div className="border border-blue-300 bg-white rounded-lg p-3 space-y-2 mt-2">
+          {/* شريط أدوات التنسيق */}
+          <div className="flex flex-wrap gap-1 border-b pb-2">
+            <span className="text-[10px] font-semibold text-blue-800 flex items-center gap-1 ml-auto">
+              <Pencil className="w-3 h-3" />تعديل محتوى العقد
+            </span>
+            <button onClick={() => execCmd("bold")} className="px-2 py-0.5 text-[10px] border rounded hover:bg-gray-100 font-bold">ب</button>
+            <button onClick={() => execCmd("italic")} className="px-2 py-0.5 text-[10px] border rounded hover:bg-gray-100 italic">i</button>
+            <button onClick={() => execCmd("underline")} className="px-2 py-0.5 text-[10px] border rounded hover:bg-gray-100 underline">u</button>
+            <button onClick={() => execCmd("insertOrderedList")} className="px-2 py-0.5 text-[10px] border rounded hover:bg-gray-100">قائمة مرقمة</button>
+            <button onClick={() => execCmd("insertUnorderedList")} className="px-2 py-0.5 text-[10px] border rounded hover:bg-gray-100">• قائمة</button>
+            <button
+              onClick={() => {
+                const para = document.createElement("p");
+                para.innerHTML = "بند جديد: أضف نصك هنا";
+                editorRef.current?.appendChild(para);
+                editorRef.current?.focus();
+              }}
+              className="px-2 py-0.5 text-[10px] border rounded hover:bg-green-100 text-green-700"
+            >+ بند</button>
+          </div>
+
+          {/* منطقة التحرير */}
+          <div
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            dir="rtl"
+            className="min-h-[200px] max-h-[400px] overflow-y-auto text-xs p-2 border rounded bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-300"
+            style={{ fontFamily: "'Noto Naskh Arabic', Arial, sans-serif", lineHeight: "2" }}
+          />
+
+          {/* أزرار الحفظ والإلغاء */}
+          <div className="flex gap-2 justify-end">
+            <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setShowEditor(false)}>
+              <X className="w-3 h-3 ml-1" />إلغاء
+            </Button>
+            <Button size="sm" className="text-xs h-7 bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={editorSaving}
+              onClick={handleSaveEditor}
+            >
+              {editorSaving ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <Save className="w-3 h-3 ml-1" />}
+              حفظ التعديلات
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
