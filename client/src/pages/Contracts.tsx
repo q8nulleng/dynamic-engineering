@@ -934,7 +934,9 @@ export default function Contracts() {
                       <th className="text-right py-3 px-4 font-medium w-8"></th>
                       <th className="text-right py-3 px-4 font-medium">رقم العقد</th>
                       <th className="text-right py-3 px-4 font-medium">العميل</th>
-                      <th className="text-right py-3 px-4 font-medium">نوع العقد</th>
+                      <th className="text-right py-3 px-4 font-medium">نوع العقار</th>
+                      <th className="text-right py-3 px-4 font-medium">نوع الخدمة</th>
+                      <th className="text-right py-3 px-4 font-medium">القالب</th>
                       <th className="text-right py-3 px-4 font-medium">القيمة (د.ك)</th>
                       <th className="text-right py-3 px-4 font-medium">الحالة</th>
                       <th className="text-right py-3 px-4 font-medium">إجراءات</th>
@@ -960,9 +962,11 @@ export default function Contracts() {
                               )}
                             </td>
                             <td className="py-3 px-4 font-medium">{c.client}</td>
-                            <td className="py-3 px-4 text-xs text-muted-foreground max-w-[200px] truncate"
-                              title={c.templateType || c.template || `${c.type} - ${c.service}`}>
-                              {c.templateType || c.template || `${c.type} - ${c.service}`}
+                            <td className="py-3 px-4"><Badge variant="outline" className="text-xs">{c.type || "—"}</Badge></td>
+                            <td className="py-3 px-4"><Badge variant="secondary" className="text-xs">{c.service || "—"}</Badge></td>
+                            <td className="py-3 px-4 text-xs text-muted-foreground max-w-[160px] truncate"
+                              title={c.templateType || c.template || "—"}>
+                              {c.templateType || c.template || "—"}
                             </td>
                             <td className="py-3 px-4 font-bold" style={{ fontFamily: "'Space Grotesk'" }}>{c.amount}</td>
                             <td className="py-3 px-4">
@@ -997,7 +1001,7 @@ export default function Contracts() {
                           </tr>
                           {isExpanded && (
                             <tr key={c.id + "-detail"} className="bg-muted/10">
-                              <td colSpan={7} className="py-4 px-6">
+                              <td colSpan={9} className="py-4 px-6">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                   <div>
                                     <h4 className="text-xs font-bold mb-3 text-muted-foreground uppercase tracking-wider">معلومات العقد</h4>
