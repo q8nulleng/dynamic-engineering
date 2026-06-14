@@ -29,6 +29,7 @@ import {
   ClipboardList, MessageCircle, Activity, Users, MapPin, Loader2,
   Pencil, Trash2, Eye, CheckCircle, Hash, Ruler, ArrowRightLeft, Archive,
   Clock, UserCheck, CalendarPlus, Bell, Briefcase,
+  Upload, CreditCard, ShieldCheck, AlertCircle, ImageIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { kuwaitGovernorates } from "./Clients";
@@ -74,6 +75,10 @@ interface Lead {
   isArchived?: number;
   archivedAt?: string;
   archivedReason?: string;
+  // وثائق التوقيع
+  civilCardUrl?: string;
+  signedContractUrl?: string;
+  contractSigningStatus?: string;
 }
 
 const stageTemplates = [
@@ -1229,16 +1234,21 @@ function LeadContractSection({
   onViewQuote,
   signingBusy,
   onSigned,
+  onLeadUpdate,
 }: {
   lead: Lead;
   onCreateContract: () => void;
   onViewQuote: () => void;
   signingBusy: boolean;
   onSigned: () => void;
+  onLeadUpdate: () => void;
 }) {
   const { data: contracts = [] } = useContractsByLead(lead.id);
   const contract = contracts[0];
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [uploadingCivil, setUploadingCivil] = useState(false);
+  const [uploadingSigned, setUploadingSigned] = useState(false);
+  const [signingStatus, setSigningStatus] = useState(lead.contractSigningStatus || "مسودة");
 
   const handleContractPdf = async () => {
     if (!contract) return;
@@ -1258,6 +1268,70 @@ function LeadContractSection({
     }
   };
 
+  const handleUploadCivilCard = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingCivil(true);
+    const tid = toast.loading("جاري رفع البطاقة المدنية...");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/leads/${lead.id}/upload-civil-card`, { method: "POST", body: fd });
+      if (!res.ok) throw new Error("فشل الرفع");
+      toast.success("تم رفع البطاقة المدنية", { id: tid });
+      onLeadUpdate();
+    } catch {
+      toast.error("فشل رفع البطاقة المدنية", { id: tid });
+    } finally {
+      setUploadingCivil(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleUploadSignedContract = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingSigned(true);
+    const tid = toast.loading("جاري رفع صورة العقد الموقع...");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/leads/${lead.id}/upload-signed-contract`, { method: "POST", body: fd });
+      if (!res.ok) throw new Error("فشل الرفع");
+      toast.success("تم رفع صورة العقد الموقع", { id: tid });
+      onLeadUpdate();
+    } catch {
+      toast.error("فشل رفع صورة العقد الموقع", { id: tid });
+    } finally {
+      setUploadingSigned(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleUpdateSigningStatus = async (newStatus: string) => {
+    const tid = toast.loading("جاري تحديث الحالة...");
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/signing-status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error();
+      setSigningStatus(newStatus);
+      toast.success(`تم تحديث الحالة إلى: ${newStatus}`, { id: tid });
+      onLeadUpdate();
+    } catch {
+      toast.error("فشل تحديث الحالة", { id: tid });
+    }
+  };
+
+  // Signing status steps
+  const signingSteps = ["مسودة", "جاهز للتوقيع", "موقّع"];
+  const currentStepIdx = signingSteps.indexOf(signingStatus);
+
+  const civilCardUrl = lead.civilCardUrl || "";
+  const signedContractUrl = lead.signedContractUrl || "";
+
   return (
     <div className="space-y-2 w-full">
       {contract && (
@@ -1276,6 +1350,99 @@ function LeadContractSection({
           </div>
         </div>
       )}
+
+      {/* ── وثائق التوقيع ── */}
+      {contract && (
+        <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 space-y-2">
+          <div className="text-xs font-semibold text-amber-800 flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5" />وثائق التوقيع والبدء
+          </div>
+
+          {/* شريط حالة التوقيع */}
+          <div className="flex items-center gap-1 text-[10px]">
+            {signingSteps.map((step, idx) => (
+              <div key={step} className="flex items-center gap-1">
+                <button
+                  onClick={() => handleUpdateSigningStatus(step)}
+                  className={`px-2 py-0.5 rounded-full font-medium transition-colors ${
+                    idx === currentStepIdx
+                      ? "bg-amber-500 text-white"
+                      : idx < currentStepIdx
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200 text-gray-500 hover:bg-gray-300"
+                  }`}
+                >
+                  {step}
+                </button>
+                {idx < signingSteps.length - 1 && (
+                  <span className="text-gray-300">›</span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* رفع الوثائق */}
+          <div className="grid grid-cols-2 gap-2">
+            {/* البطاقة المدنية */}
+            <div className="space-y-1">
+              <div className="text-[10px] font-medium text-gray-600 flex items-center gap-1">
+                <CreditCard className="w-3 h-3" />البطاقة المدنية
+              </div>
+              {civilCardUrl ? (
+                <div className="flex items-center gap-1">
+                  <a href={civilCardUrl} target="_blank" rel="noreferrer"
+                    className="text-[10px] text-blue-600 underline flex items-center gap-0.5">
+                    <ImageIcon className="w-3 h-3" />عرض
+                  </a>
+                  <label className="cursor-pointer text-[10px] text-gray-500 hover:text-gray-700">
+                    <Upload className="w-3 h-3 inline" />
+                    <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleUploadCivilCard} />
+                  </label>
+                </div>
+              ) : (
+                <label className={`flex items-center gap-1 cursor-pointer px-2 py-1 rounded border border-dashed border-amber-300 text-[10px] text-amber-700 hover:bg-amber-100 ${uploadingCivil ? "opacity-50" : ""}`}>
+                  {uploadingCivil ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                  رفع
+                  <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleUploadCivilCard} disabled={uploadingCivil} />
+                </label>
+              )}
+            </div>
+
+            {/* العقد الموقع */}
+            <div className="space-y-1">
+              <div className="text-[10px] font-medium text-gray-600 flex items-center gap-1">
+                <FileText className="w-3 h-3" />العقد الموقع
+              </div>
+              {signedContractUrl ? (
+                <div className="flex items-center gap-1">
+                  <a href={signedContractUrl} target="_blank" rel="noreferrer"
+                    className="text-[10px] text-blue-600 underline flex items-center gap-0.5">
+                    <ImageIcon className="w-3 h-3" />عرض
+                  </a>
+                  <label className="cursor-pointer text-[10px] text-gray-500 hover:text-gray-700">
+                    <Upload className="w-3 h-3 inline" />
+                    <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleUploadSignedContract} />
+                  </label>
+                </div>
+              ) : (
+                <label className={`flex items-center gap-1 cursor-pointer px-2 py-1 rounded border border-dashed border-amber-300 text-[10px] text-amber-700 hover:bg-amber-100 ${uploadingSigned ? "opacity-50" : ""}`}>
+                  {uploadingSigned ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                  رفع
+                  <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleUploadSignedContract} disabled={uploadingSigned} />
+                </label>
+              )}
+            </div>
+          </div>
+
+          {/* تحذير إذا لم يكن موقعاً */}
+          {signingStatus !== "موقّع" && signedContractUrl && (
+            <div className="text-[10px] text-amber-700 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" />تأكيد التوقيع: اضغط على "موقّع" في الشريط أعلاه
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex gap-2 flex-wrap">
         {!contract ? (
           <Button size="sm" className="text-xs h-7" style={{ backgroundColor: "oklch(0.30 0.05 250)" }}
@@ -1300,13 +1467,25 @@ function LeadContractSection({
         <Button size="sm" variant="outline" className="text-xs h-7 text-blue-700 border-blue-300"
           onClick={onViewQuote}
         ><Eye className="w-3 h-3 ml-1" />عرض السعر</Button>
-        <Button size="sm" className="text-xs h-7 text-white" style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
-          disabled={signingBusy}
-          onClick={onSigned}
-        >
-          {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <CheckCircle className="w-3 h-3 ml-1" />}
-          تم قبول العقد وفتح مشروع
-        </Button>
+
+        {/* زر بدء المشروع - يظهر فقط عند حالة موقّع */}
+        {signingStatus === "موقّع" ? (
+          <Button size="sm" className="text-xs h-7 text-white w-full" style={{ backgroundColor: "oklch(0.50 0.18 150)" }}
+            disabled={signingBusy}
+            onClick={onSigned}
+          >
+            {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <Briefcase className="w-3 h-3 ml-1" />}
+            بدء المشروع
+          </Button>
+        ) : (
+          <Button size="sm" className="text-xs h-7 text-white" style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
+            disabled={signingBusy}
+            onClick={onSigned}
+          >
+            {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <CheckCircle className="w-3 h-3 ml-1" />}
+            تم قبول العقد وفتح مشروع
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -1515,6 +1694,7 @@ function AppointmentDialog({ lead, onClose }: { lead: Lead; onClose: () => void 
 
 export default function CRM() {
   const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
   const { data: leadsData } = useCrmLeads();
   const { data: contractsData } = useContracts();
   const { data: allProjects = [] } = useProjects();
@@ -1652,6 +1832,36 @@ export default function CRM() {
 
       // إنشاء المهام التلقائية مباشرة بعد المشروع
       await fetch(`/api/projects/${projectId}/auto-tasks`, { method: "POST" }).catch(() => null);
+
+      // نقل وثائق التوقيع إلى مستندات المشروع
+      const now2 = new Date().toISOString();
+      if (lead.civilCardUrl) {
+        await fetch("/api/upload-from-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: lead.civilCardUrl,
+            clientId: client.id,
+            projectId,
+            name: `بطاقة مدنية - ${lead.name}`,
+            category: "وثائق العقد",
+          }),
+        }).catch(() => null);
+      }
+      if (lead.signedContractUrl) {
+        await fetch("/api/upload-from-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: lead.signedContractUrl,
+            clientId: client.id,
+            projectId,
+            name: `عقد موقّع - ${lead.name}`,
+            category: "وثائق العقد",
+          }),
+        }).catch(() => null);
+      }
+      void now2;
 
       // First invoice: file opening fee (50 KD) + 30% of contract amount
       const fileOpenFee = 50;
@@ -2115,7 +2325,7 @@ export default function CRM() {
                             {/* ── Stage 3: بانتظار التعاقد ── */}
                             {si === 3 && (
                               <div className="space-y-2 w-full">
-                                <LeadContractSection lead={lead} onCreateContract={() => setContractTarget(lead)} onViewQuote={() => setViewQuoteTarget(lead)} signingBusy={signingBusy} onSigned={() => handleContractSigned(lead)} />
+                                <LeadContractSection lead={lead} onCreateContract={() => setContractTarget(lead)} onViewQuote={() => setViewQuoteTarget(lead)} signingBusy={signingBusy} onSigned={() => handleContractSigned(lead)} onLeadUpdate={() => queryClient.invalidateQueries({ queryKey: ['crm-leads'] })} />
                                 <div className="border-t pt-2">
                                   <p className="text-[10px] text-muted-foreground mb-1.5">أو ابدأ العمل فوراً وأتمم التعاقد لاحقاً:</p>
                                   <Button size="sm" variant="outline" className="text-xs h-7 text-orange-700 border-orange-300 w-full"

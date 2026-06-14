@@ -2443,3 +2443,93 @@ apiRouter.delete("/api/governorate-areas/governorate/:name", async (req, res) =>
     res.json({ success: true });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
+
+// ── Contract Signing Documents (وثائق توقيع العقد) ───────────────────────────
+
+// POST /api/leads/:id/upload-civil-card — رفع البطاقة المدنية
+apiRouter.post("/api/leads/:id/upload-civil-card", upload.single("file"), async (req, res) => {
+  try {
+    const db = getDb();
+    if (!req.file) return res.status(400).json({ error: "no file" });
+    const leadId = req.params.id;
+    const fs = await import("fs");
+    const fileBuffer = fs.readFileSync(req.file.path);
+    const nameParts = req.file.originalname.split(".");
+    const ext = nameParts.length > 1 ? (nameParts.pop() || "jpg").toLowerCase() : "jpg";
+    const storageKey = `civil-cards/${leadId}/${nanoid(8)}.${ext}`;
+    const { url: storageUrl } = await storagePut(storageKey, fileBuffer, req.file.mimetype);
+    fs.unlinkSync(req.file.path);
+    await db.update(crmLeads).set({ civilCardUrl: storageUrl } as any).where(eq(crmLeads.id, leadId));
+    res.json({ url: storageUrl });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/leads/:id/upload-signed-contract — رفع صورة العقد الموقع
+apiRouter.post("/api/leads/:id/upload-signed-contract", upload.single("file"), async (req, res) => {
+  try {
+    const db = getDb();
+    if (!req.file) return res.status(400).json({ error: "no file" });
+    const leadId = req.params.id;
+    const fs = await import("fs");
+    const fileBuffer = fs.readFileSync(req.file.path);
+    const nameParts = req.file.originalname.split(".");
+    const ext = nameParts.length > 1 ? (nameParts.pop() || "jpg").toLowerCase() : "jpg";
+    const storageKey = `signed-contracts/${leadId}/${nanoid(8)}.${ext}`;
+    const { url: storageUrl } = await storagePut(storageKey, fileBuffer, req.file.mimetype);
+    fs.unlinkSync(req.file.path);
+    await db.update(crmLeads).set({ signedContractUrl: storageUrl } as any).where(eq(crmLeads.id, leadId));
+    res.json({ url: storageUrl });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/leads/:id/signing-status — تحديث حالة التوقيع
+apiRouter.patch("/api/leads/:id/signing-status", async (req, res) => {
+  try {
+    const db = getDb();
+    const { status } = req.body; // مسودة | جاهز للتوقيع | موقّع
+    if (!status) return res.status(400).json({ error: "status required" });
+    await db.update(crmLeads).set({ contractSigningStatus: status } as any).where(eq(crmLeads.id, req.params.id));
+    res.json({ success: true, status });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/upload-from-url — نسخ ملف من URL إلى مستندات المشروع
+apiRouter.post("/api/upload-from-url", async (req, res) => {
+  try {
+    const db = getDb();
+    const { url: fileUrl, clientId, projectId, name, category } = req.body;
+    if (!fileUrl) return res.status(400).json({ error: "url required" });
+    const now = new Date().toISOString();
+
+    // جلب الملف من URL باستخدام fetch المدمج
+    const response = await fetch(fileUrl);
+    if (!response.ok) return res.status(400).json({ error: "failed to fetch file" });
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const contentType = response.headers.get("content-type") || "application/octet-stream";
+
+    // تحديد الامتداد
+    const extMap: Record<string, string> = {
+      "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
+      "image/gif": "gif", "application/pdf": "pdf",
+    };
+    const ext = extMap[contentType.split(";")[0]] || "bin";
+    const storageKey = `project-docs/${projectId || clientId || "general"}/${nanoid(8)}.${ext}`;
+    const { url: storageUrl } = await storagePut(storageKey, buffer, contentType);
+
+    await db.insert(documents).values({
+      clientId: clientId || null,
+      projectId: projectId || null,
+      name: name || "وثيقة",
+      category: category || "وثائق العقد",
+      status: "received",
+      fileName: `${name || "doc"}.${ext}`,
+      fileSize: `${(buffer.length / 1024).toFixed(0)} KB`,
+      uploadedAt: now,
+      url: storageUrl,
+      mimeType: contentType,
+      fileExtension: ext,
+    });
+
+    res.status(201).json({ success: true, url: storageUrl });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});

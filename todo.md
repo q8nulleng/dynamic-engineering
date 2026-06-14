@@ -189,3 +189,9 @@
 - [x] تحديث useEmployee.ts: إضافة /settings لصلاحيات admin و secretary
 - [x] إصلاح WorkPlansSummary: استخدام useEffect بدل useState لجلب البيانات
 - [x] إضافة زر تعديل اسم المنطقة في تبويب المناطق والمحافظات
+
+## كرت العقد - وثائق التوقيع وبدء المشروع
+- [ ] إضافة حقول civil_card_url وsigned_contract_url وcontract_signing_status في جدول crm_leads
+- [ ] إضافة API endpoints: رفع البطاقة المدنية، رفع العقد الموقع، تحديث حالة التوقيع
+- [ ] تحديث LeadContractSection في CRM.tsx: قسم الوثائق + شريط الحالة + زر بدء المشروع
+- [ ] نقل صور البطاقة المدنية والعقد الموقع إلى أول كرت في المشروع عند بدء المشروع

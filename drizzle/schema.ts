@@ -83,6 +83,10 @@ export const crmLeads = mysqlTable("crm_leads", {
   isArchived: tinyint("is_archived").default(0),
   archivedAt: varchar("archived_at", { length: 32 }).default(""),
   archivedReason: varchar("archived_reason", { length: 255 }).default(""),
+  // وثائق التوقيع
+  civilCardUrl: text("civil_card_url").default(""),
+  signedContractUrl: text("signed_contract_url").default(""),
+  contractSigningStatus: varchar("contract_signing_status", { length: 32 }).default("مسودة"),
 });
 
 export const projects = mysqlTable("projects", {
