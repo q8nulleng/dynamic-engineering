@@ -2,7 +2,7 @@
  * Settings - صفحة الإعدادات المركزية
  * تجمع: عروض الأسعار (الباقات) | العقود الهندسية (القوالب) | خطط العمل | المناطق والمحافظات
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -412,12 +412,12 @@ function WorkPlansSummary() {
   const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useState(() => {
+  useEffect(() => {
     fetch("/api/work-plans")
       .then(r => r.json())
       .then(data => { setPlans(data); setLoading(false); })
       .catch(() => setLoading(false));
-  });
+  }, []);
 
   if (loading) return <div className="py-8 text-center text-muted-foreground">جاري التحميل...</div>;
 
@@ -461,6 +461,7 @@ function WorkPlansSummary() {
 function GovernorateAreasTab() {
   const { data: { grouped, rows } } = useGovernorateAreas();
   const addArea = useAddGovernorateArea();
+  const updateArea = useUpdateGovernorateArea();
   const deleteArea = useDeleteGovernorateArea();
   const addGov = useAddGovernorate();
   const deleteGov = useDeleteGovernorate();
@@ -470,6 +471,8 @@ function GovernorateAreasTab() {
   const [newAreaName, setNewAreaName] = useState("");
   const [showAddGov, setShowAddGov] = useState(false);
   const [newGovName, setNewGovName] = useState("");
+  const [editingAreaId, setEditingAreaId] = useState<number | null>(null);
+  const [editingAreaName, setEditingAreaName] = useState("");
 
   const governorates = Object.keys(grouped).sort();
 
@@ -489,6 +492,18 @@ function GovernorateAreasTab() {
     if (!confirm(`حذف منطقة "${area}"؟`)) return;
     await deleteArea.mutateAsync(id);
     toast.success("تم حذف المنطقة");
+  };
+
+  const handleEditArea = async (id: number) => {
+    if (!editingAreaName.trim()) { toast.error("يرجى إدخال اسم المنطقة"); return; }
+    try {
+      await updateArea.mutateAsync({ id, area: editingAreaName.trim() });
+      toast.success("تم تحديث اسم المنطقة");
+      setEditingAreaId(null);
+      setEditingAreaName("");
+    } catch (e: any) {
+      toast.error(e.message || "فشل التحديث");
+    }
   };
 
   const handleAddGov = async () => {
@@ -566,11 +581,35 @@ function GovernorateAreasTab() {
                     <div className="flex flex-wrap gap-2 mb-3">
                       {areaRows.map(row => (
                         <div key={row.id} className="flex items-center gap-1 bg-muted/40 rounded-full px-3 py-1 text-sm">
-                          <span>{row.area}</span>
-                          <button onClick={() => handleDeleteArea(row.id, row.area)}
-                            className="text-red-400 hover:text-red-600 mr-1" title="حذف">
-                            <X className="w-3 h-3" />
-                          </button>
+                          {editingAreaId === row.id ? (
+                            <>
+                              <input
+                                className="bg-transparent border-b border-primary outline-none text-sm w-24"
+                                value={editingAreaName}
+                                onChange={e => setEditingAreaName(e.target.value)}
+                                onKeyDown={e => { if (e.key === "Enter") handleEditArea(row.id); if (e.key === "Escape") { setEditingAreaId(null); setEditingAreaName(""); } }}
+                                autoFocus
+                              />
+                              <button onClick={() => handleEditArea(row.id)} className="text-green-500 hover:text-green-700 mr-0.5" title="حفظ">
+                                <Save className="w-3 h-3" />
+                              </button>
+                              <button onClick={() => { setEditingAreaId(null); setEditingAreaName(""); }} className="text-muted-foreground hover:text-foreground" title="إلغاء">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span>{row.area}</span>
+                              <button onClick={() => { setEditingAreaId(row.id); setEditingAreaName(row.area); }}
+                                className="text-blue-400 hover:text-blue-600 mr-0.5" title="تعديل">
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              <button onClick={() => handleDeleteArea(row.id, row.area)}
+                                className="text-red-400 hover:text-red-600" title="حذف">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       ))}
                       {areas.length === 0 && (

@@ -187,5 +187,5 @@
 - [x] تحديث DashboardLayout: إضافة رابط الإعدادات في الشريط الجانبي
 - [x] تحديث App.tsx: إضافة مسار /settings
 - [x] تحديث useEmployee.ts: إضافة /settings لصلاحيات admin و secretary
-- [ ] إصلاح WorkPlansSummary: استخدام useEffect بدل useState لجلب البيانات
-- [ ] إضافة زر تعديل اسم المنطقة في تبويب المناطق والمحافظات
+- [x] إصلاح WorkPlansSummary: استخدام useEffect بدل useState لجلب البيانات
+- [x] إضافة زر تعديل اسم المنطقة في تبويب المناطق والمحافظات
