@@ -42,7 +42,7 @@ import {
   useAppointmentsByLead, useCreateAppointment, useDeleteAppointment, useAppointments,
   useEmployees, usePackages,
 } from "@/lib/api";
-import { exportQuotationPdf, exportContractPdf, downloadQuotationPdf, printQuotationPdf, downloadContractPdf } from "@/lib/pdf";
+import { exportQuotationPdf, exportContractPdf, downloadQuotationPdf, printQuotationPdf, downloadContractPdf, buildContractPreviewHtml } from "@/lib/pdf";
 import { toast } from "sonner";
 
 interface Lead {
@@ -1029,6 +1029,64 @@ function ContractDialog({ lead, onClose, onSaved }: {
     selectedTemplateId: 0,
   });
   const [busy, setBusy] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+
+  // Build draft contract object for preview
+  const buildDraftContract = () => {
+    const now = new Date().toISOString().slice(0, 10);
+    const selectedTemplate = apiTemplates.find(t => t.id === form.selectedTemplateId) ?? null;
+    const termsText = selectedTemplate
+      ? JSON.stringify({
+          content: selectedTemplate.content || "",
+          scopeOfWork: selectedTemplate.scopeOfWork,
+          terms: selectedTemplate.terms,
+          party1Obligations: selectedTemplate.party1Obligations,
+          party2Obligations: selectedTemplate.party2Obligations,
+          paymentSchedule: selectedTemplate.paymentSchedule,
+          duration: selectedTemplate.duration,
+          notes: selectedTemplate.notes,
+        })
+      : "";
+    return {
+      id: "مسودة",
+      quotationId: null,
+      projectId: null,
+      clientId: null,
+      client: lead.name,
+      template: form.templateType,
+      type: form.contractType || lead.type || "",
+      service: form.contractService || lead.serviceType || "",
+      package: quote?.package || "",
+      status: "مسودة",
+      date: now,
+      amount: form.amount,
+      civilId: form.civilId,
+      area: form.area,
+      block: form.block,
+      plot: form.plot,
+      leadId: lead.id,
+      templateType: form.templateType,
+      termsText,
+      signingDate: form.signingDate,
+      signedFileUrl: "",
+    };
+  };
+
+  const handlePreview = () => {
+    const draft = buildDraftContract();
+    const html = buildContractPreviewHtml(draft);
+    setPreviewHtml(html);
+  };
+
+  const handleExportPdf = async () => {
+    const draft = buildDraftContract();
+    setBusy(true);
+    try {
+      await exportContractPdf(draft);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // Sync amount from quote once loaded
   const quoteAmount = quote?.amount;
@@ -1132,6 +1190,7 @@ function ContractDialog({ lead, onClose, onSaved }: {
   };
 
   return (
+    <>
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
@@ -1215,8 +1274,16 @@ function ContractDialog({ lead, onClose, onSaved }: {
             </div>
           </div>
         </div>
-        <div className="flex gap-2 justify-end pt-2">
+        <div className="flex gap-2 justify-end pt-2 flex-wrap">
           <Button variant="outline" onClick={onClose}>إلغاء</Button>
+          <Button variant="outline" onClick={handlePreview} disabled={!form.selectedTemplateId}>
+            <Eye className="w-3.5 h-3.5 ml-1" />
+            معاينة
+          </Button>
+          <Button variant="outline" onClick={handleExportPdf} disabled={busy || !form.selectedTemplateId}>
+            {busy ? <Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> : <Download className="w-3.5 h-3.5 ml-1" />}
+            تصدير PDF
+          </Button>
           <Button disabled={busy} onClick={handleSubmit} style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>
             {busy ? <Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> : <Save className="w-3.5 h-3.5 ml-1" />}
             إنشاء العقد
@@ -1224,6 +1291,31 @@ function ContractDialog({ lead, onClose, onSaved }: {
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* نافذة المعاينة */}
+    {previewHtml && (
+      <Dialog open onOpenChange={() => setPreviewHtml(null)}>
+        <DialogContent className="max-w-4xl w-full p-0 overflow-hidden" style={{ height: '92vh' }}>
+          <DialogHeader className="px-4 py-3 border-b flex-row items-center justify-between">
+            <DialogTitle className="text-sm font-semibold">معاينة العقد قبل الحفظ</DialogTitle>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={handleExportPdf} disabled={busy}>
+                {busy ? <Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> : <Download className="w-3.5 h-3.5 ml-1" />}
+                تصدير PDF
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setPreviewHtml(null)}>إغلاق</Button>
+            </div>
+          </DialogHeader>
+          <iframe
+            srcDoc={previewHtml}
+            className="w-full border-0"
+            style={{ height: 'calc(92vh - 60px)' }}
+            title="معاينة العقد"
+          />
+        </DialogContent>
+      </Dialog>
+    )}
+    </>
   );
 }
 

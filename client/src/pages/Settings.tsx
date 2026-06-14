@@ -14,8 +14,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Plus, Trash2, Pencil, Save, X, MapPin, FileText, FileSignature, ClipboardList,
   ChevronDown, ChevronUp, CheckCircle, Loader2, Building2,
-  Bold, Underline, AlignRight, AlignLeft, AlignCenter, Type, Palette
+  Bold, Underline, AlignRight, AlignLeft, AlignCenter, Type, Palette, Eye, Download
 } from "lucide-react";
+import { buildContractPreviewHtml, exportContractPdf } from "@/lib/pdf";
 import { toast } from "sonner";
 import {
   usePackages, useCreatePackage, useUpdatePackage, useDeletePackage,
@@ -246,6 +247,74 @@ function ContractTemplatesTab() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", buildingType: "سكن خاص", serviceType: "إشراف", content: "" });
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+
+  const buildPreviewFromForm = () => {
+    const termsText = JSON.stringify({ content: form.content || "" });
+    return {
+      id: "مسودة",
+      quotationId: null as null,
+      projectId: null as null,
+      clientId: null as null,
+      client: "اسم العميل",
+      template: form.name,
+      type: form.buildingType,
+      service: form.serviceType,
+      package: "",
+      status: "مسودة",
+      date: new Date().toISOString().slice(0, 10),
+      amount: "0",
+      civilId: "XXXXXXXXXXXX",
+      area: "المنطقة",
+      block: "00",
+      plot: "000",
+      leadId: "",
+      templateType: form.name,
+      termsText,
+      signingDate: new Date().toISOString().slice(0, 10),
+      signedFileUrl: "",
+    };
+  };
+
+  const handlePreviewForm = () => {
+    const draft = buildPreviewFromForm();
+    setPreviewHtml(buildContractPreviewHtml(draft));
+  };
+
+  const handlePreviewTemplate = (t: any) => {
+    const termsText = JSON.stringify({ content: t.content || "" });
+    const draft = {
+      id: "معاينة",
+      quotationId: null as null,
+      projectId: null as null,
+      clientId: null as null,
+      client: "اسم العميل",
+      template: t.name,
+      type: t.buildingType || "",
+      service: t.serviceType || "",
+      package: "",
+      status: "معاينة",
+      date: new Date().toISOString().slice(0, 10),
+      amount: "0",
+      civilId: "XXXXXXXXXXXX",
+      area: "المنطقة",
+      block: "00",
+      plot: "000",
+      leadId: "",
+      templateType: t.name,
+      termsText,
+      signingDate: new Date().toISOString().slice(0, 10),
+      signedFileUrl: "",
+    };
+    setPreviewHtml(buildContractPreviewHtml(draft));
+  };
+
+  const handleExportPreviewPdf = async () => {
+    const draft = buildPreviewFromForm();
+    setPreviewBusy(true);
+    try { await exportContractPdf(draft); } finally { setPreviewBusy(false); }
+  };
 
   const BUILDING_TYPES_T = ["سكن خاص", "استثماري", "تجاري", "صناعي"];
   const SERVICE_TYPES_T = ["إشراف", "تصميم", "تصميم وإشراف", "بناء جديد", "تعديل وإضافة", "استشارة", "أخرى"];
@@ -306,6 +375,9 @@ function ContractTemplatesTab() {
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500 hover:text-blue-700" title="معاينة" onClick={() => handlePreviewTemplate(t)}>
+                    <Eye className="w-3.5 h-3.5" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(t)}>
                     <Pencil className="w-3.5 h-3.5" />
                   </Button>
@@ -336,6 +408,9 @@ function ContractTemplatesTab() {
           <TemplateFormFields form={form} setForm={setForm} buildingTypes={BUILDING_TYPES_T} serviceTypes={SERVICE_TYPES_T} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAdd(false)}>إلغاء</Button>
+            <Button variant="outline" onClick={handlePreviewForm} disabled={!form.content}>
+              <Eye className="w-4 h-4 ml-1" />معاينة
+            </Button>
             <Button onClick={handleSaveNew} disabled={createTemplate.isPending}>
               {createTemplate.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Save className="w-4 h-4 ml-1" />}
               حفظ
@@ -351,6 +426,9 @@ function ContractTemplatesTab() {
           <TemplateFormFields form={form} setForm={setForm} buildingTypes={BUILDING_TYPES_T} serviceTypes={SERVICE_TYPES_T} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingId(null)}>إلغاء</Button>
+            <Button variant="outline" onClick={handlePreviewForm} disabled={!form.content}>
+              <Eye className="w-4 h-4 ml-1" />معاينة
+            </Button>
             <Button onClick={handleSaveEdit} disabled={updateTemplate.isPending}>
               {updateTemplate.isPending ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Save className="w-4 h-4 ml-1" />}
               حفظ التعديلات
@@ -358,6 +436,30 @@ function ContractTemplatesTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* نافذة معاينة القالب */}
+      {previewHtml && (
+        <Dialog open onOpenChange={() => setPreviewHtml(null)}>
+          <DialogContent className="max-w-4xl w-full p-0 overflow-hidden" style={{ height: '92vh' }}>
+            <DialogHeader className="px-4 py-3 border-b flex-row items-center justify-between">
+              <DialogTitle className="text-sm font-semibold">معاينة العقد النهائي</DialogTitle>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={handleExportPreviewPdf} disabled={previewBusy}>
+                  {previewBusy ? <Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> : <Download className="w-3.5 h-3.5 ml-1" />}
+                  تصدير PDF
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setPreviewHtml(null)}>إغلاق</Button>
+              </div>
+            </DialogHeader>
+            <iframe
+              srcDoc={previewHtml}
+              className="w-full border-0"
+              style={{ height: 'calc(92vh - 60px)' }}
+              title="معاينة العقد"
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

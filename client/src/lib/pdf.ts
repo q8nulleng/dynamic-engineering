@@ -613,6 +613,42 @@ function openPrintWindow(html: string): Promise<void> {
   });
 }
 
+// ── Build contract preview HTML (no auto-print, for iframe preview) ────────
+export function buildContractPreviewHtml(contract: Contract): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const body = contractBody(contract);
+  return `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<base href="${origin}/">
+<title>معاينة العقد</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;900&family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Noto Naskh Arabic','Noto Kufi Arabic','Simplified Arabic',Arial,sans-serif;direction:rtl;background:#f5f5f5;color:#111;font-size:13px;line-height:1.9;}
+  .page{padding:30px 35px 100px;max-width:794px;margin:20px auto;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.12);}
+  table{border-collapse:collapse;}
+  img{max-width:100%;}
+  .article-heading{font-size:14px;font-weight:700;color:#000;border-bottom:2px solid #000;padding-bottom:4px;margin:18px 0 10px;}
+  .article-content{font-size:12px;line-height:2.1;color:#222;padding-right:10px;white-space:pre-line;}
+  .article-item{font-size:12px;line-height:2.1;color:#222;padding-right:10px;position:relative;}
+  .bold-line{font-weight:700;color:#000;}
+  .template-content p{font-family:'Noto Naskh Arabic','Noto Kufi Arabic',Arial,sans-serif;font-size:12px;line-height:2;color:#222;margin:4px 0;direction:rtl;text-align:justify;}
+  .template-content span{font-family:'Noto Naskh Arabic','Noto Kufi Arabic',Arial,sans-serif !important;font-size:12px !important;line-height:2 !important;}
+  .template-content li{font-family:'Noto Naskh Arabic','Noto Kufi Arabic',Arial,sans-serif;font-size:12px;line-height:2;color:#222;margin:3px 0;direction:rtl;}
+  .template-content strong,.template-content b{font-weight:700;color:#000;}
+  .template-content ul,.template-content ol{padding-right:20px;padding-left:0;margin:4px 0;}
+  .template-content [style*="margin-right"]{margin-right:0 !important;}
+</style>
+</head>
+<body>
+<div class="page">${body}</div>
+</body>
+</html>`;
+}
+
 // ── Public API ────────────────────────────────────────────────────────────
 export async function exportContractPdf(contract: Contract): Promise<void> {
   await openPrintWindow(buildPage(contractBody(contract), `عقد ${contract.id}`));
