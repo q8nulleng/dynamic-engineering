@@ -517,11 +517,30 @@ apiRouter.post("/api/contracts", async (req, res) => {
     const db = getDb();
     const id = req.body.id || `CON-${new Date().getFullYear()}-${nanoid(3).toUpperCase()}`;
     const now = new Date().toISOString().slice(0, 10);
+    // Clean null values to avoid MySQL NOT NULL constraint errors
+    const body = req.body;
     await db.insert(contracts).values({
-      ...req.body,
       id,
-      date: req.body.date || now,
-      leadId: req.body.leadId || "",
+      client: body.client || "",
+      quotationId: body.quotationId || undefined,
+      projectId: body.projectId || undefined,
+      clientId: body.clientId || undefined,
+      template: body.template || "",
+      type: body.type || "",
+      service: body.service || "",
+      package: body.package || "",
+      status: body.status || "مسودة",
+      date: body.date || now,
+      amount: body.amount || "0",
+      civilId: body.civilId || "",
+      area: body.area || "",
+      block: body.block || "",
+      plot: body.plot || "",
+      leadId: body.leadId || "",
+      templateType: body.templateType || "",
+      termsText: body.termsText || "",
+      signingDate: body.signingDate || "",
+      signedFileUrl: body.signedFileUrl || "",
     });
     const [row] = await db.select().from(contracts).where(eq(contracts.id, id));
     res.status(201).json(row);
