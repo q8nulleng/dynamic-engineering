@@ -19,6 +19,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -1938,6 +1939,7 @@ export default function CRM() {
   const [signingBusy, setSigningBusy] = useState(false);
     const [appointmentTarget, setAppointmentTarget] = useState<Lead | null>(null);
   const [showArchive, setShowArchive] = useState(false);
+  const [deleteConfirmLead, setDeleteConfirmLead] = useState<Lead | null>(null);
   const [wonDialogLead, setWonDialogLead] = useState<Lead | null>(null);
   const { data: allAppointments = [] } = useAppointments();
   // Build a Set of leadIds that have upcoming appointments
@@ -3365,11 +3367,7 @@ export default function CRM() {
                         <ChevronUp className="w-3 h-3 ml-1" />استعادة
                       </Button>
                       <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50"
-                        onClick={async () => {
-                          if (!window.confirm(`هل تريد حذف فرصة "${lead.name}" نهائياً؟`)) return;
-                          await deleteLead.mutateAsync(lead.id);
-                          toast.success(`تم حذف فرصة "${lead.name}" نهائياً`);
-                        }}
+                        onClick={() => setDeleteConfirmLead(lead as unknown as Lead)}
                       >
                         <Trash2 className="w-3 h-3 ml-1" />حذف
                       </Button>
@@ -3381,6 +3379,40 @@ export default function CRM() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ── Delete Confirm Dialog ── */}
+      {deleteConfirmLead && (
+        <Dialog open onOpenChange={() => setDeleteConfirmLead(null)}>
+          <DialogContent className="max-w-sm" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="text-base font-bold text-red-600 flex items-center gap-2">
+                <Trash2 className="w-4 h-4" />
+                تأكيد الحذف النهائي
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-3 text-sm text-muted-foreground">
+              هل تريد حذف فرصة <span className="font-semibold text-foreground">"{deleteConfirmLead.name}"</span> نهائياً؟
+              <br />
+              <span className="text-red-500 text-xs mt-1 block">لا يمكن التراجع عن هذا الإجراء.</span>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setDeleteConfirmLead(null)}>إلغاء</Button>
+              <Button
+                variant="destructive"
+                disabled={deleteLead.isPending}
+                onClick={async () => {
+                  await deleteLead.mutateAsync(deleteConfirmLead.id);
+                  toast.success(`تم حذف فرصة "${deleteConfirmLead.name}" نهائياً`);
+                  setDeleteConfirmLead(null);
+                }}
+              >
+                {deleteLead.isPending ? <Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 ml-1" />}
+                حذف نهائياً
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

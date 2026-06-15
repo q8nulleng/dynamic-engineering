@@ -563,7 +563,10 @@ export function useDeleteCrmLead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => request(`/api/crm-leads/${id}`, { method: "DELETE" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["crm-leads"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm-leads"] });
+      qc.invalidateQueries({ queryKey: ["crm-leads-archived"] });
+    },
   });
 }
 
