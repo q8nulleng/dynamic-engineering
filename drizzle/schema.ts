@@ -87,6 +87,7 @@ export const crmLeads = mysqlTable("crm_leads", {
   civilCardUrl: text("civil_card_url").default(""),
   signedContractUrl: text("signed_contract_url").default(""),
   contractSigningStatus: varchar("contract_signing_status", { length: 32 }).default("مسودة"),
+  stageChangedAt: varchar("stage_changed_at", { length: 32 }).default(""),
 });
 
 export const projects = mysqlTable("projects", {

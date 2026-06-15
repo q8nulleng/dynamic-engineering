@@ -1,0 +1,1 @@
+ALTER TABLE `crm_leads` ADD `stage_changed_at` varchar(32) DEFAULT '';

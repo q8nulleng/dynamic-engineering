@@ -963,7 +963,11 @@ apiRouter.put("/api/crm-leads/:id", async (req, res) => {
   try {
     const db = getDb();
     const { tags, ...rest } = req.body;
-    const updateData = tags !== undefined ? { ...rest, tags: JSON.stringify(tags) } : rest;
+    let updateData: any = tags !== undefined ? { ...rest, tags: JSON.stringify(tags) } : rest;
+    // Track when stage changes to 'عرض سعر مرسل'
+    if (rest.stage) {
+      updateData.stageChangedAt = new Date().toISOString().split('T')[0];
+    }
     await db.update(crmLeads).set(updateData).where(eq(crmLeads.id, req.params.id));
     const [row] = await db.select().from(crmLeads).where(eq(crmLeads.id, req.params.id));
     if (!row) return res.status(404).json({ error: "not found" });
