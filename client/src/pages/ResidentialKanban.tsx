@@ -345,8 +345,24 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
     t.name.includes("نماذج") || t.name.includes("بلدية") || t.name.includes("تعهد") || t.name.includes("تعبئة")
   );
 
-  const doneCount = phase.tasks.filter(t => t.status === "done").length;
-  const progress = phase.tasks.length > 0 ? Math.round((doneCount / phase.tasks.length) * 100) : 0;
+  // حساب العداد الشامل: مهام + ملفات مرفوعة + خطوات phase_meta
+  const tasksDone = phase.tasks.filter(t => t.status === "done").length;
+  // الخطوات الإضافية من phase_meta (8 خطوات)
+  const metaSteps = [
+    fileMeta.soilRequestDone, fileMeta.soilReceiveDone,
+    fileMeta.elecRequestDone, fileMeta.elecReceiveDone,
+    fileMeta.soilRequestDate, fileMeta.elecRequestDate,
+    fileMeta.soilReceiveDate, fileMeta.elecReceiveDate,
+  ].filter(Boolean).length;
+  // الملفات المرفوعة تُحتسب كخطوة واحدة لكل فئة
+  const docsUploaded = docsDocs.length > 0 ? 1 : 0;
+  const techUploaded = techDocs.length > 0 ? 1 : 0;
+  const formsUploaded = formsDocs.length > 0 ? 1 : 0;
+  const extraDone = docsUploaded + techUploaded + formsUploaded;
+  const extraTotal = 3; // 3 فئات ملفات
+  const totalCount = phase.tasks.length + extraTotal;
+  const doneCount = tasksDone + extraDone;
+  const progress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
 
   const handleFileUploaded = (_group: string, _doc: { name: string }) => {
     // إعادة جلب المستندات من قاعدة البيانات لتحديث القائمة فوراً
@@ -380,7 +396,7 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
           </div>
           <div className="flex items-center gap-3">
             <Progress value={progress} className="flex-1 h-1.5" />
-            <span className="text-xs font-bold shrink-0" style={{ color, fontFamily: "'Space Grotesk'" }}>{doneCount}/{phase.tasks.length}</span>
+            <span className="text-xs font-bold shrink-0" style={{ color, fontFamily: "'Space Grotesk'" }}>{doneCount}/{totalCount}</span>
           </div>
         </div>
 
@@ -412,6 +428,12 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
                 <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedGroup === "docs" ? "rotate-90" : ""}`} />
               </div>
             </div>
+            {/* الوثائق المرفوعة تظهر دائماً حتى عند إغلاق القسم */}
+            {docsDocs.length > 0 && expandedGroup !== "docs" && (
+              <div className="px-3 pb-2 pt-1 border-t bg-muted/5">
+                <UploadedFilesList docs={docsDocs} key={refreshKey + 1000} onDeleted={() => { refetchDocs(); setRefreshKey(k => k + 1); }} />
+              </div>
+            )}
             {expandedGroup === "docs" && (
               <div className="px-3 pb-4 pt-3 space-y-3 border-t">
                 <p className="text-[11px] text-muted-foreground">ارفع الملفات المطلوبة — ستظهر تلقائياً في المستندات</p>
