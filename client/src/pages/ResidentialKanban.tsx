@@ -2184,7 +2184,7 @@ function parseChecklistStats(checklistData: string | undefined) {
   } catch { return { total: 0, accepted: 0, rejected: 0, withNotes: 0, pending: 0 }; }
 }
 
-function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
+export function PhaseSupervisionPopup({ phase, project, onClose, onTaskUpdate }: {
   phase: Phase; project: ProjectData; onClose: () => void;
   onTaskUpdate: (taskId: number, status: Task["status"]) => void;
 }) {

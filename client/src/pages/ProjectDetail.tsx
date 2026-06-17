@@ -26,6 +26,7 @@ import FormsTaskPanel from "@/components/FormsTaskPanel";
 import SupervisionTaskPanel from "@/components/SupervisionTaskPanel";
 import ProjectBriefForm from "@/components/ProjectBriefForm";
 import ResidentialKanban from "@/pages/ResidentialKanban";
+import SupervisionProjectView from "@/pages/SupervisionProjectView";
 
 /* ===== Types ===== */
 interface SubTask { name: string; done: boolean; assignee?: string; }
@@ -448,6 +449,11 @@ export default function ProjectDetail() {
   };
 
   if (isLoading) return <div className="flex items-center justify-center min-h-96 text-muted-foreground">جاري التحميل...</div>;
+
+  // مشاريع الإشراف: عرض مرحلتين فقط (تجهيز الملف + الإشراف)
+  if (project && project.serviceType === "\u0625\u0634\u0631\u0627\u0641") {
+    return <SupervisionProjectView projectId={projectId} />;
+  }
 
   // تحويل جميع أنواع المشاريع إلى Kanban (سكن خاص، صناعي، تجاري، استثماري)
   if (project && ["\u0633\u0643\u0646 \u062e\u0627\u0635", "\u0635\u0646\u0627\u0639\u064a", "\u062a\u062c\u0627\u0631\u064a", "\u0627\u0633\u062a\u062b\u0645\u0627\u0631\u064a"].includes(project.type)) {
