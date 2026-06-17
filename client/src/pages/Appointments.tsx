@@ -34,12 +34,27 @@ const MEETING_REASONS = [
   "أخرى",
 ];
 
-const TIME_SLOTS = [
-  "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
-  "11:00", "11:30", "12:00", "12:30", "13:00", "13:30",
-  "14:00", "14:30", "15:00", "15:30", "16:00", "16:30",
-  "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00",
-];
+// أوقات العمل: سبت-أربعاء صباحي+مسائي, خميس صباحي فقط, جمعة مغلق
+const MORNING_SLOTS = ["09:00", "10:00", "11:00"];
+const EVENING_SLOTS = ["17:00", "18:00", "19:00", "20:00"];
+
+function getTimeSlotsForDate(dateStr: string): { morning: string[]; evening: string[] } | null {
+  if (!dateStr) return null;
+  const day = new Date(dateStr + 'T12:00:00').getDay();
+  // 5=جمعة → مغلق
+  if (day === 5) return null;
+  // 4=خميس → صباحي فقط
+  if (day === 4) return { morning: MORNING_SLOTS, evening: [] };
+  // 6,0,1,2,3 = سبت-أربعاء → صباحي + مسائي
+  return { morning: MORNING_SLOTS, evening: EVENING_SLOTS };
+}
+
+function formatTimeSlot(t: string): string {
+  const [h] = t.split(":").map(Number);
+  if (h < 12) return `${h}:00 صباحاً`;
+  if (h === 12) return `12:00 ظهراً`;
+  return `${h - 12}:00 مساءً`;
+}
 
 function getStatusColor(status: string) {
   if (status === "completed") return "bg-green-100 text-green-700 border-green-200";
@@ -319,17 +334,44 @@ function BookingModal({
               {/* الوقت */}
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">وقت الموعد *</label>
-                <div className="grid grid-cols-5 gap-1.5 max-h-36 overflow-y-auto p-1">
-                  {TIME_SLOTS.map(t => (
-                    <button
-                      key={t}
-                      className={`py-1.5 rounded-lg text-xs font-medium border transition-all ${apptTime === t ? "bg-orange-500 text-white border-orange-500" : "border-border hover:border-orange-300 hover:bg-orange-50"}`}
-                      onClick={() => setApptTime(t)}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
+                {!apptDate ? (
+                  <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2.5">حدد التاريخ أولاً لعرض الأوقات المتاحة</div>
+                ) : (() => {
+                  const slots = getTimeSlotsForDate(apptDate);
+                  if (!slots) {
+                    return <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5">🔴 الجمعة عطلة رسمية — لا تتوفر مواعيد</div>;
+                  }
+                  return (
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-[10px] font-bold text-muted-foreground mb-1">☀️ فترة صباحية</p>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {slots.morning.map((t: string) => (
+                            <button key={t}
+                              className={`py-1.5 rounded-lg text-xs font-medium border transition-all ${apptTime === t ? "bg-orange-500 text-white border-orange-500" : "border-border hover:border-orange-300 hover:bg-orange-50"}`}
+                              onClick={() => setApptTime(t)}>
+                              {formatTimeSlot(t)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {slots.evening.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-bold text-muted-foreground mb-1">🌙 فترة مسائية</p>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {slots.evening.map((t: string) => (
+                              <button key={t}
+                                className={`py-1.5 rounded-lg text-xs font-medium border transition-all ${apptTime === t ? "bg-orange-500 text-white border-orange-500" : "border-border hover:border-orange-300 hover:bg-orange-50"}`}
+                                onClick={() => setApptTime(t)}>
+                                {formatTimeSlot(t)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* سبب الموعد */}

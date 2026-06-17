@@ -1807,7 +1807,68 @@ function AppointmentDialog({ lead, onClose }: { lead: Lead; onClose: () => void 
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground block mb-1">الوقت</label>
-              <Input type="time" dir="ltr" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} className="text-sm" />
+              {(() => {
+                // حساب الأوقات المتاحة حسب اليوم
+                const selectedDay = form.date ? new Date(form.date + 'T12:00:00').getDay() : -1;
+                // 0=الأحد, 1=الاثنين, 2=الثلاثاء, 3=الأربعاء, 4=الخميس, 5=الجمعة, 6=السبت
+                // السبت-الأربعاء: 6,0,1,2,3 → صباحي (9,10,11) + مسائي (17,18,19,20)
+                // الخميس: 4 → صباحي فقط (9,10,11)
+                // الجمعة: 5 → مغلق
+                const isFriday = selectedDay === 5;
+                const isThursday = selectedDay === 4;
+                const isWeekday = [6,0,1,2,3].includes(selectedDay); // سبت-أربعاء
+                let timeSlots: { value: string; label: string }[] = [];
+                if (isWeekday) {
+                  timeSlots = [
+                    { value: "09:00", label: "فترة صباحية" },
+                    { value: "09:00", label: "9:00 صباحاً" },
+                    { value: "10:00", label: "10:00 صباحاً" },
+                    { value: "11:00", label: "11:00 صباحاً" },
+                    { value: "17:00", label: "── فترة مسائية ──" },
+                    { value: "17:00", label: "5:00 مساءً" },
+                    { value: "18:00", label: "6:00 مساءً" },
+                    { value: "19:00", label: "7:00 مساءً" },
+                    { value: "20:00", label: "8:00 مساءً" },
+                  ];
+                } else if (isThursday) {
+                  timeSlots = [
+                    { value: "09:00", label: "9:00 صباحاً" },
+                    { value: "10:00", label: "10:00 صباحاً" },
+                    { value: "11:00", label: "11:00 صباحاً" },
+                  ];
+                }
+                if (!form.date) {
+                  return <div className="text-xs text-muted-foreground bg-muted/30 rounded-md px-3 py-2.5">حدد التاريخ أولاً</div>;
+                }
+                if (isFriday) {
+                  return <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2.5">🔴 الجمعة عطلة رسمية — لا تتوفر مواعيد</div>;
+                }
+                return (
+                  <Select value={form.time} onValueChange={v => {
+                    if (v.startsWith("─")) return; // تجاهل الفواصل
+                    setForm(f => ({ ...f, time: v }));
+                  }}>
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="اختر الوقت..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__morning__" disabled className="text-xs font-bold text-muted-foreground">── فترة صباحية ──</SelectItem>
+                      <SelectItem value="09:00">9:00 صباحاً</SelectItem>
+                      <SelectItem value="10:00">10:00 صباحاً</SelectItem>
+                      <SelectItem value="11:00">11:00 صباحاً</SelectItem>
+                      {isWeekday && (
+                        <>
+                          <SelectItem value="__sep__" disabled className="text-xs font-bold text-muted-foreground">── فترة مسائية ──</SelectItem>
+                          <SelectItem value="17:00">5:00 مساءً</SelectItem>
+                          <SelectItem value="18:00">6:00 مساءً</SelectItem>
+                          <SelectItem value="19:00">7:00 مساءً</SelectItem>
+                          <SelectItem value="20:00">8:00 مساءً</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                );
+              })()}
             </div>
           </div>
           <div>
