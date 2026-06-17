@@ -85,7 +85,24 @@ apiRouter.get("/api/projects", async (_req, res) => {
   try {
     const db = getDb();
     const rows = await db.select().from(projects).orderBy(desc(projects.createdAt));
-    res.json(rows);
+    // Hydrate phases + tasks for each project so frontend counters work
+    const enriched = await Promise.all(rows.map(async (project: any) => {
+      const projectPhases = await db.select().from(phases)
+        .where(eq(phases.projectId, project.id))
+        .orderBy(phases.order);
+      const phasesWithTasks = await Promise.all(projectPhases.map(async (phase: any) => {
+        const phaseTasks = await db.select().from(tasks)
+          .where(eq(tasks.phaseId, phase.id))
+          .orderBy(tasks.order);
+        return { ...phase, tasks: phaseTasks };
+      }));
+      // Recompute progress from actual tasks
+      const total = phasesWithTasks.reduce((s, p) => s + p.tasks.length, 0);
+      const done = phasesWithTasks.reduce((s, p) => s + p.tasks.filter((t: any) => t.status === 'done').length, 0);
+      const progress = total > 0 ? Math.round((done / total) * 100) : project.progress;
+      return { ...project, phases: phasesWithTasks, progress };
+    }));
+    res.json(enriched);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 

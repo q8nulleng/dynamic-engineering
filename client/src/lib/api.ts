@@ -263,6 +263,7 @@ export function useUpdateTask(projectId: string) {
       request<TaskData>(`/api/tasks/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["projects", projectId] });
+      qc.invalidateQueries({ queryKey: ["projects"] });
       qc.invalidateQueries({ queryKey: ["tasks", "all"] });
     },
   });

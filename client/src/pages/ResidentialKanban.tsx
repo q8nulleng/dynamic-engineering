@@ -2986,7 +2986,7 @@ interface ResidentialKanbanProps {
 }
 
 export default function ResidentialKanban({ projectId }: ResidentialKanbanProps) {
-  const { data: projectData, isLoading } = useProject(projectId);
+  const { data: projectData, isLoading, refetch: refetchProject } = useProject(projectId);
   const updateTask = useUpdateTask(projectId);
   const [activePopup, setActivePopup] = useState<number | null>(null);
   // جلب زيارات الإشراف لحساب تقدم مرحلة الإشراف من الخارج
@@ -3001,7 +3001,11 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
 
   const handleTaskUpdate = (taskId: number, status: Task["status"]) => {
     updateTask.mutate({ id: taskId, status }, {
-      onSuccess: () => toast.success("تم تحديث المهمة ✓"),
+      onSuccess: () => {
+        toast.success("تم تحديث المهمة ✓");
+        // Refetch project data to update counters
+        setTimeout(() => refetchProject(), 300);
+      },
       onError: () => toast.error("حدث خطأ"),
     });
   };
