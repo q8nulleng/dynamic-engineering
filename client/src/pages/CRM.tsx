@@ -32,7 +32,7 @@ import {
   ClipboardList, MessageCircle, Activity, Users, MapPin, Loader2,
   Pencil, Trash2, Eye, CheckCircle, Hash, Ruler, ArrowRightLeft, Archive,
   Clock, UserCheck, CalendarPlus, Bell, Briefcase,
-  Upload, CreditCard, ShieldCheck, AlertCircle, ImageIcon,
+  Upload, CreditCard, ShieldCheck, AlertCircle, ImageIcon, PenLine,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { kuwaitGovernorates } from "./Clients";
@@ -2290,6 +2290,79 @@ export default function CRM() {
     }
   };
 
+  // فتح كروكي: ينشئ مشروع كروكي مباشرة بدون عقد أو عميل
+  const handleOpenSketch = async (lead: Lead) => {
+    if (signingBusy) return;
+    if (!window.confirm(`هل تريد فتح مشروع كروكي لـ "${lead.name}"\u061f\nسيتم إنشاء مشروع كروكي في المشاريع مباشرة.`)) return;
+    setSigningBusy(true);
+    try {
+      const now = new Date().toISOString().slice(0, 10);
+      const clientId = `C${Date.now().toString(36).toUpperCase()}`;
+      const client = await createClient.mutateAsync({
+        id: clientId,
+        name: lead.name,
+        phone: lead.phone,
+        type: "individual" as const,
+        governorate: lead.governorate || "",
+        area: lead.area || "",
+        block: "",
+        plot: lead.plotNumber || "",
+        parcelArea: lead.landArea || 0,
+        status: "active" as const,
+        rating: 3,
+        createdAt: now,
+        projectType: lead.type || "",
+        serviceType: "كروكي",
+        leadId: lead.id,
+        totalContractsValue: 0,
+        totalPaid: 0,
+        totalRemaining: 0,
+        notes: (lead.notes || "") + (lead.notes ? " | " : "") + "مشروع كروكي مبدئي",
+        civilId: lead.civilId || "",
+        email: "",
+        ownershipDoc: "",
+        ownershipDate: "",
+        spouseName: "",
+        spouseCivilId: "",
+        phone2: "",
+        parcelShape: "",
+        parcelFacing: "",
+      });
+      const maxSeq = allProjects.reduce((max, p) => {
+        const n = parseInt(p.id.replace(/^S/, ""), 10);
+        return isNaN(n) ? max : Math.max(max, n);
+      }, 0);
+      const projectId = `S${String(maxSeq + 1).padStart(5, "0")}`;
+      const sketchPhases = [
+        { title: "تصميم الكروكي", tasks: [
+          { name: "تصميم الكروكي المبدئي", status: "pending", order: 0 },
+          { name: "مراجعة العميل واعتماد الكروكي", status: "pending", order: 1 },
+          { name: "تسليم الكروكي للعميل", status: "pending", order: 2 },
+        ]},
+      ];
+      await createProject.mutateAsync({
+        id: projectId,
+        name: `كروكي - ${lead.name}`,
+        clientId: client.id,
+        client: lead.name,
+        type: lead.type || "سكن خاص",
+        serviceType: "كروكي",
+        area: lead.area || "",
+        contractId: "",
+        leadId: lead.id,
+        status: "كروكي",
+        phases: sketchPhases as unknown[],
+      });
+      toast.success(`✅ تم فتح مشروع كروكي لـ "${lead.name}" — راجع المشاريع`);
+      setSelectedLead(null);
+    } catch (err) {
+      toast.error("حدث خطأ أثناء فتح الكروكي");
+      console.error(err);
+    } finally {
+      setSigningBusy(false);
+    }
+  };
+
   const totalLeads = leadsData?.length ?? 0;
   const totalRevenue = (leadsData || []).reduce((s, l) => s + parseFloat((l.expectedRevenue || "0").replace(",", "") || "0"), 0);
 
@@ -2554,11 +2627,15 @@ export default function CRM() {
                             {/* ── Stage 0: استفسار جديد ── */}
                             {si === 0 && (<>
                               <Button size="sm" variant="outline" className="text-xs h-7"
-                                onClick={() => window.open(`tel:${(lead.phone || "").replace(/\s/g, "")}`)}
-                              ><Phone className="w-3 h-3 ml-1" />اتصال</Button>
+                                onClick={() => window.open(`tel:${(lead.phone || "").replace(/\s/g, "")}`)}>
+<Phone className="w-3 h-3 ml-1" />اتصال</Button>
                               <Button size="sm" variant="outline" className="text-xs h-7"
-                                onClick={() => window.open(`https://wa.me/965${(lead.phone || "").replace(/\s/g, "")}`, "_blank")}
-                              ><MessageCircle className="w-3 h-3 ml-1" />واتساب</Button>
+                                onClick={() => window.open(`https://wa.me/965${(lead.phone || "").replace(/\s/g, "")}`, "_blank")}>
+<MessageCircle className="w-3 h-3 ml-1" />واتساب</Button>
+                              <Button size="sm" variant="outline" className="text-xs h-7 text-purple-600 border-purple-200"
+                                disabled={signingBusy}
+                                onClick={() => handleOpenSketch(lead)}
+                              ><PenLine className="w-3 h-3 ml-1" />فتح كروكي</Button>
                               <Button size="sm" variant="outline" className="text-xs h-7 text-blue-600 border-blue-200"
                                 onClick={async () => {
                                   await updateLead.mutateAsync({ id: lead.id, stage: "تم التواصل" });
@@ -2576,6 +2653,10 @@ export default function CRM() {
                               <Button size="sm" variant="outline" className="text-xs h-7 text-orange-600 border-orange-200"
                                 onClick={() => setAppointmentTarget(lead)}
                               ><CalendarPlus className="w-3 h-3 ml-1" />حجز موعد</Button>
+                              <Button size="sm" variant="outline" className="text-xs h-7 text-purple-600 border-purple-200"
+                                disabled={signingBusy}
+                                onClick={() => handleOpenSketch(lead)}
+                              ><PenLine className="w-3 h-3 ml-1" />فتح كروكي</Button>
                               <Button size="sm" variant="outline" className="text-xs h-7 text-red-600 border-red-200"
                                 onClick={() => { setLostDialogLead(lead); setLostReason(""); }}
                               ><X className="w-3 h-3 ml-1" />خسارة</Button>
@@ -2606,6 +2687,10 @@ export default function CRM() {
                                 }
                                 return null;
                               })()}
+                              <Button size="sm" variant="outline" className="text-xs h-7 text-purple-600 border-purple-200"
+                                disabled={signingBusy}
+                                onClick={() => handleOpenSketch(lead)}
+                              ><PenLine className="w-3 h-3 ml-1" />فتح كروكي</Button>
                               <Button size="sm" className="text-xs h-7" style={{ backgroundColor: "oklch(0.55 0.15 150)" }}
                                 onClick={() => setWonDialogLead(lead)}
                               ><Trophy className="w-3 h-3 ml-1" />فوز</Button>
