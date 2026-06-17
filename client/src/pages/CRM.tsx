@@ -87,6 +87,7 @@ interface Lead {
 
 const stageTemplates = [
   { title: "استفسار جديد",           color: "oklch(0.55 0.15 250)", icon: Users },
+  { title: "كروكي",                  color: "oklch(0.55 0.18 300)", icon: PenLine },
   { title: "تم التواصل",             color: "oklch(0.72 0.10 60)",  icon: Phone },
   { title: "عرض سعر مرسل",          color: "oklch(0.60 0.15 280)", icon: FileText },
   { title: "بانتظار التعاقد",        color: "oklch(0.65 0.15 140)", icon: FileText },
@@ -2353,8 +2354,11 @@ export default function CRM() {
         status: "كروكي",
         phases: sketchPhases as unknown[],
       });
-      toast.success(`✅ تم فتح مشروع كروكي لـ "${lead.name}" — راجع المشاريع`);
+      // نقل الفرصة إلى مرحلة "كروكي"
+      await updateLead.mutateAsync({ id: lead.id, stage: "كروكي" });
       setSelectedLead(null);
+      setOpenStage(stageTemplates.findIndex((s) => s.title === "كروكي"));
+      toast.success(`✅ تم فتح مشروع كروكي لـ "${lead.name}" — راجع المشاريع`);
     } catch (err) {
       toast.error("حدث خطأ أثناء فتح الكروكي");
       console.error(err);
@@ -2639,14 +2643,19 @@ export default function CRM() {
                               <Button size="sm" variant="outline" className="text-xs h-7 text-blue-600 border-blue-200"
                                 onClick={async () => {
                                   await updateLead.mutateAsync({ id: lead.id, stage: "تم التواصل" });
-                                  setOpenStage(1); setSelectedLead(null);
+                                  setOpenStage(2); setSelectedLead(null);
                                   toast.success(`"${lead.name}" → تم التواصل`);
                                 }}
                               ><ChevronUp className="w-3 h-3 ml-1" />تم التواصل</Button>
                             </>)}
 
-                            {/* ── Stage 1: تم التواصل ── */}
+                            {/* ── Stage 1: كروكي ── */}
                             {si === 1 && (<>
+                              <span className="text-xs text-muted-foreground italic">مشروع كروكي قيد التنفيذ — راجع المشاريع</span>
+                            </>)}
+
+                            {/* ── Stage 2: تم التواصل ── */}
+                            {si === 2 && (<>
                               <Button size="sm" className="text-xs h-7" style={{ backgroundColor: "oklch(0.30 0.05 250)" }}
                                 onClick={() => setQuotationTarget(lead)}
                               ><FileText className="w-3 h-3 ml-1" />إنشاء عرض سعر</Button>
@@ -2662,8 +2671,8 @@ export default function CRM() {
                               ><X className="w-3 h-3 ml-1" />خسارة</Button>
                             </>)}
 
-                            {/* ── Stage 2: عرض سعر مرسل ── */}
-                            {si === 2 && (<>
+                            {/* ── Stage 3: عرض سعر مرسل ── */}
+                            {si === 3 && (<>
                               <Button size="sm" variant="outline" className="text-xs h-7 text-blue-700 border-blue-300"
                                 onClick={() => setViewQuoteTarget(lead)}
                               ><Eye className="w-3 h-3 ml-1" />عرض عرض السعر</Button>
@@ -2699,8 +2708,8 @@ export default function CRM() {
                               ><X className="w-3 h-3 ml-1" />خسارة</Button>
                             </>)}
 
-                            {/* ── Stage 3: بانتظار التعاقد ── */}
-                            {si === 3 && (
+                            {/* ── Stage 4: بانتظار التعاقد ── */}
+                            {si === 4 && (
                               <div className="space-y-2 w-full">
                                 <LeadContractSection lead={lead} onCreateContract={() => setContractTarget(lead)} onViewQuote={() => setViewQuoteTarget(lead)} signingBusy={signingBusy} onSigned={() => handleContractSigned(lead)} onLeadUpdate={() => queryClient.invalidateQueries({ queryKey: ['crm-leads'] })} />
                                 <div className="border-t pt-2">
@@ -2716,8 +2725,8 @@ export default function CRM() {
                               </div>
                             )}
 
-                            {/* ── Stage 4: جارٍ العمل - بدون عقد ── */}
-                            {si === 4 && (
+                            {/* ── Stage 5: جارٍ العمل - بدون عقد ── */}
+                            {si === 5 && (
                               <div className="space-y-2 w-full">
                                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-2.5 text-xs">
                                   <p className="font-semibold text-orange-800 flex items-center gap-1 mb-1">
@@ -2735,13 +2744,13 @@ export default function CRM() {
                               </div>
                             )}
 
-                            {/* ── Stage 5: تم التعاقد (archived) ── */}
-                            {si === 5 && (
+                            {/* ── Stage 6: تم التعاقد (archived) ── */}
+                            {si === 6 && (
                               <span className="text-xs text-muted-foreground italic">مكتمل — تم نقله للعملاء</span>
                             )}
 
-                            {/* ── Stage 6: فرص خاسرة ── */}
-                            {si === 6 && (<>
+                            {/* ── Stage 7: فرص خاسرة ── */}
+                            {si === 7 && (<>
                               <Button size="sm" variant="outline" className="text-xs h-7 text-blue-600 border-blue-200"
                                 onClick={async () => {
                                   await updateLead.mutateAsync({ id: lead.id, stage: "استفسار جديد" });
@@ -2820,7 +2829,7 @@ export default function CRM() {
               stage: "عرض سعر مرسل",
             });
             setQuotationTarget(null);
-            setOpenStage(2);
+            setOpenStage(3);
             setSelectedLead(null);
           }}
         />
