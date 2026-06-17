@@ -1045,33 +1045,44 @@ function PhaseFacadeStructuralPopup({ phase, project, onClose, onTaskUpdate }: {
   const updateMeta = useUpdatePhaseMeta(project.id, "facade_structural");
   const meta: Record<string, any> = metaRow?.data || {};
 
-  // ── حالة المراحل الفرعية ──
-  // structuralDone: تم رفع ملف الإنشائي (DWG)
+  // ── حالة المراحل الفرعية الأربع ──
+  // columnsDone: تم اعتماد سستم الأعمدة
   // facadeDone: تم اعتماد الواجهات من العميل
-  const structuralDone = meta.structuralDone === true;
+  // fullStructuralDone: تم رفع التصميم الإنشائي الكامل
+  const columnsDone = meta.columnsDone === true;
   const facadeDone = meta.facadeDone === true;
-  const structuralFile = meta.structuralFile || null; // اسم الملف المرفوع
+  const fullStructuralDone = meta.fullStructuralDone === true;
+  const columnsFile = meta.columnsFile || null;
+  const fullStructuralFile = meta.fullStructuralFile || null;
 
-  const setStructuralDone = (val: boolean, fileName?: string) => {
-    updateMeta.mutate({ ...meta, structuralDone: val, structuralFile: fileName || meta.structuralFile });
+  const setColumnsDone = (val: boolean, fileName?: string) => {
+    updateMeta.mutate({ ...meta, columnsDone: val, columnsFile: fileName || meta.columnsFile });
   };
   const setFacadeDone = (val: boolean) => {
     updateMeta.mutate({ ...meta, facadeDone: val });
   };
+  const setFullStructuralDone = (val: boolean, fileName?: string) => {
+    updateMeta.mutate({ ...meta, fullStructuralDone: val, fullStructuralFile: fileName || meta.fullStructuralFile });
+  };
 
   const facadeTasks = phase.tasks.filter(t => t.name.includes("واجهة") || t.name.includes("معماري") || t.name.includes("ثلاثي") || t.name.includes("3D"));
-  const structuralTasks = phase.tasks.filter(t => t.name.includes("إنشائ") || t.name.includes("أعمدة") || t.name.includes("حديد") || t.name.includes("خرسان"));
+  const structuralTasks = phase.tasks.filter(t => t.name.includes("إنشائي") || t.name.includes("أعمدة") || t.name.includes("حديد") || t.name.includes("خرسان"));
   const mepTasks = phase.tasks.filter(t => t.name.includes("كهرباء") || t.name.includes("صحي") || t.name.includes("ميكانيك") || t.name.includes("MEP"));
   const otherTasks = phase.tasks.filter(t =>
     !facadeTasks.find(x => x.id === t.id) &&
     !structuralTasks.find(x => x.id === t.id) &&
     !mepTasks.find(x => x.id === t.id)
   );
-  const doneCount = phase.tasks.filter(t => t.status === "done").length;
-  const progress = phase.tasks.length > 0 ? Math.round((doneCount / phase.tasks.length) * 100) : 0;
+  // حساب العداد الشامل
+  const extraStepsDone = (columnsDone ? 1 : 0) + (facadeDone ? 1 : 0) + (fullStructuralDone ? 1 : 0);
+  const extraStepsTotal = 3;
+  const tasksDoneCount = phase.tasks.filter(t => t.status === "done").length;
+  const doneCount = tasksDoneCount + extraStepsDone;
+  const totalCount = phase.tasks.length + extraStepsTotal;
+  const progress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
 
   // ── تحديد المرحلة الفرعية النشطة ──
-  const activeSubStep = !structuralDone ? "structural" : !facadeDone ? "facade" : "municipality";
+  const activeSubStep = !columnsDone ? "columns" : !facadeDone ? "facade" : !fullStructuralDone ? "fullstructural" : "municipality";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" dir="rtl" onClick={onClose}>
@@ -1099,27 +1110,28 @@ function PhaseFacadeStructuralPopup({ phase, project, onClose, onTaskUpdate }: {
           </div>
           <div className="flex items-center gap-3">
             <Progress value={progress} className="flex-1 h-1.5" />
-            <span className="text-xs font-bold shrink-0" style={{ color, fontFamily: "'Space Grotesk'" }}>{doneCount}/{phase.tasks.length}</span>
+            <span className="text-xs font-bold shrink-0" style={{ color, fontFamily: "'Space Grotesk'" }}>{doneCount}/{totalCount}</span>
           </div>
-          {/* Sub-pipeline indicator */}
-          <div className="flex items-center gap-1 mt-2.5">
+          {/* Sub-pipeline indicator - 4 مراحل */}
+          <div className="flex items-center gap-0.5 mt-2.5 flex-wrap">
             {[
-              { key: "structural", label: "① الإنشائي", done: structuralDone },
+              { key: "columns", label: "① الأعمدة", done: columnsDone },
               { key: "facade", label: "② الواجهات", done: facadeDone },
-              { key: "municipality", label: "③ البلدية", done: false },
+              { key: "fullstructural", label: "③ الإنشائي", done: fullStructuralDone },
+              { key: "municipality", label: "④ البلدية", done: false },
             ].map((step, idx) => {
               const isActive = activeSubStep === step.key;
               const isPast = step.done;
               return (
                 <React.Fragment key={step.key}>
-                  <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium transition-all ${
+                  <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium transition-all ${
                     isPast ? "bg-green-100 text-green-700" :
                     isActive ? "text-white" : "bg-muted text-muted-foreground opacity-50"
                   }`} style={isActive ? { backgroundColor: color } : {}}>
-                    {isPast ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
+                    {isPast ? <CheckCircle2 className="w-2.5 h-2.5" /> : <Circle className="w-2.5 h-2.5" />}
                     {step.label}
                   </div>
-                  {idx < 2 && <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" style={{ transform: "scaleX(-1)" }} />}
+                  {idx < 3 && <ChevronRight className="w-2.5 h-2.5 text-muted-foreground shrink-0" style={{ transform: "scaleX(-1)" }} />}
                 </React.Fragment>
               );
             })}
@@ -1129,100 +1141,75 @@ function PhaseFacadeStructuralPopup({ phase, project, onClose, onTaskUpdate }: {
         {/* Content */}
         <div className="overflow-y-auto flex-1 p-4 space-y-3">
 
-          {/* ── المرحلة الفرعية ①: التصميم الإنشائي ── */}
+          {/* ── المرحلة الفرعية ①: سستم الأعمدة ── */}
           <div className={`rounded-xl border-2 overflow-hidden transition-all ${
-            structuralDone ? "border-green-200 bg-green-50/30" :
-            activeSubStep === "structural" ? "border-orange-300" : "border-muted opacity-60"
+            columnsDone ? "border-green-200 bg-green-50/30" :
+            activeSubStep === "columns" ? "border-orange-300" : "border-muted opacity-60"
           }`}>
             <div className="px-3 py-2.5 flex items-center justify-between cursor-pointer hover:bg-muted/10"
-              onClick={() => setExpandedSection(expandedSection === "structural-card" ? null : "structural-card")}>
+              onClick={() => setExpandedSection(expandedSection === "columns-card" ? null : "columns-card")}>
               <div className="flex items-center gap-2">
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${structuralDone ? "bg-green-500" : "bg-orange-500"}`}>
-                  {structuralDone ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <Building2 className="w-3.5 h-3.5 text-white" />}
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${columnsDone ? "bg-green-500" : "bg-orange-500"}`}>
+                  {columnsDone ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <Building2 className="w-3.5 h-3.5 text-white" />}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">① التصميم الإنشائي</p>
-                  <p className="text-[10px] text-muted-foreground">سستم الأعمدة والقواعد والسملات</p>
+                  <p className="text-sm font-semibold">① سستم الأعمدة</p>
+                  <p className="text-[10px] text-muted-foreground">تصميم الأعمدة والقواعد والسملات فقط</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {structuralDone
+                {columnsDone
                   ? <span className="text-[10px] text-green-600 font-medium flex items-center gap-0.5"><CheckCircle2 className="w-3 h-3" /> مكتمل</span>
                   : <span className="text-[10px] font-medium" style={{ color }}>جارٍ</span>}
-                <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedSection === "structural-card" ? "rotate-90" : ""}`} />
+                <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedSection === "columns-card" ? "rotate-90" : ""}`} />
               </div>
             </div>
-            {expandedSection === "structural-card" && (
+            {expandedSection === "columns-card" && (
               <div className="px-3 pb-3 pt-2 border-t space-y-3">
-                {/* إشعار المهندس الإنشائي */}
-                {!structuralDone && (
+                {!columnsDone && (
                   <div className="bg-orange-50 border border-orange-200 rounded-lg p-2.5">
-                    <p className="text-xs font-medium text-orange-800 mb-1">🔔 تنبيه المهندس الإنشائي</p>
-                    <p className="text-[10px] text-orange-700 mb-2">عند رفع الملف المعماري المعتمد، سيصل إشعار تلقائي للمهندس الإنشائي لبدء تصميم سستم الأعمدة.</p>
+                    <p className="text-xs font-medium text-orange-800 mb-1">🔔 مهندس التصميم الإنشائي</p>
+                    <p className="text-[10px] text-orange-700 mb-2">يبدأ بتصميم سستم الأعمدة فقط — بدون التصميم الإنشائي الكامل حتى تعتمد الواجهات.</p>
                     <Button size="sm" variant="outline" className="h-7 text-[10px] border-orange-300 text-orange-700"
                       onClick={() => {
                         toast.success("تم إرسال إشعار للمهندس الإنشائي ✓");
-                        fetch("/api/send-email", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            to: "structural@office.com",
-                            subject: `مشروع ${project.name} — يرجى البدء بتصميم سستم الأعمدة`,
-                            body: `تم اعتماد التصميم المعماري لمشروع ${project.name}. يرجى البدء بتصميم سستم الأعمدة والقواعد والسملات.`,
-                            projectId: project.id,
-                            type: "structural_notify",
-                          }),
-                        });
                       }}>
-                      <Phone className="w-3 h-3 ml-1" /> إرسال إشعار للمهندس الإنشائي
+                      <Phone className="w-3 h-3 ml-1" /> إشعار المهندس الإنشائي
                     </Button>
                   </div>
                 )}
-                {/* رفع ملف الإنشائي DWG */}
                 <div>
-                  <p className="text-[10px] text-muted-foreground mb-1.5">ارفع ملف التصميم الإنشائي (DWG)</p>
-                  {structuralFile && (
+                  <p className="text-[10px] text-muted-foreground mb-1.5">ارفع ملف سستم الأعمدة (DWG)</p>
+                  {columnsFile && (
                     <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg p-2 mb-2">
                       <File className="w-4 h-4 text-green-600 shrink-0" />
-                      <span className="text-xs text-green-700 flex-1 truncate">{structuralFile}</span>
+                      <span className="text-xs text-green-700 flex-1 truncate">{columnsFile}</span>
                       <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
                     </div>
                   )}
                   <FileUploadButton
-                    label={structuralFile ? "استبدال الملف" : "رفع ملف الإنشائي (DWG)"}
-                    category="تصميم إنشائي"
+                    label={columnsFile ? "استبدال الملف" : "رفع ملف سستم الأعمدة (DWG)"}
+                    category="سستم أعمدة"
                     projectId={project.id}
                     clientId={project.clientId}
                     onUploaded={(doc) => {
-                      setStructuralDone(true, doc?.name || "ملف الإنشائي");
-                      toast.success("تم رفع ملف الإنشائي ✓ — سيصل إشعار لرسام الواجهات");
-                      fetch("/api/send-email", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          to: "facade@office.com",
-                          subject: `مشروع ${project.name} — جاهز لتصميم الواجهات`,
-                          body: `تم إنجاز التصميم الإنشائي لمشروع ${project.name}. يرجى البدء بتصميم الواجهات.`,
-                          projectId: project.id,
-                          type: "facade_notify",
-                        }),
-                      });
+                      setColumnsDone(true, doc?.name || "ملف سستم الأعمدة");
+                      toast.success("تم رفع سستم الأعمدة ✓ — يمكن الآن بدء تصميم الواجهات");
                     }}
                   />
                 </div>
-                {/* قفل مرن */}
-                {!structuralDone && (
+                {!columnsDone && (
                   <div className="flex items-center gap-2 pt-1 border-t">
-                    <input type="checkbox" id="bypass-structural" checked={bypassLock}
+                    <input type="checkbox" id="bypass-columns" checked={bypassLock}
                       onChange={e => setBypassLock(e.target.checked)} className="w-3 h-3" />
-                    <label htmlFor="bypass-structural" className="text-[10px] text-muted-foreground cursor-pointer">
-                      تجاوز القفل (للمدير فقط) — الانتقال للواجهات بدون رفع ملف
+                    <label htmlFor="bypass-columns" className="text-[10px] text-muted-foreground cursor-pointer">
+                      تجاوز القفل (للمدير فقط)
                     </label>
                   </div>
                 )}
-                {bypassLock && !structuralDone && (
+                {bypassLock && !columnsDone && (
                   <Button size="sm" className="w-full h-8 text-xs" variant="outline"
-                    onClick={() => { setStructuralDone(true); setBypassLock(false); toast.warning("تم تجاوز القفل — الإنشائي مكتمل"); }}>
+                    onClick={() => { setColumnsDone(true); setBypassLock(false); toast.warning("تم تجاوز القفل"); }}>
                     تأكيد التجاوز والانتقال للواجهات
                   </Button>
                 )}
@@ -1235,19 +1222,19 @@ function PhaseFacadeStructuralPopup({ phase, project, onClose, onTaskUpdate }: {
             facadeDone ? "border-green-200 bg-green-50/30" :
             activeSubStep === "facade" ? "" : "border-muted opacity-60"
           }`} style={activeSubStep === "facade" && !facadeDone ? { borderColor: color } : {}}>
-            {/* قفل إذا لم يكتمل الإنشائي */}
-            {!structuralDone && !bypassLock && (
+            {/* قفل إذا لم يكتمل سستم الأعمدة */}
+            {!columnsDone && !bypassLock && (
               <div className="px-3 py-2.5 flex items-center gap-2 bg-muted/20">
                 <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center">
                   <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">② تصميم الواجهات</p>
-                  <p className="text-[10px] text-muted-foreground">🔒 ينشط بعد إنجاز التصميم الإنشائي</p>
+                  <p className="text-[10px] text-muted-foreground">🔒 ينشط بعد اعتماد سستم الأعمدة</p>
                 </div>
               </div>
             )}
-            {(structuralDone || bypassLock) && (
+            {(columnsDone || bypassLock) && (
               <>
                 <div className="px-3 py-2.5 flex items-center justify-between cursor-pointer hover:bg-muted/10"
                   onClick={() => setExpandedSection(expandedSection === "facade-card" ? null : "facade-card")}>
@@ -1343,23 +1330,106 @@ function PhaseFacadeStructuralPopup({ phase, project, onClose, onTaskUpdate }: {
             )}
           </div>
 
-          {/* ── المرحلة الفرعية ③: الانتقال للبلدية ── */}
+          {/* ── المرحلة الفرعية ③: التصميم الإنشائي الكامل ── */}
           <div className={`rounded-xl border-2 overflow-hidden transition-all ${
-            facadeDone ? "border-green-300 bg-green-50/50" : "border-muted opacity-50"
+            fullStructuralDone ? "border-green-200 bg-green-50/30" :
+            activeSubStep === "fullstructural" ? "" : "border-muted opacity-60"
+          }`} style={activeSubStep === "fullstructural" && !fullStructuralDone ? { borderColor: color } : {}}>
+            {/* قفل إذا لم تعتمد الواجهات */}
+            {!facadeDone && (
+              <div className="px-3 py-2.5 flex items-center gap-2 bg-muted/20">
+                <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center">
+                  <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">③ التصميم الإنشائي الكامل</p>
+                  <p className="text-[10px] text-muted-foreground">🔒 ينشط بعد اعتماد الواجهات من العميل</p>
+                </div>
+              </div>
+            )}
+            {facadeDone && (
+              <>
+                <div className="px-3 py-2.5 flex items-center justify-between cursor-pointer hover:bg-muted/10"
+                  onClick={() => setExpandedSection(expandedSection === "fullstructural-card" ? null : "fullstructural-card")}>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${fullStructuralDone ? "bg-green-500" : ""}`} style={!fullStructuralDone ? { backgroundColor: color } : {}}>
+                      {fullStructuralDone ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <Building2 className="w-3.5 h-3.5 text-white" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold">③ التصميم الإنشائي الكامل</p>
+                      <p className="text-[10px] text-muted-foreground">بعد اعتماد الواجهات — التصميم الإنشائي الكامل مع جميع التفاصيل</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {fullStructuralDone
+                      ? <span className="text-[10px] text-green-600 font-medium flex items-center gap-0.5"><CheckCircle2 className="w-3 h-3" /> مكتمل</span>
+                      : <span className="text-[10px] font-medium" style={{ color }}>جارٍ</span>}
+                    <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedSection === "fullstructural-card" ? "rotate-90" : ""}`} />
+                  </div>
+                </div>
+                {expandedSection === "fullstructural-card" && (
+                  <div className="px-3 pb-3 pt-2 border-t space-y-3">
+                    {!fullStructuralDone && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
+                        <p className="text-xs font-medium text-blue-800 mb-1">📌 التصميم الإنشائي الكامل</p>
+                        <p className="text-[10px] text-blue-700 mb-2">تم اعتماد الواجهات — يمكن الآن إكمال التصميم الإنشائي الكامل بما يتناسب مع الواجهات المعتمدة.</p>
+                        <Button size="sm" variant="outline" className="h-7 text-[10px] border-blue-300 text-blue-700"
+                          onClick={() => toast.success("تم إشعار المهندس الإنشائي لإكمال التصميم الكامل ✓")}>
+                          <Phone className="w-3 h-3 ml-1" /> إشعار المهندس الإنشائي
+                        </Button>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-1.5">ارفع ملف التصميم الإنشائي الكامل (DWG)</p>
+                      {fullStructuralFile && (
+                        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg p-2 mb-2">
+                          <File className="w-4 h-4 text-green-600 shrink-0" />
+                          <span className="text-xs text-green-700 flex-1 truncate">{fullStructuralFile}</span>
+                          <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                        </div>
+                      )}
+                      <FileUploadButton
+                        label={fullStructuralFile ? "استبدال الملف" : "رفع ملف الإنشائي الكامل (DWG)"}
+                        category="تصميم إنشائي كامل"
+                        projectId={project.id}
+                        clientId={project.clientId}
+                        onUploaded={(doc) => {
+                          setFullStructuralDone(true, doc?.name || "ملف الإنشائي الكامل");
+                          toast.success("تم رفع التصميم الإنشائي الكامل ✓ — جاهز للانتقال للبلدية");
+                        }}
+                      />
+                    </div>
+                    {/* مهام الإنشائي */}
+                    {structuralTasks.length > 0 && (
+                      <TaskGroup title="مهام التصميم الإنشائي" subtitle="من خطة العمل"
+                        icon={<Building2 className="w-3.5 h-3.5 text-white" />} color="oklch(0.55 0.15 30)"
+                        tasks={structuralTasks} expanded={(expandedSection as string) === "structural-tasks"}
+                        onToggle={() => setExpandedSection((expandedSection as string) === "structural-tasks" ? null : "structural-tasks")}
+                        onTaskUpdate={onTaskUpdate} />
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* ── المرحلة الفرعية ④: الانتقال للبلدية ── */}
+          <div className={`rounded-xl border-2 overflow-hidden transition-all ${
+            fullStructuralDone ? "border-green-300 bg-green-50/50" : "border-muted opacity-50"
           }`}>
             <div className="px-3 py-2.5 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${facadeDone ? "bg-green-500" : "bg-muted"}`}>
-                  {facadeDone ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />}
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${fullStructuralDone ? "bg-green-500" : "bg-muted"}`}>
+                  {fullStructuralDone ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />}
                 </div>
                 <div>
-                  <p className={`text-sm font-semibold ${facadeDone ? "" : "text-muted-foreground"}`}>③ الانتقال لمرحلة البلدية</p>
+                  <p className={`text-sm font-semibold ${fullStructuralDone ? "" : "text-muted-foreground"}`}>④ الانتقال لمرحلة البلدية</p>
                   <p className="text-[10px] text-muted-foreground">
-                    {facadeDone ? "✅ جاهز — يمكن الانتقال للبلدية" : "🔒 ينشط بعد اعتماد العميل للواجهات"}
+                    {fullStructuralDone ? "✅ جاهز — يمكن الانتقال للبلدية" : "🔒 ينشط بعد إكمال التصميم الإنشائي الكامل"}
                   </p>
                 </div>
               </div>
-              {facadeDone && (
+              {fullStructuralDone && (
                 <Button size="sm" className="h-7 text-[10px] text-white" style={{ backgroundColor: color }}
                   onClick={() => {
                     toast.success("تم الانتقال لمرحلة مخطط البلدية ✓");
