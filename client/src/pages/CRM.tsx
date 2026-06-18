@@ -43,7 +43,7 @@ import {
   useCreateClient, useCreateProject, useCreateContract, useUpdateContract,
   useCreateInvoice, useContracts, useContractsByLead, useProjects, useContractTemplates,
   useAppointmentsByLead, useCreateAppointment, useDeleteAppointment, useAppointments,
-  useEmployees, usePackages,
+  useEmployees, usePackages, useUpdatePackage,
 } from "@/lib/api";
 import { exportQuotationPdf, exportContractPdf, downloadQuotationPdf, printQuotationPdf, downloadContractPdf, buildContractPreviewHtml } from "@/lib/pdf";
 import { toast } from "sonner";
@@ -111,7 +111,7 @@ const emptyForm = {
   notes: "", plotNumber: "", parcelNumber: "", landArea: "", customArea: "",
 };
 
-type PkgType = { name: string; price: string; buildingType: string; serviceType: string; level: string; features: string[] };
+type PkgType = { id?: number; name: string; price: string; buildingType: string; serviceType: string; level: string; features: string[] };
 
 function QuotationDialog({ lead, onClose, onSaved }: {
   lead: Lead;
@@ -119,6 +119,7 @@ function QuotationDialog({ lead, onClose, onSaved }: {
   onSaved: (quotationId: string) => void;
 }) {
   const createQuotation = useCreateQuotation();
+  const updatePackage = useUpdatePackage();
   const [selectedPkg, setSelectedPkg] = useState<PkgType | null>(null);
   const [generating, setGenerating] = useState(false);
   const [agreedPrice, setAgreedPrice] = useState("");
@@ -126,6 +127,25 @@ function QuotationDialog({ lead, onClose, onSaved }: {
   const [newFeature, setNewFeature] = useState("");
   const [editingFeatureIdx, setEditingFeatureIdx] = useState<number | null>(null);
   const [editingFeatureText, setEditingFeatureText] = useState("");
+
+  // هل تم تعديل الخدمات عن الأصل؟
+  const featuresChanged = selectedPkg
+    ? JSON.stringify(editableFeatures) !== JSON.stringify(selectedPkg.features)
+    : false;
+
+  const handleSaveToPackage = async () => {
+    if (!selectedPkg?.id) return;
+    await updatePackage.mutateAsync({
+      id: selectedPkg.id,
+      name: selectedPkg.name,
+      price: selectedPkg.price,
+      buildingType: selectedPkg.buildingType,
+      serviceType: selectedPkg.serviceType,
+      level: selectedPkg.level,
+      features: editableFeatures,
+    });
+    toast.success(`✅ تم حفظ التعديلات في باقة "${selectedPkg.name}" للاستخدام المستقبلي`);
+  };
 
   const { data: dynamicPackages = {} } = usePackages();
   const allFlat = Object.values(dynamicPackages).flat();
@@ -385,6 +405,24 @@ function QuotationDialog({ lead, onClose, onSaved }: {
                           }}
                         >إضافة</button>
                       </div>
+                      {/* زر حفظ التعديلات في الباقة */}
+                      {featuresChanged && selectedPkg?.id && (
+                        <div className="mt-2 pt-2 border-t border-dashed border-amber-300">
+                          <button
+                            className="w-full text-xs px-2 py-1.5 rounded bg-amber-500 text-white font-semibold flex items-center justify-center gap-1 disabled:opacity-60"
+                            disabled={updatePackage.isPending}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await handleSaveToPackage();
+                            }}
+                          >
+                            {updatePackage.isPending
+                              ? <span className="animate-spin">⏳</span>
+                              : <Save className="w-3 h-3" />}
+                            حفظ التعديلات في الباقة للاستخدام المستقبلي
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
