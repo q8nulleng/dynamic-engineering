@@ -2652,6 +2652,9 @@ export default function CRM() {
                             {/* ── Stage 1: كروكي ── */}
                             {si === 1 && (<>
                               <span className="text-xs text-muted-foreground italic">مشروع كروكي قيد التنفيذ — راجع المشاريع</span>
+                              <Button size="sm" variant="outline" className="text-xs h-7 text-amber-600 border-amber-200"
+                                onClick={() => { setLostDialogLead(lead); setLostReason(""); }}
+                              ><Archive className="w-3 h-3 ml-1" />أرشفة</Button>
                             </>)}
 
                             {/* ── Stage 2: تم التواصل ── */}
@@ -2721,6 +2724,9 @@ export default function CRM() {
                                     {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <Briefcase className="w-3 h-3 ml-1" />}
                                     ⚡ بدء العمل بدون عقد
                                   </Button>
+                                  <Button size="sm" variant="outline" className="text-xs h-7 text-amber-600 border-amber-200 w-full mt-1"
+                                    onClick={() => { setLostDialogLead(lead); setLostReason(""); }}
+                                  ><Archive className="w-3 h-3 ml-1" />أرشفة</Button>
                                 </div>
                               </div>
                             )}
@@ -2741,12 +2747,20 @@ export default function CRM() {
                   {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <CheckCircle className="w-3 h-3 ml-1" />}
                   تم قبول العقد وفتح مشروع
                 </Button>
+                                <Button size="sm" variant="outline" className="text-xs h-7 text-amber-600 border-amber-200 w-full"
+                                  onClick={() => { setLostDialogLead(lead); setLostReason(""); }}
+                                ><Archive className="w-3 h-3 ml-1" />أرشفة</Button>
                               </div>
                             )}
 
                             {/* ── Stage 6: تم التعاقد (archived) ── */}
                             {si === 6 && (
-                              <span className="text-xs text-muted-foreground italic">مكتمل — تم نقله للعملاء</span>
+                              <div className="flex flex-wrap gap-1.5">
+                                <span className="text-xs text-muted-foreground italic">مكتمل — تم نقله للعملاء</span>
+                                <Button size="sm" variant="outline" className="text-xs h-7 text-amber-600 border-amber-200"
+                                  onClick={() => { setLostDialogLead(lead); setLostReason(""); }}
+                                ><Archive className="w-3 h-3 ml-1" />أرشفة</Button>
+                              </div>
                             )}
 
                             {/* ── Stage 7: فرص خاسرة ── */}
@@ -2769,7 +2783,7 @@ export default function CRM() {
                             </>)}
 
                             {/* Edit + Archive always visible except archived/lost */}
-                            {si < 5 && (<>
+                            {si < 5 && si !== 1 && (<>
                               <Button size="sm" variant="outline" className="text-xs h-7"
                                 onClick={() => {
                                   setEditForm({
