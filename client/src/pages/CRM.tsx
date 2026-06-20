@@ -1597,6 +1597,10 @@ function LeadContractSection({
                     className="text-[10px] text-blue-600 underline flex items-center gap-0.5">
                     <ImageIcon className="w-3 h-3" />عرض
                   </a>
+                  <a href={civilCardUrl} download
+                    className="text-[10px] text-green-600 underline flex items-center gap-0.5">
+                    <Download className="w-3 h-3" />تحميل
+                  </a>
                   <label className="cursor-pointer text-[10px] text-gray-500 hover:text-gray-700">
                     <Upload className="w-3 h-3 inline" />
                     <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleUploadCivilCard} />
@@ -1621,6 +1625,10 @@ function LeadContractSection({
                   <a href={signedContractUrl} target="_blank" rel="noreferrer"
                     className="text-[10px] text-blue-600 underline flex items-center gap-0.5">
                     <ImageIcon className="w-3 h-3" />عرض
+                  </a>
+                  <a href={signedContractUrl} download
+                    className="text-[10px] text-green-600 underline flex items-center gap-0.5">
+                    <Download className="w-3 h-3" />تحميل
                   </a>
                   <label className="cursor-pointer text-[10px] text-gray-500 hover:text-gray-700">
                     <Upload className="w-3 h-3 inline" />
