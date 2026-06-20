@@ -1371,6 +1371,7 @@ function LeadContractSection({
   signingBusy,
   onSigned,
   onLeadUpdate,
+  onOpenOldContract,
 }: {
   lead: Lead;
   onCreateContract: () => void;
@@ -1378,6 +1379,7 @@ function LeadContractSection({
   signingBusy: boolean;
   onSigned: () => void;
   onLeadUpdate: () => void;
+  onOpenOldContract?: () => void;
 }) {
   const { data: contracts = [] } = useContractsByLead(lead.id);
   const contract = contracts[0];
@@ -1645,9 +1647,26 @@ function LeadContractSection({
 
       <div className="flex gap-2 flex-wrap">
         {!contract ? (
-          <Button size="sm" className="text-xs h-7" style={{ backgroundColor: "oklch(0.30 0.05 250)" }}
-            onClick={onCreateContract}
-          ><FileText className="w-3 h-3 ml-1" />إنشاء عقد</Button>
+          <>
+            <Button size="sm" className="text-xs h-7" style={{ backgroundColor: "oklch(0.30 0.05 250)" }}
+              onClick={onCreateContract}
+            ><FileText className="w-3 h-3 ml-1" />إنشاء عقد</Button>
+            {onOpenOldContract && civilCardUrl && signedContractUrl && (
+              <Button size="sm" className="text-xs h-7 text-white" style={{ backgroundColor: "oklch(0.45 0.18 280)" }}
+                disabled={signingBusy}
+                onClick={onOpenOldContract}
+              >
+                {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <Briefcase className="w-3 h-3 ml-1" />}
+                فتح مشروع (عقد قديم)
+              </Button>
+            )}
+            {onOpenOldContract && (!civilCardUrl || !signedContractUrl) && (
+              <div className="text-[10px] text-purple-600 flex items-center gap-1 w-full mt-1">
+                <AlertCircle className="w-3 h-3" />
+                لفتح مشروع بعقد قديم: ارفع البطاقة المدنية والعقد الموقع أولاً
+              </div>
+            )}
+          </>
         ) : (
           <>
             <Button size="sm" variant="outline" className="text-xs h-7 text-blue-700 border-blue-300"
@@ -2352,6 +2371,134 @@ export default function CRM() {
     }
   };
 
+  // ── فتح مشروع بعقد قديم (ارفاق المدنية والعقد الموقع فقط) ──────────────────
+  const handleOpenOldContract = async (lead: Lead) => {
+    if (signingBusy) return;
+    if (!window.confirm(`هل تريد فتح مشروع لـ "${lead.name}" بعقد قديم؟\nسيتم إنشاء العميل والمشروع مباشرة بدون إنشاء عقد من النظام.`)) return;
+    setSigningBusy(true);
+    try {
+      const now = new Date().toISOString().slice(0, 10);
+      const clientId = `C${Date.now().toString(36).toUpperCase()}`;
+
+      const client = await createClient.mutateAsync({
+        id: clientId,
+        name: lead.name,
+        phone: lead.phone,
+        type: "individual" as const,
+        governorate: lead.governorate || "",
+        area: lead.area || "",
+        block: "",
+        plot: lead.plotNumber || "",
+        parcelArea: lead.landArea || 0,
+        status: "active" as const,
+        rating: 4,
+        createdAt: now,
+        projectType: lead.type || "",
+        serviceType: lead.serviceType || "",
+        leadId: lead.id,
+        totalContractsValue: 0,
+        totalPaid: 0,
+        totalRemaining: 0,
+        notes: (lead.notes || "") + (lead.notes ? " | " : "") + "تم فتح المشروع بعقد قديم (مرفق مع الملف)",
+        civilId: lead.civilId || "",
+        email: "",
+        ownershipDoc: "",
+        ownershipDate: "",
+        spouseName: "",
+        spouseCivilId: "",
+        phone2: "",
+        parcelShape: "",
+        parcelFacing: "",
+      });
+
+      const maxSeq = allProjects.reduce((max, p) => {
+        const n = parseInt(p.id.replace(/^S/, ""), 10);
+        return isNaN(n) ? max : Math.max(max, n);
+      }, 0);
+      const projectId = `S${String(maxSeq + 1).padStart(5, "0")}`;
+      const defaultPhases = [
+        { title: "تجهيز الملف", tasks: [
+          { name: "تصميم الكروكي", status: "pending", order: 0 },
+          { name: "تجميع المستندات", status: "pending", order: 1 },
+          { name: "نماذج البلدية", status: "pending", order: 2 },
+        ]},
+        { title: "التصميم", tasks: [
+          { name: "التصميم المعماري", status: "pending", order: 0 },
+          { name: "تصميم الواجهات", status: "pending", order: 1 },
+          { name: "مخطط البلدية", status: "pending", order: 2 },
+        ]},
+        { title: "البلدية والاعتماد", tasks: [
+          { name: "تقديم بلدية", status: "pending", order: 0 },
+          { name: "الحصول على موافقة البلدية", status: "pending", order: 1 },
+        ]},
+        { title: "الكراسة والمخططات", tasks: [
+          { name: "التصميم الإنشائي", status: "pending", order: 0 },
+          { name: "التصميم الصحي", status: "pending", order: 1 },
+          { name: "التصميم الكهربائي", status: "pending", order: 2 },
+        ]},
+        { title: "الإشراف", tasks: [
+          { name: "إصدار خطاب إشراف", status: "pending", order: 0 },
+          { name: "الإشراف الميداني", status: "pending", order: 1 },
+          { name: "شهادة الإنجاز", status: "pending", order: 2 },
+        ]},
+      ];
+      await createProject.mutateAsync({
+        id: projectId,
+        name: `${lead.type || "مشروع"} - ${lead.name}`,
+        clientId: client.id,
+        client: lead.name,
+        type: lead.type || "سكن خاص",
+        serviceType: lead.serviceType || "بناء جديد",
+        area: lead.area || "",
+        contractId: "",
+        leadId: lead.id,
+        status: "جديد",
+        phases: defaultPhases as unknown[],
+      });
+
+      await fetch(`/api/projects/${projectId}/auto-tasks`, { method: "POST" }).catch(() => null);
+
+      // نقل وثائق التوقيع إلى مستندات المشروع
+      if (lead.civilCardUrl) {
+        await fetch("/api/upload-from-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: lead.civilCardUrl,
+            clientId: client.id,
+            projectId,
+            name: `بطاقة مدنية - ${lead.name}`,
+            category: "وثائق العقد",
+          }),
+        }).catch(() => null);
+      }
+      if (lead.signedContractUrl) {
+        await fetch("/api/upload-from-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: lead.signedContractUrl,
+            clientId: client.id,
+            projectId,
+            name: `عقد موقّع (قديم) - ${lead.name}`,
+            category: "وثائق العقد",
+          }),
+        }).catch(() => null);
+      }
+
+      await updateLead.mutateAsync({ id: lead.id, stage: "تم التعاقد" });
+
+      setSelectedLead(null);
+      toast.success(`🎉 تم فتح مشروع "${lead.name}" بعقد قديم — جاري الانتقال للمشروع...`);
+      setTimeout(() => navigate(`/projects/${projectId}`), 800);
+    } catch (err) {
+      toast.error("حدث خطأ أثناء فتح المشروع — تحقق من البيانات");
+      console.error(err);
+    } finally {
+      setSigningBusy(false);
+    }
+  };
+
   // فتح كروكي: ينشئ مشروع كروكي مباشرة بدون عقد أو عميل
   const handleOpenSketch = async (lead: Lead) => {
     if (signingBusy) return;
@@ -2775,7 +2922,7 @@ export default function CRM() {
                             {/* ── Stage 4: بانتظار التعاقد ── */}
                             {si === 4 && (
                               <div className="space-y-2 w-full">
-                                <LeadContractSection lead={lead} onCreateContract={() => setContractTarget(lead)} onViewQuote={() => setViewQuoteTarget(lead)} signingBusy={signingBusy} onSigned={() => handleContractSigned(lead)} onLeadUpdate={() => queryClient.invalidateQueries({ queryKey: ['crm-leads'] })} />
+                                <LeadContractSection lead={lead} onCreateContract={() => setContractTarget(lead)} onViewQuote={() => setViewQuoteTarget(lead)} signingBusy={signingBusy} onSigned={() => handleContractSigned(lead)} onLeadUpdate={() => queryClient.invalidateQueries({ queryKey: ['crm-leads'] })} onOpenOldContract={() => handleOpenOldContract(lead)} />
                                 <div className="border-t pt-2">
                                   <p className="text-[10px] text-muted-foreground mb-1.5">أو ابدأ العمل فوراً وأتمم التعاقد لاحقاً:</p>
                                   <Button size="sm" variant="outline" className="text-xs h-7 text-orange-700 border-orange-300 w-full"
