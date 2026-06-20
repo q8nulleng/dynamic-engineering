@@ -44,6 +44,7 @@ import {
   useCreateInvoice, useContracts, useContractsByLead, useProjects, useContractTemplates,
   useAppointmentsByLead, useCreateAppointment, useDeleteAppointment, useAppointments,
   useEmployees, usePackages, useUpdatePackage,
+  useGovernorateAreas, useAddGovernorateArea,
 } from "@/lib/api";
 import { exportQuotationPdf, exportContractPdf, downloadQuotationPdf, printQuotationPdf, downloadContractPdf, buildContractPreviewHtml } from "@/lib/pdf";
 import { toast } from "sonner";
@@ -2047,6 +2048,28 @@ export default function CRM() {
   const [lostDialogLead, setLostDialogLead] = useState<Lead | null>(null);
   const [lostReason, setLostReason] = useState("");
   const { data: allAppointments = [] } = useAppointments();
+  // بيانات المحافظات والمناطق من قاعدة البيانات (ديناميكية)
+  const { data: govAreasData } = useGovernorateAreas();
+  const addGovernorateArea = useAddGovernorateArea();
+  // دمج البيانات الثابتة مع الديناميكية من قاعدة البيانات
+  const dynamicGovernorates: Record<string, string[]> = {};
+  // أضف المحافظات الثابتة أولاً
+  Object.entries(kuwaitGovernorates).forEach(([gov, areas]) => {
+    dynamicGovernorates[gov] = [...areas];
+  });
+  // أضف/دمج البيانات الديناميكية من قاعدة البيانات
+  if (govAreasData?.grouped) {
+    Object.entries(govAreasData.grouped).forEach(([gov, areas]) => {
+      if (!dynamicGovernorates[gov]) {
+        dynamicGovernorates[gov] = [];
+      }
+      (areas as string[]).forEach(area => {
+        if (!dynamicGovernorates[gov].includes(area)) {
+          dynamicGovernorates[gov].push(area);
+        }
+      });
+    });
+  }
   // Build a Set of leadIds that have upcoming appointments
   const leadsWithAppointments = new Set(
     allAppointments
@@ -2833,13 +2856,13 @@ export default function CRM() {
                                     priority: String(lead.priority || ""),
                                     governorate: lead.governorate || "",
                                     area: (() => {
-                                      const govAreas = kuwaitGovernorates[lead.governorate || ""] || [];
+                                      const govAreas = dynamicGovernorates[lead.governorate || ""] || [];
                                       return govAreas.includes(lead.area || "") ? (lead.area || "") : (lead.area ? "أخرى" : "");
                                     })(),
                                     notes: lead.notes || "",
                                     plotNumber: lead.plotNumber || "", parcelNumber: lead.parcelNumber || "", landArea: String(lead.landArea || ""),
                                     customArea: (() => {
-                                      const govAreas = kuwaitGovernorates[lead.governorate || ""] || [];
+                                      const govAreas = dynamicGovernorates[lead.governorate || ""] || [];
                                       return govAreas.includes(lead.area || "") ? "" : (lead.area || "");
                                     })(),
                                   });
@@ -3063,7 +3086,7 @@ export default function CRM() {
                     <Select value={editForm.governorate} onValueChange={(v) => setEditForm(p => ({ ...p, governorate: v, area: "" }))}>
                       <SelectTrigger><SelectValue placeholder="اختر المحافظة" /></SelectTrigger>
                       <SelectContent>
-                        {Object.keys(kuwaitGovernorates).map((g) => (
+                        {Object.keys(dynamicGovernorates).map((g) => (
                           <SelectItem key={g} value={g}>{g}</SelectItem>
                         ))}
                       </SelectContent>
@@ -3077,7 +3100,7 @@ export default function CRM() {
                     <Select value={editForm.area} onValueChange={(v) => setEditForm(p => ({ ...p, area: v, customArea: v !== "أخرى" ? "" : (p.customArea || "") }))} disabled={!editForm.governorate}>
                       <SelectTrigger><SelectValue placeholder={editForm.governorate ? "اختر المنطقة" : "اختر المحافظة أولاً"} /></SelectTrigger>
                       <SelectContent>
-                        {(kuwaitGovernorates[editForm.governorate] || []).map((a) => (
+                        {(dynamicGovernorates[editForm.governorate] || []).map((a) => (
                           <SelectItem key={a} value={a}>{a}</SelectItem>
                         ))}
                       </SelectContent>
@@ -3086,9 +3109,19 @@ export default function CRM() {
                       <Input
                         value={(editForm as any).customArea || ""}
                         onChange={(e) => setEditForm(p => ({ ...p, customArea: e.target.value } as any))}
-                        placeholder="اكتب اسم المنطقة..."
+                        placeholder="اكتب اسم المنطقة الجديدة..."
                         className="mt-1 text-right text-sm"
                         autoFocus
+                        onBlur={async (e) => {
+                          const newArea = e.target.value.trim();
+                          if (newArea && editForm.governorate) {
+                            const existing = dynamicGovernorates[editForm.governorate] || [];
+                            if (!existing.includes(newArea)) {
+                              await addGovernorateArea.mutateAsync({ governorate: editForm.governorate, area: newArea });
+                              toast.success(`✅ تم حفظ "${newArea}" في إعدادات المناطق`);
+                            }
+                          }
+                        }}
                       />
                     )}
                   </div>
@@ -3355,7 +3388,7 @@ export default function CRM() {
                     <Select value={form.governorate} onValueChange={(v) => { handleFormChange("governorate", v); handleFormChange("area", ""); }}>
                       <SelectTrigger><SelectValue placeholder="اختر المحافظة" /></SelectTrigger>
                       <SelectContent>
-                        {Object.keys(kuwaitGovernorates).map((g) => (
+                        {Object.keys(dynamicGovernorates).map((g) => (
                           <SelectItem key={g} value={g}>{g}</SelectItem>
                         ))}
                       </SelectContent>
@@ -3372,7 +3405,7 @@ export default function CRM() {
                       disabled={!form.governorate}>
                       <SelectTrigger><SelectValue placeholder={form.governorate ? "اختر المنطقة" : "اختر المحافظة أولاً"} /></SelectTrigger>
                       <SelectContent>
-                        {(kuwaitGovernorates[form.governorate] || []).map((a) => (
+                        {(dynamicGovernorates[form.governorate] || []).map((a) => (
                           <SelectItem key={a} value={a}>{a}</SelectItem>
                         ))}
                       </SelectContent>
@@ -3381,9 +3414,19 @@ export default function CRM() {
                       <Input
                         value={form.customArea}
                         onChange={(e) => handleFormChange("customArea", e.target.value)}
-                        placeholder="اكتب اسم المنطقة..."
+                        placeholder="اكتب اسم المنطقة الجديدة..."
                         className="mt-1 text-right text-sm"
                         autoFocus
+                        onBlur={async (e) => {
+                          const newArea = e.target.value.trim();
+                          if (newArea && form.governorate) {
+                            const existing = dynamicGovernorates[form.governorate] || [];
+                            if (!existing.includes(newArea)) {
+                              await addGovernorateArea.mutateAsync({ governorate: form.governorate, area: newArea });
+                              toast.success(`✅ تم حفظ "${newArea}" في إعدادات المناطق`);
+                            }
+                          }
+                        }}
                       />
                     )}
                   </div>
