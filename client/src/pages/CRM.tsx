@@ -33,6 +33,7 @@ import {
   Pencil, Trash2, Eye, CheckCircle, Hash, Ruler, ArrowRightLeft, Archive,
   Clock, UserCheck, CalendarPlus, Bell, Briefcase,
   Upload, CreditCard, ShieldCheck, AlertCircle, ImageIcon, PenLine,
+  ChevronLeft, ExternalLink,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { kuwaitGovernorates } from "./Clients";
@@ -1391,8 +1392,29 @@ function LeadContractSection({
   // ── محرر العقد inline ──
   const [showEditor, setShowEditor] = useState(false);
   const [editorSaving, setEditorSaving] = useState(false);
+  const [showSelectContract, setShowSelectContract] = useState(false);
+  const [linkingContract, setLinkingContract] = useState(false);
+  const [contractSearch, setContractSearch] = useState("");
   const editorRef = useRef<HTMLDivElement>(null);
   const updateContract = useUpdateContract();
+  const { data: allContracts = [] } = useContracts();
+  const queryClient = useQueryClient();
+
+  const handleLinkContract = async (contractId: string) => {
+    setLinkingContract(true);
+    try {
+      await updateContract.mutateAsync({ id: contractId, leadId: lead.id });
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["contracts-by-lead", lead.id] });
+      toast.success("تم ربط العقد بالكرت بنجاح");
+      setShowSelectContract(false);
+      onLeadUpdate();
+    } catch {
+      toast.error("حدث خطأ أثناء ربط العقد");
+    } finally {
+      setLinkingContract(false);
+    }
+  };
 
   // استخراج محتوى HTML من termsText
   const getContractHtml = useCallback(() => {
@@ -1653,12 +1675,53 @@ function LeadContractSection({
           )}
         </div>
 
+      {/* Dialog اختيار عقد موجود */}
+      {showSelectContract && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowSelectContract(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-4 space-y-3" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm">اختيار عقد موجود</h3>
+              <button onClick={() => setShowSelectContract(false)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+            </div>
+            <input
+              type="text"
+              placeholder="بحث باسم العميل أو رقم العقد..."
+              value={contractSearch}
+              onChange={e => setContractSearch(e.target.value)}
+              className="w-full border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"
+              dir="rtl"
+            />
+            <div className="max-h-64 overflow-y-auto space-y-1.5">
+              {allContracts
+                .filter(c => !contractSearch || c.client?.includes(contractSearch) || c.id?.includes(contractSearch))
+                .slice(0, 20)
+                .map(c => (
+                  <div key={c.id} className="flex items-center justify-between p-2 rounded-lg border hover:bg-blue-50 cursor-pointer"
+                    onClick={() => handleLinkContract(c.id)}>
+                    <div>
+                      <div className="text-xs font-medium">{c.client}</div>
+                      <div className="text-[10px] text-muted-foreground">{c.id} · {c.type} · {c.amount} د.ك</div>
+                    </div>
+                    {linkingContract ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" /> : <ChevronLeft className="w-3.5 h-3.5 text-gray-400" />}
+                  </div>
+                ))}
+              {allContracts.filter(c => !contractSearch || c.client?.includes(contractSearch) || c.id?.includes(contractSearch)).length === 0 && (
+                <p className="text-xs text-center text-muted-foreground py-4">لا توجد عقود مطابقة</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2 flex-wrap">
         {!contract ? (
           <>
             <Button size="sm" className="text-xs h-7" style={{ backgroundColor: "oklch(0.30 0.05 250)" }}
               onClick={onCreateContract}
             ><FileText className="w-3 h-3 ml-1" />إنشاء عقد</Button>
+            <Button size="sm" variant="outline" className="text-xs h-7 text-indigo-700 border-indigo-300"
+              onClick={() => { setContractSearch(""); setShowSelectContract(true); }}
+            ><ExternalLink className="w-3 h-3 ml-1" />اختيار عقد آخر</Button>
             {onOpenOldContract && civilCardUrl && signedContractUrl && (
               <Button size="sm" className="text-xs h-7 text-white" style={{ backgroundColor: "oklch(0.45 0.18 280)" }}
                 disabled={signingBusy}
