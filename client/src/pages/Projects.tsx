@@ -14,7 +14,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   Plus, Users, MapPin, Link2, ChevronLeft, Briefcase,
-  Home, Factory, TrendingUp, Store,
+  Home, Factory, TrendingUp, Store, PenTool,
   Building2, Wrench, PlusSquare, Layers, Trash2, Eye,
   StickyNote, X, MessageSquare, UserPlus, Search, Phone,
   AlertTriangle, CheckCircle2, Loader2
@@ -53,6 +53,7 @@ const MAIN_CATS = [
   { key: "صناعي",    label: "صناعي",    icon: Factory,    color: "oklch(0.50 0.15 30)"  },
   { key: "استثماري", label: "استثماري", icon: TrendingUp, color: "oklch(0.50 0.15 150)" },
   { key: "تجاري",    label: "تجاري",    icon: Store,      color: "oklch(0.50 0.15 60)"  },
+  { key: "كروكي",    label: "كروكي",    icon: PenTool,    color: "oklch(0.50 0.15 320)" },
 ];
 
 /* ─── التصنيفات الفرعية ─── */

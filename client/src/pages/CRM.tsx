@@ -2962,14 +2962,32 @@ export default function CRM() {
                             )}
 
                             {/* ── Stage 6: تم التعاقد (archived) ── */}
-                            {si === 6 && (
-                              <div className="flex flex-wrap gap-1.5">
-                                <span className="text-xs text-muted-foreground italic">مكتمل — تم نقله للعملاء</span>
-                                <Button size="sm" variant="outline" className="text-xs h-7 text-amber-600 border-amber-200"
-                                  onClick={() => { setLostDialogLead(lead); setLostReason(""); }}
-                                ><Archive className="w-3 h-3 ml-1" />أرشفة</Button>
-                              </div>
-                            )}
+                            {si === 6 && (() => {
+                              const linkedProject = allProjects.find((p) => p.leadId === lead.id);
+                              return (
+                                <div className="flex flex-wrap gap-1.5 w-full">
+                                  {linkedProject ? (
+                                    <Button size="sm" className="text-xs h-7 text-white w-full" style={{ backgroundColor: "oklch(0.50 0.18 150)" }}
+                                      onClick={() => navigate(`/projects/${linkedProject.id}`)}
+                                    ><Briefcase className="w-3 h-3 ml-1" />فتح المشروع</Button>
+                                  ) : (
+                                    <>
+                                      <span className="text-xs text-muted-foreground italic w-full">مكتمل — لم يُنشأ مشروع بعد</span>
+                                      <Button size="sm" className="text-xs h-7 text-white w-full" style={{ backgroundColor: "oklch(0.45 0.18 280)" }}
+                                        disabled={signingBusy}
+                                        onClick={() => handleOpenOldContract(lead)}
+                                      >
+                                        {signingBusy ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <Briefcase className="w-3 h-3 ml-1" />}
+                                        فتح مشروع (عقد قديم)
+                                      </Button>
+                                    </>
+                                  )}
+                                  <Button size="sm" variant="outline" className="text-xs h-7 text-amber-600 border-amber-200 w-full"
+                                    onClick={() => { setLostDialogLead(lead); setLostReason(""); }}
+                                  ><Archive className="w-3 h-3 ml-1" />أرشفة</Button>
+                                </div>
+                              );
+                            })()}
 
                             {/* ── Stage 7: فرص خاسرة ── */}
                             {si === 7 && (<>
