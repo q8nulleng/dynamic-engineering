@@ -3030,6 +3030,7 @@ export default function CRM() {
                         <SelectItem value="مخازن/شبرات">مخازن / شبرات</SelectItem>
                         <SelectItem value="مساجد">مساجد</SelectItem>
                         <SelectItem value="مزارع">مزارع</SelectItem>
+                        <SelectItem value="شاليه">شاليه</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -3321,6 +3322,7 @@ export default function CRM() {
                         <SelectItem value="مخازن/شبرات">مخازن / شبرات</SelectItem>
                         <SelectItem value="مساجد">مساجد</SelectItem>
                         <SelectItem value="مزارع">مزارع</SelectItem>
+                        <SelectItem value="شاليه">شاليه</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
