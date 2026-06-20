@@ -477,3 +477,40 @@ export const packages = mysqlTable("packages", {
 });
 export type Package = typeof packages.$inferSelect;
 export type InsertPackage = typeof packages.$inferInsert;
+
+// ── Contract Payment Schedule (جدول دفعات العقد) ──────────────────────────────
+// يُعرِّف الدفعات المتفق عليها في العقد (الدفعة الأولى، الثانية، ...)
+export const contractPaymentSchedule = mysqlTable("contract_payment_schedule", {
+  id: int("id").autoincrement().primaryKey(),
+  contractId: varchar("contract_id", { length: 64 }).notNull(),
+  label: varchar("label", { length: 128 }).notNull(),       // "الدفعة الأولى"، "عند التوقيع"، إلخ
+  percentage: float("percentage").default(0),               // نسبة من إجمالي العقد (0-100)
+  amount: float("amount").default(0),                       // المبلغ المحسوب أو المحدد يدوياً
+  dueDate: varchar("due_date", { length: 32 }).default(""), // تاريخ الاستحقاق
+  triggerEvent: varchar("trigger_event", { length: 128 }).default(""), // "عند التوقيع"، "بعد الرفع البلدي"، إلخ
+  order: int("order").notNull().default(0),                 // ترتيب الدفعة
+  status: varchar("status", { length: 32 }).notNull().default("pending"), // pending | partial | paid
+  collectedAmount: float("collected_amount").default(0),    // إجمالي المُحصَّل من هذه الدفعة
+  notes: text("notes").default(""),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type ContractPaymentSchedule = typeof contractPaymentSchedule.$inferSelect;
+export type InsertContractPaymentSchedule = typeof contractPaymentSchedule.$inferInsert;
+
+// ── Payment Collections (سجل التحصيلات الفعلية) ──────────────────────────────
+// كل سطر = دفعة فعلية مُحصَّلة (قد تكون جزءاً من دفعة العقد)
+export const paymentCollections = mysqlTable("payment_collections", {
+  id: int("id").autoincrement().primaryKey(),
+  contractId: varchar("contract_id", { length: 64 }).notNull(),
+  scheduleId: int("schedule_id"),                           // مرتبط بـ contractPaymentSchedule.id
+  invoiceId: varchar("invoice_id", { length: 64 }).default(""), // الفاتورة المرتبطة (اختياري)
+  amount: float("amount").notNull(),                        // المبلغ المُحصَّل فعلياً
+  paymentMethod: varchar("payment_method", { length: 32 }).default("نقدي"),
+  paymentDate: varchar("payment_date", { length: 32 }).notNull(),
+  reference: varchar("reference", { length: 128 }).default(""), // رقم الشيك أو مرجع التحويل
+  notes: text("notes").default(""),
+  createdBy: varchar("created_by", { length: 64 }).default(""),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type PaymentCollection = typeof paymentCollections.$inferSelect;
+export type InsertPaymentCollection = typeof paymentCollections.$inferInsert;

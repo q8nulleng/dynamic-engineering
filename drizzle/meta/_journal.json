@@ -155,6 +155,13 @@
       "when": 1781547627304,
       "tag": "0021_regular_whistler",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1781972312786,
+      "tag": "0022_tidy_jack_flag",
+      "breakpoints": true
     }
   ]
 }

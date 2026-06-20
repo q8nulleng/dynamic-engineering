@@ -14,7 +14,8 @@ import {
   workPlans, workPlanPhases, workPlanTasks, projectBriefs, projectMeetings, phaseMeta,
   employees, employeeSessions,
   supervisionVisits, detailedDrawings, municipalitySubmissions,
-  employeeNotifications, packages, governorateAreas
+  employeeNotifications, packages, governorateAreas,
+  contractPaymentSchedule, paymentCollections
 } from "../drizzle/schema.js";
 import { nanoid } from "nanoid";
 import { storagePut } from "./storage.js";
@@ -2571,5 +2572,215 @@ apiRouter.post("/api/upload-from-url", async (req, res) => {
     });
 
     res.status(201).json({ success: true, url: storageUrl });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONTRACT PAYMENT SCHEDULE — جدول دفعات العقد
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/contracts/:contractId/payment-schedule — جلب جدول الدفعات لعقد معين
+apiRouter.get("/api/contracts/:contractId/payment-schedule", async (req, res) => {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(contractPaymentSchedule)
+      .where(eq(contractPaymentSchedule.contractId, req.params.contractId))
+      .orderBy(contractPaymentSchedule.order);
+    res.json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/contracts/:contractId/payment-schedule — إضافة دفعة لجدول العقد
+apiRouter.post("/api/contracts/:contractId/payment-schedule", async (req, res) => {
+  try {
+    const db = getDb();
+    const { label, percentage, amount, dueDate, triggerEvent, order, notes } = req.body;
+    const [result] = await db.insert(contractPaymentSchedule).values({
+      contractId: req.params.contractId,
+      label: label || "دفعة",
+      percentage: parseFloat(percentage) || 0,
+      amount: parseFloat(amount) || 0,
+      dueDate: dueDate || "",
+      triggerEvent: triggerEvent || "",
+      order: parseInt(order) || 0,
+      status: "pending",
+      collectedAmount: 0,
+      notes: notes || "",
+    });
+    const [row] = await db.select().from(contractPaymentSchedule)
+      .where(eq(contractPaymentSchedule.id, (result as any).insertId));
+    res.status(201).json(row);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT /api/payment-schedule/:id — تعديل دفعة في الجدول
+apiRouter.put("/api/payment-schedule/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    const { label, percentage, amount, dueDate, triggerEvent, order, notes, status } = req.body;
+    await db.update(contractPaymentSchedule).set({
+      ...(label !== undefined && { label }),
+      ...(percentage !== undefined && { percentage: parseFloat(percentage) }),
+      ...(amount !== undefined && { amount: parseFloat(amount) }),
+      ...(dueDate !== undefined && { dueDate }),
+      ...(triggerEvent !== undefined && { triggerEvent }),
+      ...(order !== undefined && { order: parseInt(order) }),
+      ...(notes !== undefined && { notes }),
+      ...(status !== undefined && { status }),
+    }).where(eq(contractPaymentSchedule.id, parseInt(req.params.id)));
+    const [row] = await db.select().from(contractPaymentSchedule)
+      .where(eq(contractPaymentSchedule.id, parseInt(req.params.id)));
+    res.json(row);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/payment-schedule/:id — حذف دفعة من الجدول
+apiRouter.delete("/api/payment-schedule/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    await db.delete(contractPaymentSchedule)
+      .where(eq(contractPaymentSchedule.id, parseInt(req.params.id)));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAYMENT COLLECTIONS — سجل التحصيلات الفعلية (مع دعم التجزئة)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/contracts/:contractId/collections — جلب كل تحصيلات عقد
+apiRouter.get("/api/contracts/:contractId/collections", async (req, res) => {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(paymentCollections)
+      .where(eq(paymentCollections.contractId, req.params.contractId))
+      .orderBy(desc(paymentCollections.paymentDate));
+    res.json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/payment-schedule/:scheduleId/collections — تحصيلات دفعة معينة
+apiRouter.get("/api/payment-schedule/:scheduleId/collections", async (req, res) => {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(paymentCollections)
+      .where(eq(paymentCollections.scheduleId, parseInt(req.params.scheduleId)))
+      .orderBy(desc(paymentCollections.paymentDate));
+    res.json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/payment-schedule/:scheduleId/collect — تسجيل تحصيل (كامل أو جزئي)
+apiRouter.post("/api/payment-schedule/:scheduleId/collect", async (req, res) => {
+  try {
+    const db = getDb();
+    const scheduleId = parseInt(req.params.scheduleId);
+    const { amount, paymentMethod, paymentDate, reference, notes, invoiceId } = req.body;
+
+    // جلب الدفعة الأصلية
+    const [schedule] = await db.select().from(contractPaymentSchedule)
+      .where(eq(contractPaymentSchedule.id, scheduleId));
+    if (!schedule) return res.status(404).json({ error: "الدفعة غير موجودة" });
+
+    const collectedAmt = parseFloat(amount) || 0;
+    const today = new Date().toISOString().slice(0, 10);
+
+    // إضافة سجل التحصيل
+    await db.insert(paymentCollections).values({
+      contractId: schedule.contractId,
+      scheduleId,
+      invoiceId: invoiceId || "",
+      amount: collectedAmt,
+      paymentMethod: paymentMethod || "نقدي",
+      paymentDate: paymentDate || today,
+      reference: reference || "",
+      notes: notes || "",
+    });
+
+    // تحديث المبلغ المُحصَّل والحالة في جدول الدفعات
+    const newCollected = (schedule.collectedAmount || 0) + collectedAmt;
+    const scheduleAmount = schedule.amount || 0;
+    let newStatus = "partial";
+    if (newCollected >= scheduleAmount && scheduleAmount > 0) newStatus = "paid";
+    if (newCollected <= 0) newStatus = "pending";
+
+    await db.update(contractPaymentSchedule).set({
+      collectedAmount: newCollected,
+      status: newStatus,
+    }).where(eq(contractPaymentSchedule.id, scheduleId));
+
+    // إذا كان مرتبطاً بفاتورة، حدّث حالتها
+    if (invoiceId) {
+      const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
+      if (inv) {
+        const invStatus = newCollected >= (inv.total || 0) ? "مدفوعة" : "مدفوعة جزئياً";
+        await db.update(invoices).set({ status: invStatus }).where(eq(invoices.id, invoiceId));
+      }
+    }
+
+    const [updatedSchedule] = await db.select().from(contractPaymentSchedule)
+      .where(eq(contractPaymentSchedule.id, scheduleId));
+    res.status(201).json({ schedule: updatedSchedule, collected: collectedAmt });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/collections/:id — حذف تحصيل وإعادة حساب المبلغ
+apiRouter.delete("/api/collections/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    const [col] = await db.select().from(paymentCollections)
+      .where(eq(paymentCollections.id, parseInt(req.params.id)));
+    if (!col) return res.status(404).json({ error: "التحصيل غير موجود" });
+
+    await db.delete(paymentCollections)
+      .where(eq(paymentCollections.id, parseInt(req.params.id)));
+
+    // إعادة حساب المجموع
+    if (col.scheduleId) {
+      const remaining = await db.select().from(paymentCollections)
+        .where(eq(paymentCollections.scheduleId, col.scheduleId));
+      const total = remaining.reduce((s: number, r: { amount: number | null }) => s + (r.amount || 0), 0);
+      const [sched] = await db.select().from(contractPaymentSchedule)
+        .where(eq(contractPaymentSchedule.id, col.scheduleId));
+      const newStatus = total <= 0 ? "pending" : total >= (sched?.amount || 0) ? "paid" : "partial";
+      await db.update(contractPaymentSchedule).set({
+        collectedAmount: total,
+        status: newStatus,
+      }).where(eq(contractPaymentSchedule.id, col.scheduleId));
+    }
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/contracts/:contractId/payment-schedule/bulk — إنشاء جدول دفعات كامل دفعة واحدة
+apiRouter.post("/api/contracts/:contractId/payment-schedule/bulk", async (req, res) => {
+  try {
+    const db = getDb();
+    const { schedules } = req.body; // array of { label, percentage, amount, dueDate, triggerEvent, order }
+    if (!Array.isArray(schedules) || schedules.length === 0) {
+      return res.status(400).json({ error: "schedules مطلوب" });
+    }
+    // حذف الجدول القديم أولاً
+    await db.delete(contractPaymentSchedule)
+      .where(eq(contractPaymentSchedule.contractId, req.params.contractId));
+    // إدراج الجديد
+    for (const s of schedules) {
+      await db.insert(contractPaymentSchedule).values({
+        contractId: req.params.contractId,
+        label: s.label || "دفعة",
+        percentage: parseFloat(s.percentage) || 0,
+        amount: parseFloat(s.amount) || 0,
+        dueDate: s.dueDate || "",
+        triggerEvent: s.triggerEvent || "",
+        order: parseInt(s.order) || 0,
+        status: "pending",
+        collectedAmount: 0,
+        notes: s.notes || "",
+      });
+    }
+    const rows = await db.select().from(contractPaymentSchedule)
+      .where(eq(contractPaymentSchedule.contractId, req.params.contractId))
+      .orderBy(contractPaymentSchedule.order);
+    res.status(201).json(rows);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });

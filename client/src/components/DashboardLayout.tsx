@@ -44,6 +44,7 @@ const allNavItems = [
   { path: "/tasks", label: "المهام", icon: ListChecks, badge: 5 },
   { path: "/documents", label: "المستندات", icon: FolderOpen },
   { path: "/payments", label: "الدفعات", icon: CreditCard },
+  { path: "/contract-payments", label: "تحصيل العقود", icon: CreditCard },
   { path: "/client-portal", label: "حفظ في بوابة العميل", icon: Globe },
   { path: "/reports", label: "التقارير", icon: BarChart3 },
   { path: "/settings", label: "الإعدادات", icon: Settings2 },
@@ -51,7 +52,7 @@ const allNavItems = [
 ];
 
 // الصفحات التي تحتاج صلاحية مالية
-const FINANCE_PATHS = ["/payments"];
+const FINANCE_PATHS = ["/payments", "/contract-payments"];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();

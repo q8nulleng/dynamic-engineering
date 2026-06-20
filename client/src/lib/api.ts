@@ -1242,3 +1242,120 @@ export function useDeleteGovernorate() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["governorate-areas"] }),
   });
 }
+
+// ── Contract Payment Schedule Hooks ──────────────────────────────────────────
+export interface PaymentScheduleItem {
+  id: number;
+  contractId: string;
+  label: string;
+  percentage: number;
+  amount: number;
+  dueDate: string;
+  triggerEvent: string;
+  order: number;
+  status: "pending" | "partial" | "paid";
+  collectedAmount: number;
+  notes: string;
+  createdAt: string;
+}
+
+export interface PaymentCollectionItem {
+  id: number;
+  contractId: string;
+  scheduleId: number | null;
+  invoiceId: string;
+  amount: number;
+  paymentMethod: string;
+  paymentDate: string;
+  reference: string;
+  notes: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export function usePaymentSchedule(contractId: string | undefined) {
+  return useQuery<PaymentScheduleItem[]>({
+    queryKey: ["payment-schedule", contractId],
+    queryFn: () => request(`/api/contracts/${contractId}/payment-schedule`),
+    enabled: !!contractId,
+    initialData: [],
+  });
+}
+
+export function usePaymentCollections(contractId: string | undefined) {
+  return useQuery<PaymentCollectionItem[]>({
+    queryKey: ["payment-collections", contractId],
+    queryFn: () => request(`/api/contracts/${contractId}/collections`),
+    enabled: !!contractId,
+    initialData: [],
+  });
+}
+
+export function useScheduleCollections(scheduleId: number | undefined) {
+  return useQuery<PaymentCollectionItem[]>({
+    queryKey: ["schedule-collections", scheduleId],
+    queryFn: () => request(`/api/payment-schedule/${scheduleId}/collections`),
+    enabled: !!scheduleId,
+    initialData: [],
+  });
+}
+
+export function useCreatePaymentSchedule(contractId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<PaymentScheduleItem>) =>
+      request(`/api/contracts/${contractId}/payment-schedule`, { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["payment-schedule", contractId] }),
+  });
+}
+
+export function useBulkCreatePaymentSchedule(contractId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (schedules: Partial<PaymentScheduleItem>[]) =>
+      request(`/api/contracts/${contractId}/payment-schedule/bulk`, { method: "POST", body: JSON.stringify({ schedules }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["payment-schedule", contractId] }),
+  });
+}
+
+export function useUpdatePaymentSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, contractId, ...data }: Partial<PaymentScheduleItem> & { id: number; contractId: string }) =>
+      request(`/api/payment-schedule/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: ["payment-schedule", vars.contractId] }),
+  });
+}
+
+export function useDeletePaymentSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, contractId }: { id: number; contractId: string }) =>
+      request(`/api/payment-schedule/${id}`, { method: "DELETE" }),
+    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: ["payment-schedule", vars.contractId] }),
+  });
+}
+
+export function useCollectPayment(contractId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ scheduleId, ...data }: { scheduleId: number; amount: number; paymentMethod?: string; paymentDate?: string; reference?: string; notes?: string; invoiceId?: string }) =>
+      request(`/api/payment-schedule/${scheduleId}/collect`, { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["payment-schedule", contractId] });
+      qc.invalidateQueries({ queryKey: ["payment-collections", contractId] });
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
+}
+
+export function useDeleteCollection(contractId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => request(`/api/collections/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["payment-schedule", contractId] });
+      qc.invalidateQueries({ queryKey: ["payment-collections", contractId] });
+    },
+  });
+}

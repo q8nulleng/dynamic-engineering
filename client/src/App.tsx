@@ -12,6 +12,7 @@ import Projects from "./pages/Projects";
 import Tasks from "./pages/Tasks";
 import Documents from "./pages/Documents";
 import Payments from "./pages/Payments";
+import ContractPayments from "./pages/ContractPayments";
 import ClientPortal from "./pages/ClientPortal";
 import Reports from "./pages/Reports";
 import Contracts from "./pages/Contracts";
@@ -41,6 +42,7 @@ function Router() {
       <Route path="/documents" component={Documents} />
       <Route path="/documents/:clientId" component={ClientDocuments} />
       <Route path="/payments" component={Payments} />
+      <Route path="/contract-payments" component={ContractPayments} />
       <Route path="/client-portal" component={ClientPortal} />
       <Route path="/reports" component={Reports} />
       <Route path="/contracts" component={Contracts} />
