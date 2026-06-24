@@ -510,12 +510,18 @@ function QuotationDialog({ lead, onClose, onSaved }: {
                   <div style={{ fontFamily: "'Space Grotesk',sans-serif" }}>
                     {/* إذا تم تطبيق خصم: أظهر السعر القديم مشطوباً والجديد بجانبه */}
                     {originalPriceBeforeDiscount && agreedPrice.trim() ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                        <div style={{ fontSize: "13px", color: "#999", textDecoration: "line-through", fontWeight: 600 }}>
-                          {originalPriceBeforeDiscount} <span style={{ fontSize: "9px" }}>د.ك</span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ fontSize: "9px", color: "#999", fontFamily: "'Noto Kufi Arabic', sans-serif", whiteSpace: "nowrap" }}>قبل الخصم:</span>
+                          <span style={{ fontSize: "13px", color: "#999", textDecoration: "line-through", fontWeight: 600 }}>
+                            {originalPriceBeforeDiscount} <span style={{ fontSize: "9px" }}>د.ك</span>
+                          </span>
                         </div>
-                        <div style={{ fontSize: "22px", fontWeight: 900, color: "#c00" }}>
-                          {agreedPrice.trim()} <span style={{ fontSize: "11px", fontWeight: 600, color: "#c00" }}>د.ك</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ fontSize: "9px", color: "#c00", fontFamily: "'Noto Kufi Arabic', sans-serif", whiteSpace: "nowrap", fontWeight: 700 }}>بعد الخصم:</span>
+                          <span style={{ fontSize: "22px", fontWeight: 900, color: "#c00" }}>
+                            {agreedPrice.trim()} <span style={{ fontSize: "11px", fontWeight: 600, color: "#c00" }}>د.ك</span>
+                          </span>
                         </div>
                       </div>
                     ) : (
