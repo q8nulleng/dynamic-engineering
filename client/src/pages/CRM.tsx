@@ -134,6 +134,7 @@ function QuotationDialog({ lead, onClose, onSaved }: {
   const [showDiscountDialog, setShowDiscountDialog] = useState(false);
   const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
   const [discountValue, setDiscountValue] = useState("");
+  const [originalPriceBeforeDiscount, setOriginalPriceBeforeDiscount] = useState<string | null>(null);
 
   const basePrice = agreedPrice.trim() ? parseFloat(agreedPrice.trim()) : (selectedPkg ? parseFloat(String(selectedPkg.price)) : 0);
   const currentPrice = basePrice;
@@ -149,6 +150,10 @@ function QuotationDialog({ lead, onClose, onSaved }: {
       return;
     }
     const finalPrice = Math.max(0, discountedPrice);
+    // حفظ السعر الأصلي قبل الخصم (إذا لم يكن محفوظاً مسبقاً)
+    if (!originalPriceBeforeDiscount) {
+      setOriginalPriceBeforeDiscount(selectedPkg ? String(selectedPkg.price) : agreedPrice);
+    }
     setAgreedPrice(finalPrice.toFixed(3));
     toast.success(`✅ تم تطبيق الخصم — السعر الجديد: ${finalPrice.toFixed(3)} د.ك`);
     setShowDiscountDialog(false);
@@ -502,8 +507,22 @@ function QuotationDialog({ lead, onClose, onSaved }: {
               {/* Package — black border frame */}
               <div style={{ border: "2px solid #000", padding: "12px 14px", marginBottom: "10px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <div style={{ fontSize: "22px", fontWeight: 900, color: "#000", fontFamily: "'Space Grotesk',sans-serif" }}>
-                    {agreedPrice.trim() ? agreedPrice.trim() : selectedPkg.price} <span style={{ fontSize: "11px", fontWeight: 600 }}>د.ك</span>
+                  <div style={{ fontFamily: "'Space Grotesk',sans-serif" }}>
+                    {/* إذا تم تطبيق خصم: أظهر السعر القديم مشطوباً والجديد بجانبه */}
+                    {originalPriceBeforeDiscount && agreedPrice.trim() ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                        <div style={{ fontSize: "13px", color: "#999", textDecoration: "line-through", fontWeight: 600 }}>
+                          {originalPriceBeforeDiscount} <span style={{ fontSize: "9px" }}>د.ك</span>
+                        </div>
+                        <div style={{ fontSize: "22px", fontWeight: 900, color: "#c00" }}>
+                          {agreedPrice.trim()} <span style={{ fontSize: "11px", fontWeight: 600, color: "#c00" }}>د.ك</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: "22px", fontWeight: 900, color: "#000" }}>
+                        {agreedPrice.trim() ? agreedPrice.trim() : selectedPkg.price} <span style={{ fontSize: "11px", fontWeight: 600 }}>د.ك</span>
+                      </div>
+                    )}
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: "13px", fontWeight: 700, color: "#000" }}>{selectedPkg.name}</div>
