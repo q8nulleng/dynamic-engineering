@@ -33,7 +33,7 @@ import {
   Pencil, Trash2, Eye, CheckCircle, Hash, Ruler, ArrowRightLeft, Archive,
   Clock, UserCheck, CalendarPlus, Bell, Briefcase,
   Upload, CreditCard, ShieldCheck, AlertCircle, ImageIcon, PenLine,
-  ChevronLeft, ExternalLink,
+  ChevronLeft, ExternalLink, BadgePercent, ThumbsUp, ThumbsDown,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { kuwaitGovernorates } from "./Clients";
@@ -46,6 +46,7 @@ import {
   useAppointmentsByLead, useCreateAppointment, useDeleteAppointment, useAppointments,
   useEmployees, usePackages, useUpdatePackage,
   useGovernorateAreas, useAddGovernorateArea,
+  useCreateDiscountRequest, useDiscountRequestsByLead, useReviewDiscountRequest, useDiscountRequests,
 } from "@/lib/api";
 import { exportQuotationPdf, exportContractPdf, downloadQuotationPdf, printQuotationPdf, downloadContractPdf, buildContractPreviewHtml } from "@/lib/pdf";
 import { toast } from "sonner";
@@ -122,6 +123,7 @@ function QuotationDialog({ lead, onClose, onSaved }: {
 }) {
   const createQuotation = useCreateQuotation();
   const updatePackage = useUpdatePackage();
+  const createDiscountRequest = useCreateDiscountRequest();
   const [selectedPkg, setSelectedPkg] = useState<PkgType | null>(null);
   const [generating, setGenerating] = useState(false);
   const [agreedPrice, setAgreedPrice] = useState("");
@@ -129,6 +131,42 @@ function QuotationDialog({ lead, onClose, onSaved }: {
   const [newFeature, setNewFeature] = useState("");
   const [editingFeatureIdx, setEditingFeatureIdx] = useState<number | null>(null);
   const [editingFeatureText, setEditingFeatureText] = useState("");
+  // نظام الخصم الخاص
+  const [showDiscountDialog, setShowDiscountDialog] = useState(false);
+  const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
+  const [discountValue, setDiscountValue] = useState("");
+  const [discountReason, setDiscountReason] = useState("");
+  const [requestedBy, setRequestedBy] = useState("");
+
+  const currentPrice = agreedPrice.trim() ? parseFloat(agreedPrice.trim()) : (selectedPkg ? parseFloat(String(selectedPkg.price)) : 0);
+  const discountedPrice = discountValue
+    ? discountType === "percentage"
+      ? currentPrice - (currentPrice * parseFloat(discountValue) / 100)
+      : currentPrice - parseFloat(discountValue)
+    : currentPrice;
+
+  const handleRequestDiscount = async () => {
+    if (!selectedPkg || !discountValue || !requestedBy) {
+      toast.error("يرجى تعبئة جميع الحقول المطلوبة");
+      return;
+    }
+    await createDiscountRequest.mutateAsync({
+      quotationId: "pending",
+      leadId: lead.id as unknown as number,
+      requestedBy,
+      discountType,
+      discountValue: parseFloat(discountValue),
+      originalPrice: currentPrice,
+      discountedPrice: Math.max(0, discountedPrice),
+      reason: discountReason,
+      status: "pending",
+    });
+    toast.success("✅ تم إرسال طلب الخصم — بانتظار موافقة م. سعود");
+    setShowDiscountDialog(false);
+    setDiscountValue("");
+    setDiscountReason("");
+    setRequestedBy("");
+  };
 
   // هل تم تعديل الخدمات عن الأصل؟
   const featuresChanged = selectedPkg
@@ -510,8 +548,128 @@ function QuotationDialog({ lead, onClose, onSaved }: {
           </div>
         )}
 
-        <div className="flex gap-2 justify-start pt-2">
+        {/* ── Dialog طلب الخصم الخاص ── */}
+        {showDiscountDialog && (
+          <Dialog open onOpenChange={() => setShowDiscountDialog(false)}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-base font-bold flex items-center gap-2">
+                  <BadgePercent className="w-4 h-4 text-purple-600" />
+                  طلب خصم خاص — {lead.name}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
+                  سيُرسل الطلب لمراجعة م. سعود قبل التطبيق
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 py-2">
+                {/* السعر الأصلي */}
+                <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                  <span className="text-muted-foreground">السعر الأصلي: </span>
+                  <span className="font-bold">{currentPrice} د.ك</span>
+                </div>
+                {/* نوع الخصم */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">نوع الخصم *</Label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setDiscountType("percentage")}
+                      className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${
+                        discountType === "percentage" ? "bg-purple-600 text-white border-purple-600" : "border-border hover:border-purple-300"
+                      }`}
+                    >نسبة مئوية (%)</button>
+                    <button
+                      onClick={() => setDiscountType("fixed")}
+                      className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${
+                        discountType === "fixed" ? "bg-purple-600 text-white border-purple-600" : "border-border hover:border-purple-300"
+                      }`}
+                    >مبلغ ثابت (د.ك)</button>
+                  </div>
+                </div>
+                {/* قيمة الخصم */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">
+                    {discountType === "percentage" ? "نسبة الخصم (%) *" : "مبلغ الخصم (د.ك) *"}
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max={discountType === "percentage" ? "100" : undefined}
+                      value={discountValue}
+                      onChange={e => setDiscountValue(e.target.value)}
+                      placeholder={discountType === "percentage" ? "مثال: 10" : "مثال: 50"}
+                      className="flex-1 border rounded-lg px-3 py-1.5 text-sm text-right bg-background focus:outline-none focus:ring-2 focus:ring-purple-300"
+                      dir="ltr"
+                    />
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {discountType === "percentage" ? "%" : "د.ك"}
+                    </span>
+                  </div>
+                </div>
+                {/* السعر بعد الخصم */}
+                {discountValue && parseFloat(discountValue) > 0 && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="text-green-700 font-semibold">السعر بعد الخصم:</span>
+                      <span className="text-xl font-bold text-green-800">{Math.max(0, discountedPrice).toFixed(3)} د.ك</span>
+                    </div>
+                    <div className="text-xs text-green-600 mt-1">
+                      وفر العميل: {(currentPrice - Math.max(0, discountedPrice)).toFixed(3)} د.ك
+                      {discountType === "percentage" && ` (${discountValue}%)`}
+                    </div>
+                  </div>
+                )}
+                {/* اسم الطالب */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">اسم الموظف الطالب *</Label>
+                  <input
+                    type="text"
+                    value={requestedBy}
+                    onChange={e => setRequestedBy(e.target.value)}
+                    placeholder="اسمك..."
+                    className="w-full border rounded-lg px-3 py-1.5 text-sm text-right bg-background focus:outline-none focus:ring-2 focus:ring-purple-300"
+                  />
+                </div>
+                {/* سبب الطلب */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">سبب طلب الخصم (اختياري)</Label>
+                  <Textarea
+                    value={discountReason}
+                    onChange={e => setDiscountReason(e.target.value)}
+                    placeholder="مثال: عميل قديم / إحالة / ظروف خاصة..."
+                    className="text-sm text-right resize-none"
+                    rows={2}
+                  />
+                </div>
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setShowDiscountDialog(false)}>إلغاء</Button>
+                <Button
+                  onClick={handleRequestDiscount}
+                  disabled={createDiscountRequest.isPending || !discountValue || !requestedBy}
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  {createDiscountRequest.isPending ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <BadgePercent className="w-3 h-3 ml-1" />}
+                  إرسال للموافقة
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        <div className="flex gap-2 justify-start pt-2 flex-wrap">
           <Button variant="outline" onClick={onClose}>إلغاء</Button>
+          {/* زر طلب خصم خاص */}
+          {selectedPkg && (
+            <Button
+              variant="outline"
+              onClick={() => setShowDiscountDialog(true)}
+              className="border-purple-300 text-purple-700 hover:bg-purple-50"
+            >
+              <BadgePercent className="w-3 h-3 ml-1" />
+              طلب خصم خاص
+            </Button>
+          )}
           <Button
             variant="outline"
             disabled={!selectedPkg || createQuotation.isPending}

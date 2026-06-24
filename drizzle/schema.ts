@@ -514,3 +514,23 @@ export const paymentCollections = mysqlTable("payment_collections", {
 });
 export type PaymentCollection = typeof paymentCollections.$inferSelect;
 export type InsertPaymentCollection = typeof paymentCollections.$inferInsert;
+
+// ── Discount Requests (طلبات الخصم الخاص) ────────────────────────────────────
+export const discountRequests = mysqlTable("discount_requests", {
+  id: varchar("id", { length: 50 }).primaryKey(),
+  quotationId: varchar("quotation_id", { length: 50 }).notNull(),
+  leadId: int("lead_id").notNull(),
+  requestedBy: varchar("requested_by", { length: 100 }).notNull(),
+  discountType: mysqlEnum("discount_type_dr", ["percentage", "fixed"]).notNull().default("percentage"),
+  discountValue: float("discount_value").notNull(),
+  originalPrice: float("original_price").notNull(),
+  discountedPrice: float("discounted_price").notNull(),
+  reason: text("reason"),
+  status: mysqlEnum("status_dr", ["pending", "approved", "rejected"]).notNull().default("pending"),
+  reviewedBy: varchar("reviewed_by", { length: 100 }),
+  reviewNote: text("review_note"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  reviewedAt: bigint("reviewed_at", { mode: "number" }),
+});
+export type DiscountRequest = typeof discountRequests.$inferSelect;
+export type InsertDiscountRequest = typeof discountRequests.$inferInsert;

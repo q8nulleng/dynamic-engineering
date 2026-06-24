@@ -1359,3 +1359,60 @@ export function useDeleteCollection(contractId: string) {
     },
   });
 }
+
+// ── Discount Requests (طلبات الخصم الخاص) ────────────────────────────────
+export interface DiscountRequest {
+  id: string;
+  quotationId: string;
+  leadId: number;
+  requestedBy: string;
+  discountType: "percentage" | "fixed";
+  discountValue: number;
+  originalPrice: number;
+  discountedPrice: number;
+  reason?: string;
+  status: "pending" | "approved" | "rejected";
+  reviewedBy?: string;
+  reviewNote?: string;
+  createdAt: number;
+  reviewedAt?: number;
+}
+
+export function useDiscountRequests(status?: string) {
+  const url = status ? `/api/discount-requests?status=${status}` : "/api/discount-requests";
+  return useQuery<DiscountRequest[]>({
+    queryKey: ["discount-requests", status ?? "all"],
+    queryFn: () => request(url),
+  });
+}
+
+export function useDiscountRequestsByLead(leadId: number | string | undefined) {
+  return useQuery<DiscountRequest[]>({
+    queryKey: ["discount-requests-lead", leadId],
+    queryFn: () => request(`/api/discount-requests/lead/${leadId}`),
+    enabled: !!leadId,
+  });
+}
+
+export function useCreateDiscountRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<DiscountRequest>) =>
+      request("/api/discount-requests", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["discount-requests"] });
+    },
+  });
+}
+
+export function useReviewDiscountRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string; status: string; reviewedBy: string; reviewNote?: string; finalDiscountValue?: number }) =>
+      request(`/api/discount-requests/${id}/review`, { method: "PATCH", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["discount-requests"] });
+      qc.invalidateQueries({ queryKey: ["quotations"] });
+    },
+  });
+}

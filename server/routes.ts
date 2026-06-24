@@ -15,7 +15,7 @@ import {
   employees, employeeSessions,
   supervisionVisits, detailedDrawings, municipalitySubmissions,
   employeeNotifications, packages, governorateAreas,
-  contractPaymentSchedule, paymentCollections
+  contractPaymentSchedule, paymentCollections, discountRequests
 } from "../drizzle/schema.js";
 import { nanoid } from "nanoid";
 import { storagePut } from "./storage.js";
@@ -2782,5 +2782,97 @@ apiRouter.post("/api/contracts/:contractId/payment-schedule/bulk", async (req, r
       .where(eq(contractPaymentSchedule.contractId, req.params.contractId))
       .orderBy(contractPaymentSchedule.order);
     res.status(201).json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DISCOUNT REQUESTS — نظام الخصم الخاص
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/discount-requests — جلب جميع طلبات الخصم (لصاحب المكتب)
+apiRouter.get("/discount-requests", async (req, res) => {
+  try {
+    const db = getDb();
+    const status = req.query.status as string | undefined;
+    let rows;
+    if (status) {
+      rows = await db.select().from(discountRequests)
+        .where(eq(discountRequests.status, status as any))
+        .orderBy(desc(discountRequests.createdAt));
+    } else {
+      rows = await db.select().from(discountRequests)
+        .orderBy(desc(discountRequests.createdAt));
+    }
+    res.json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/discount-requests/lead/:leadId — طلبات الخصم لـ lead معين
+apiRouter.get("/discount-requests/lead/:leadId", async (req, res) => {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(discountRequests)
+      .where(eq(discountRequests.leadId, parseInt(req.params.leadId)))
+      .orderBy(desc(discountRequests.createdAt));
+    res.json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/discount-requests — إنشاء طلب خصم جديد
+apiRouter.post("/discount-requests", async (req, res) => {
+  try {
+    const db = getDb();
+    const { quotationId, leadId, requestedBy, discountType, discountValue, originalPrice, discountedPrice, reason } = req.body;
+    if (!quotationId || !leadId || !requestedBy || !discountValue || !originalPrice) {
+      return res.status(400).json({ error: "بيانات ناقصة" });
+    }
+    const id = `DR-${Date.now()}`;
+    await db.insert(discountRequests).values({
+      id,
+      quotationId,
+      leadId: parseInt(leadId),
+      requestedBy,
+      discountType: discountType || "percentage",
+      discountValue: parseFloat(discountValue),
+      originalPrice: parseFloat(originalPrice),
+      discountedPrice: parseFloat(discountedPrice),
+      reason: reason || "",
+      status: "pending",
+      createdAt: Date.now(),
+    });
+    res.status(201).json({ id, message: "تم إرسال طلب الخصم بنجاح" });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/discount-requests/:id/review — موافقة أو رفض طلب الخصم
+apiRouter.patch("/discount-requests/:id/review", async (req, res) => {
+  try {
+    const db = getDb();
+    const { status, reviewedBy, reviewNote, finalDiscountValue } = req.body;
+    if (!status || !reviewedBy) {
+      return res.status(400).json({ error: "status وreviewedBy مطلوبان" });
+    }
+    // تحديث حالة الطلب
+    await db.update(discountRequests).set({
+      status,
+      reviewedBy,
+      reviewNote: reviewNote || "",
+      reviewedAt: Date.now(),
+    }).where(eq(discountRequests.id, req.params.id));
+
+    // إذا تمت الموافقة → تحديث سعر عرض السعر
+    if (status === "approved") {
+      const [dr] = await db.select().from(discountRequests)
+        .where(eq(discountRequests.id, req.params.id));
+      if (dr) {
+        const finalPrice = finalDiscountValue !== undefined
+          ? parseFloat(finalDiscountValue)
+          : dr.discountedPrice;
+        await db.update(quotations).set({
+          amount: String(finalPrice),
+        }).where(eq(quotations.id, dr.quotationId));
+      }
+    }
+    res.json({ message: status === "approved" ? "تمت الموافقة وتحديث السعر" : "تم رفض الطلب" });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
