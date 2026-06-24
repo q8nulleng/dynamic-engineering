@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
-import { useAllTasks, useInvoices, useClients, useEmployeeNotifications, useMarkAllNotificationsRead, useDiscountRequests } from "@/lib/api";
+import { useAllTasks, useInvoices, useClients, useEmployeeNotifications, useMarkAllNotificationsRead } from "@/lib/api";
 import {
   LayoutDashboard,
   Users,
@@ -28,7 +28,6 @@ import {
   UserCog,
   Settings2,
   FileSignature,
-  BadgePercent,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +48,6 @@ const allNavItems = [
   { path: "/client-portal", label: "حفظ في بوابة العميل", icon: Globe },
   { path: "/reports", label: "التقارير", icon: BarChart3 },
   { path: "/settings", label: "الإعدادات", icon: Settings2 },
-  { path: "/discount-requests", label: "طلبات الخصم", icon: BadgePercent },
   { path: "/employees", label: "إدارة الموظفين", icon: UserCog, adminOnly: true },
 ];
 
@@ -67,7 +65,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { data: allTasks = [] } = useAllTasks();
   const { data: allInvoices = [] } = useInvoices();
   const { data: clients = [] } = useClients();
-  const { data: pendingDiscounts = [] } = useDiscountRequests("pending");
   const today = new Date().toISOString().slice(0, 10);
 
   const overdueTasks = allTasks.filter(
@@ -177,13 +174,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       {(() => {
                         let count = 0;
                         if (item.path === "/clients") count = clients.length;
-                        else if (item.path === "/discount-requests") count = pendingDiscounts.length;
                         else count = (item as any).badge || 0;
                         return count > 0 ? (
                           <Badge
                             variant="secondary"
                             className="text-xs px-1.5 py-0 h-5"
-                            style={item.path === "/discount-requests" ? { backgroundColor: "oklch(0.55 0.20 300)", color: "white" } : { backgroundColor: "oklch(0.72 0.10 60)", color: "white" }}
+                            style={{ backgroundColor: "oklch(0.72 0.10 60)", color: "white" }}
                           >
                             {count}
                           </Badge>

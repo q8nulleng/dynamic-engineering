@@ -213,3 +213,13 @@
 - [x] كرت تجهيز الملف: رفع 5 ملفات محددة (مخطط معماري، مخطط إنشائي، رخصة، تعهد بلدية، عقد إشراف) مع checklist
 - [x] كرت الإشراف الفعلي: يفتح PhaseSupervisionPopup الموجود
 - [x] توجيه مشاريع الإشراف في ProjectDetail.tsx إلى SupervisionProjectView
+
+## نظام الخصم الخاص
+- [x] إنشاء جدول discount_requests في قاعدة البيانات
+- [x] إضافة API endpoints (GET, POST, PATCH /review) في routes.ts
+- [x] إضافة hooks في api.ts (useCreateDiscountRequest, useDiscountRequests, useReviewDiscountRequest)
+- [x] Dialog طلب الخصم في QuotationDialog (CRM.tsx) — نسبة مئوية أو مبلغ ثابت + حساب السعر بعد الخصم
+- [x] زر "طلب خصم خاص" (بنفسجي) يظهر عند اختيار باقة في عرض السعر
+- [x] إنشاء صفحة DiscountRequests.tsx لمراجعة الطلبات من قبل م. سعود
+- [x] إضافة Route /discount-requests في App.tsx
+- [x] إضافة رابط "طلبات الخصم" في القائمة الجانبية مع badge بنفسجي للطلبات المعلقة

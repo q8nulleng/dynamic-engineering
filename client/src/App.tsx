@@ -21,7 +21,6 @@ import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
 import Appointments from "./pages/Appointments";
 import WorkPlans from "./pages/WorkPlans";
-import DiscountRequests from "./pages/DiscountRequests";
 import ClientDocuments from "./pages/ClientDocuments";
 import EmployeeLogin from "./pages/EmployeeLogin";
 import EmployeesAdmin from "./pages/EmployeesAdmin";
@@ -49,7 +48,6 @@ function Router() {
       <Route path="/contracts" component={Contracts} />
       <Route path="/appointments" component={Appointments} />
       <Route path="/work-plans" component={WorkPlans} />
-      <Route path="/discount-requests" component={DiscountRequests} />
       <Route path="/employees" component={EmployeesAdmin} />
       <Route path="/settings" component={Settings} />
       <Route path="/404" component={NotFound} />
