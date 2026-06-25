@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useClients, useCreateClient, useProjects } from "@/lib/api";
+import { useClients, useCreateClient, useProjects, useDeleteClient } from "@/lib/api";
 import {
   Users, Plus, Search, Phone, MapPin, FileText,
-  Building2, Home, MoreVertical, Eye, MessageSquare, Star,
+  Building2, Home, MoreVertical, Eye, MessageSquare, Star, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -424,6 +424,8 @@ export default function Clients() {
   const { data: clients = [], isLoading } = useClients();
   const { data: allProjects = [] } = useProjects();
   const createClient = useCreateClient();
+  const deleteClient = useDeleteClient();
+  const [clientToDelete, setClientToDelete] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -578,7 +580,15 @@ export default function Clients() {
                           )}
                         </div>
                       </div>
-                      <DropdownMenu>
+                        <div className="flex items-center gap-1">
+                        <button
+                          className="p-1.5 rounded-lg hover:bg-red-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => { e.stopPropagation(); setClientToDelete(client.id); }}
+                          title="حذف العميل"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </button>
+                        <DropdownMenu>
                         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                           <button className="p-1.5 rounded-lg hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity">
                             <MoreVertical className="w-4 h-4 text-gray-500" />
@@ -596,6 +606,7 @@ export default function Clients() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      </div>
                     </div>
 
                     <div className="space-y-1.5 mb-3">
@@ -663,6 +674,41 @@ export default function Clients() {
         onClose={() => setShowNewDialog(false)}
         onAdd={(c) => createClient.mutate(c as any)}
       />
+
+      {/* Dialog تأكيد الحذف */}
+      {clientToDelete && (
+        <Dialog open onOpenChange={() => setClientToDelete(null)}>
+          <DialogContent className="max-w-sm text-right" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="text-red-600 flex items-center gap-2">
+                <Trash2 className="w-5 h-5" />
+                حذف العميل
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-gray-600 py-2">
+              هل أنت متأكد من حذف هذا العميل؟ سيتم حذف جميع بياناته بشكل نهائي.
+            </p>
+            <DialogFooter className="flex gap-2 justify-start">
+              <Button variant="outline" onClick={() => setClientToDelete(null)}>إلغاء</Button>
+              <Button
+                variant="destructive"
+                disabled={deleteClient.isPending}
+                onClick={() => {
+                  deleteClient.mutate(clientToDelete, {
+                    onSuccess: () => {
+                      toast.success("تم حذف العميل بنجاح");
+                      setClientToDelete(null);
+                    },
+                    onError: () => toast.error("حدث خطأ أثناء الحذف"),
+                  });
+                }}
+              >
+                {deleteClient.isPending ? "جاري الحذف..." : "حذف نهائي"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
