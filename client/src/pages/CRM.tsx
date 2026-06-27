@@ -2266,7 +2266,24 @@ export default function CRM() {
   const [openStage, setOpenStage] = useState<number | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showNewDialog, setShowNewDialog] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const DRAFT_KEY = "crm_new_lead_draft";
+  const [form, setForm] = useState<typeof emptyForm>(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) return { ...emptyForm, ...JSON.parse(saved) };
+    } catch {}
+    return emptyForm;
+  });
+  const [hasDraft, setHasDraft] = useState(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Object.values(parsed).some(v => v !== "");
+      }
+    } catch {}
+    return false;
+  });
   const [activeTab, setActiveTab] = useState<"basic" | "details" | "notes">("basic");
   const [quotationTarget, setQuotationTarget] = useState<Lead | null>(null);
   const [viewQuoteTarget, setViewQuoteTarget] = useState<Lead | null>(null);
@@ -2793,7 +2810,14 @@ export default function CRM() {
   const totalLeads = leadsData?.length ?? 0;
   const totalRevenue = (leadsData || []).reduce((s, l) => s + parseFloat((l.expectedRevenue || "0").replace(",", "") || "0"), 0);
 
-  const handleFormChange = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
+  const handleFormChange = (field: string, value: string) => setForm(prev => {
+    const next = { ...prev, [field]: value };
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(next));
+      setHasDraft(Object.values(next).some(v => v !== ""));
+    } catch {}
+    return next;
+  });
 
   const handleSubmit = async () => {
     if (!form.name.trim()) { toast.error("يرجى إدخال اسم العميل"); return; }
@@ -2824,6 +2848,7 @@ export default function CRM() {
     setForm(emptyForm);
     setActiveTab("basic");
     setShowNewDialog(false);
+    try { localStorage.removeItem(DRAFT_KEY); setHasDraft(false); } catch {}
     toast.success(`تمت إضافة فرصة "${form.name}" بنجاح`);
   };
 
@@ -2837,9 +2862,12 @@ export default function CRM() {
             <Archive className="w-4 h-4 ml-2" />
             الأرشيف ({archivedLeads.length})
           </Button>
-          <Button onClick={() => setShowNewDialog(true)} style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>
+          <Button onClick={() => setShowNewDialog(true)} style={{ backgroundColor: "oklch(0.30 0.05 250)" }} className="relative">
             <Plus className="w-4 h-4 ml-2" />
             فرصة جديدة
+            {hasDraft && (
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "oklch(0.72 0.18 60)" }} />
+            )}
           </Button>
         </div>
       </div>
@@ -3453,6 +3481,7 @@ export default function CRM() {
                         <SelectItem value="إضافة مبنى قائم">إضافة مبنى قائم</SelectItem>
                         <SelectItem value="إضافة مبنى قائم بدون ترخيص">إضافة مبنى قائم بدون ترخيص</SelectItem>
                         <SelectItem value="إشراف">إشراف</SelectItem>
+                        <SelectItem value="تصميم واجهات">تصميم واجهات</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -3615,15 +3644,46 @@ export default function CRM() {
       </Dialog>
 
       {/* ==================== New Opportunity Dialog ==================== */}
-      <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
+      <Dialog open={showNewDialog} onOpenChange={(open) => {
+        if (!open) {
+          // حفظ المسودة تلقائياً عند الإغلاق بدون حفظ
+          const hasData = Object.values(form).some(v => v !== "");
+          if (hasData) {
+            try { localStorage.setItem(DRAFT_KEY, JSON.stringify(form)); setHasDraft(true); } catch {}
+            toast.info("تم حفظ المسودة — ستجد بياناتك عند فتح نافذة فرصة جديدة");
+          }
+          setShowNewDialog(false);
+        } else {
+          setShowNewDialog(true);
+        }
+      }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
           <div className="sticky top-0 z-10 bg-background border-b">
             <DialogHeader className="p-5 pb-0">
-              <DialogTitle className="text-lg font-bold flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>
-                  <Plus className="w-4 h-4 text-white" />
+              <DialogTitle className="text-lg font-bold flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "oklch(0.30 0.05 250)" }}>
+                    <Plus className="w-4 h-4 text-white" />
+                  </div>
+                  فرصة جديدة
+                  {hasDraft && (
+                    <span className="text-xs font-normal px-2 py-0.5 rounded-full" style={{ backgroundColor: "oklch(0.95 0.05 60)", color: "oklch(0.55 0.12 60)" }}>
+                      • مسودة محفوظة
+                    </span>
+                  )}
                 </div>
-                فرصة جديدة
+                {hasDraft && (
+                  <button
+                    className="text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded"
+                    onClick={() => {
+                      try { localStorage.removeItem(DRAFT_KEY); setHasDraft(false); } catch {}
+                      setForm(emptyForm);
+                      toast.success("تم مسح المسودة");
+                    }}
+                  >
+                    × مسح المسودة
+                  </button>
+                )}
               </DialogTitle>
             </DialogHeader>
             <div className="flex gap-0 px-5 pt-4">
@@ -3755,6 +3815,7 @@ export default function CRM() {
                         <SelectItem value="إضافة مبنى قائم">إضافة مبنى قائم</SelectItem>
                         <SelectItem value="إضافة مبنى قائم بدون ترخيص">إضافة مبنى قائم بدون ترخيص</SelectItem>
                         <SelectItem value="إشراف">إشراف</SelectItem>
+                        <SelectItem value="تصميم واجهات">تصميم واجهات</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -3885,7 +3946,15 @@ export default function CRM() {
           </div>
 
           <div className="sticky bottom-0 bg-background border-t p-4 flex items-center justify-between gap-3">
-            <Button variant="outline" onClick={() => { setShowNewDialog(false); setForm(emptyForm); setActiveTab("basic"); }}>إلغاء</Button>
+            <Button variant="outline" onClick={() => {
+              const hasData = Object.values(form).some(v => v !== "");
+              if (hasData) {
+                try { localStorage.setItem(DRAFT_KEY, JSON.stringify(form)); setHasDraft(true); } catch {}
+                toast.info("تم حفظ المسودة — ستجد بياناتك عند فتح نافذة فرصة جديدة");
+              }
+              setShowNewDialog(false);
+              setActiveTab("basic");
+            }}>إلغاء</Button>
             <div className="flex gap-2">
               {activeTab !== "basic" && (
                 <Button variant="outline" onClick={() => setActiveTab(activeTab === "notes" ? "details" : "basic")}>السابق</Button>
