@@ -327,7 +327,9 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
     d.category === "بطاقة مدنية" ||
     d.category === "وثيقة ملكية" ||
     d.category === "خريطة موقع" ||
-    d.category === "وثيقة أخرى"
+    d.category === "وثيقة أخرى" ||
+    d.category === "وثائق المشروع" ||
+    d.category === "وثائق رسمية"
   );
   const techDocs = allProjectDocs.filter(d =>
     d.category === "فحص تربة" ||
@@ -363,6 +365,11 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
   const totalCount = phase.tasks.length + extraTotal;
   const doneCount = tasksDone + extraDone;
   const progress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+
+  // حالة اكتمال كل قسم فرعي
+  const docsComplete = docsDocs.length > 0;
+  const techComplete = techDocs.length > 0 && techTasks.every(t => t.status === "done");
+  const formsComplete = formsDocs.length > 0 && formTasks.every(t => t.status === "done");
 
   const handleFileUploaded = (_group: string, _doc: { name: string }) => {
     // إعادة جلب المستندات من قاعدة البيانات لتحديث القائمة فوراً
@@ -404,23 +411,26 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
         <div className="overflow-y-auto flex-1 p-4 space-y-3">
 
           {/* ══ 1. جمع الوثائق ══ */}
-          <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: `color-mix(in oklch, ${color} 35%, transparent)` }}>
+          <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: docsComplete ? "oklch(0.55 0.15 150)" : `color-mix(in oklch, ${color} 35%, transparent)` }}>
             <div
               className="flex items-center justify-between px-3 py-2.5 cursor-pointer"
-              style={{ backgroundColor: `color-mix(in oklch, ${color} 8%, white)` }}
+              style={{ backgroundColor: docsComplete ? "oklch(0.97 0.04 150)" : `color-mix(in oklch, ${color} 8%, white)` }}
               onClick={() => setExpandedGroup(expandedGroup === "docs" ? null : "docs")}
             >
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: color }}>
-                  <FileText className="w-3.5 h-3.5 text-white" />
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: docsComplete ? "oklch(0.55 0.15 150)" : color }}>
+                  {docsComplete ? <Check className="w-3.5 h-3.5 text-white" /> : <FileText className="w-3.5 h-3.5 text-white" />}
                 </div>
                 <div>
-                  <p className="text-sm font-bold" style={{ color: `color-mix(in oklch, ${color} 80%, black)` }}>جمع الوثائق</p>
+                  <p className="text-sm font-bold" style={{ color: docsComplete ? "oklch(0.40 0.12 150)" : `color-mix(in oklch, ${color} 80%, black)` }}>جمع الوثائق</p>
                   <p className="text-[10px] text-muted-foreground">البطاقة المدنية، الوثيقة، خريطة الموقع</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {docsDocs.length > 0 && (
+                {docsComplete && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">✓ مكتملة</span>
+                )}
+                {!docsComplete && docsDocs.length > 0 && (
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `color-mix(in oklch, ${color} 15%, white)`, color }}>
                     {docsDocs.length} ملف
                   </span>
@@ -438,7 +448,7 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
               <div className="px-3 pb-4 pt-3 space-y-3 border-t">
                 <p className="text-[11px] text-muted-foreground">ارفع الملفات المطلوبة — ستظهر تلقائياً في المستندات</p>
                 <div className="flex flex-wrap gap-2">
-                  <FileUploadButton label="رفع وثيقة" category="وثائق المشروع" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("docs", d)} />
+                  <FileUploadButton label="رفع وثيقة" category="بطاقة مدنية" projectId={project.id} clientId={project.clientId} onUploaded={d => handleFileUploaded("docs", d)} />
 
                 </div>
                 <UploadedFilesList docs={docsDocs} key={refreshKey} onDeleted={() => { refetchDocs(); setRefreshKey(k => k + 1); }} />
@@ -469,23 +479,26 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
           </div>
 
           {/* ══ 2. الفحوصات التقنية ══ */}
-          <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: `color-mix(in oklch, oklch(0.60 0.12 30) 35%, transparent)` }}>
+          <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: techComplete ? "oklch(0.55 0.15 150)" : `color-mix(in oklch, oklch(0.60 0.12 30) 35%, transparent)` }}>
             <div
               className="flex items-center justify-between px-3 py-2.5 cursor-pointer"
-              style={{ backgroundColor: `color-mix(in oklch, oklch(0.60 0.12 30) 8%, white)` }}
+              style={{ backgroundColor: techComplete ? "oklch(0.97 0.04 150)" : `color-mix(in oklch, oklch(0.60 0.12 30) 8%, white)` }}
               onClick={() => setExpandedGroup(expandedGroup === "tech" ? null : "tech")}
             >
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: "oklch(0.60 0.12 30)" }}>
-                  <Zap className="w-3.5 h-3.5 text-white" />
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: techComplete ? "oklch(0.55 0.15 150)" : "oklch(0.60 0.12 30)" }}>
+                  {techComplete ? <Check className="w-3.5 h-3.5 text-white" /> : <Zap className="w-3.5 h-3.5 text-white" />}
                 </div>
                 <div>
-                  <p className="text-sm font-bold" style={{ color: "oklch(0.45 0.10 30)" }}>الفحوصات التقنية</p>
+                  <p className="text-sm font-bold" style={{ color: techComplete ? "oklch(0.40 0.12 150)" : "oklch(0.45 0.10 30)" }}>الفحوصات التقنية</p>
                   <p className="text-[10px] text-muted-foreground">فحص التربة وكتاب الكهرباء</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {techDocs.length > 0 && (
+                {techComplete && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">✓ مكتملة</span>
+                )}
+                {!techComplete && techDocs.length > 0 && (
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "color-mix(in oklch, oklch(0.60 0.12 30) 15%, white)", color: "oklch(0.45 0.10 30)" }}>
                     {techDocs.length} ملف
                   </span>
@@ -628,18 +641,18 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
                 )}
               </div>
             )}
-          </div>
+                    </div>
 
           {/* ══ 3. تعبئة نماذج البلدية ══ */}
-          <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: `color-mix(in oklch, oklch(0.55 0.15 150) 35%, transparent)` }}>
+          <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: formsComplete ? "oklch(0.55 0.15 150)" : `color-mix(in oklch, oklch(0.55 0.15 150) 35%, transparent)` }}>
             <div
               className="flex items-center justify-between px-3 py-2.5 cursor-pointer"
-              style={{ backgroundColor: `color-mix(in oklch, oklch(0.55 0.15 150) 8%, white)` }}
+              style={{ backgroundColor: formsComplete ? "oklch(0.97 0.04 150)" : `color-mix(in oklch, oklch(0.55 0.15 150) 8%, white)` }}
               onClick={() => setExpandedGroup(expandedGroup === "forms" ? null : "forms")}
             >
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: "oklch(0.55 0.15 150)" }}>
-                  <ClipboardList className="w-3.5 h-3.5 text-white" />
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: formsComplete ? "oklch(0.55 0.15 150)" : "oklch(0.55 0.15 150)" }}>
+                  {formsComplete ? <Check className="w-3.5 h-3.5 text-white" /> : <ClipboardList className="w-3.5 h-3.5 text-white" />}
                 </div>
                 <div>
                   <p className="text-sm font-bold" style={{ color: "oklch(0.40 0.12 150)" }}>تعبئة نماذج البلدية</p>
@@ -647,7 +660,10 @@ function PhaseFilePreparationPopup({ phase, project, onClose, onTaskUpdate }: {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {formsDocs.length > 0 && (
+                {formsComplete && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">✓ مكتملة</span>
+                )}
+                {!formsComplete && formsDocs.length > 0 && (
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "color-mix(in oklch, oklch(0.55 0.15 150) 15%, white)", color: "oklch(0.40 0.12 150)" }}>
                     {formsDocs.length} ملف
                   </span>
@@ -3035,8 +3051,27 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
       const completedStages = supervisionVisitsData.filter(
         v => v.visitStatus === "completed" || v.visitStatus === "approved"
       ).map(v => v.stageKey).filter((k, i, arr) => arr.indexOf(k) === i).length;
-      const totalStages = 18; // عدد مراحل الإشراف
+      const totalStages = 18;
       return Math.round((completedStages / totalStages) * 100);
+    }
+    // مرحلة تجهيز الملف (idx 0): تشمل الملفات المرفوعة كخطوات إضافية
+    if (idx === 0) {
+      const tasksDone = phase.tasks.filter(t => t.status === "done").length;
+      const docsUploaded = allProjectDocsMain.filter((d: any) =>
+        d.category === "بطاقة مدنية" || d.category === "وثيقة ملكية" ||
+        d.category === "خريطة الموقع" || d.category === "وثائق العقد"
+      ).length > 0 ? 1 : 0;
+      const techUploaded = allProjectDocsMain.filter((d: any) =>
+        d.category === "فحص تربة" || d.category === "كتاب كهرباء"
+      ).length > 0 ? 1 : 0;
+      const formsUploaded = allProjectDocsMain.filter((d: any) =>
+        d.category === "نماذج بلدية" || d.category === "نماذج"
+      ).length > 0 ? 1 : 0;
+      const extraDone = docsUploaded + techUploaded + formsUploaded;
+      const extraTotal = 3;
+      const total = phase.tasks.length + extraTotal;
+      const done = tasksDone + extraDone;
+      return total > 0 ? Math.round((done / total) * 100) : 0;
     }
     const total = phase.tasks.length;
     const done = phase.tasks.filter(t => t.status === "done").length;
