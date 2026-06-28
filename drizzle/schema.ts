@@ -534,3 +534,23 @@ export const discountRequests = mysqlTable("discount_requests", {
 });
 export type DiscountRequest = typeof discountRequests.$inferSelect;
 export type InsertDiscountRequest = typeof discountRequests.$inferInsert;
+
+// ── Service Types (أنواع الخدمات) ──────────────────────────────────────────────
+export const serviceTypes = mysqlTable("service_types", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 128 }).notNull(),
+  sortOrder: int("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type ServiceType = typeof serviceTypes.$inferSelect;
+export type InsertServiceType = typeof serviceTypes.$inferInsert;
+
+// ── Property Types (أنواع العقار) ───────────────────────────────────────────────
+export const propertyTypes = mysqlTable("property_types", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 128 }).notNull(),
+  sortOrder: int("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type PropertyType = typeof propertyTypes.$inferSelect;
+export type InsertPropertyType = typeof propertyTypes.$inferInsert;

@@ -47,6 +47,7 @@ import {
   useEmployees, usePackages, useUpdatePackage,
   useGovernorateAreas, useAddGovernorateArea,
   useCreateDiscountRequest, useDiscountRequestsByLead, useReviewDiscountRequest, useDiscountRequests,
+  useServiceTypes, usePropertyTypes,
 } from "@/lib/api";
 import { exportQuotationPdf, exportContractPdf, downloadQuotationPdf, printQuotationPdf, downloadContractPdf, buildContractPreviewHtml } from "@/lib/pdf";
 import { toast } from "sonner";
@@ -2304,6 +2305,16 @@ export default function CRM() {
   // بيانات المحافظات والمناطق من قاعدة البيانات (ديناميكية)
   const { data: govAreasData } = useGovernorateAreas();
   const addGovernorateArea = useAddGovernorateArea();
+  // أنواع الخدمات والعقار من قاعدة البيانات
+  const { data: dbServiceTypes = [] } = useServiceTypes();
+  const { data: dbPropertyTypes = [] } = usePropertyTypes();
+  // القوائم الديناميكية: إذا كانت فارغة من قاعدة البيانات نستخدم القوائم الثابتة
+  const dynamicServiceTypes: string[] = dbServiceTypes.length > 0
+    ? dbServiceTypes.map(s => s.name)
+    : ["بناء جديد", "هدم", "تعديل", "إضافة", "تعديل وإضافة", "إضافة مبنى قائم", "إضافة مبنى قائم بدون ترخيص", "إشراف", "تصميم واجهات"];
+  const dynamicPropertyTypes: string[] = dbPropertyTypes.length > 0
+    ? dbPropertyTypes.map(p => p.name)
+    : ["سكن خاص", "استثماري", "تجاري", "صناعي", "كروكي"];
   // دمج البيانات الثابتة مع الديناميكية من قاعدة البيانات
   const dynamicGovernorates: Record<string, string[]> = {};
   // أضف المحافظات الثابتة أولاً
@@ -3455,15 +3466,9 @@ export default function CRM() {
                     <Select value={editForm.type} onValueChange={(v) => setEditForm(p => ({ ...p, type: v }))}>
                       <SelectTrigger><SelectValue placeholder="اختر نوع العقار" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="سكن خاص">سكن خاص</SelectItem>
-                        <SelectItem value="استثماري">استثماري</SelectItem>
-                        <SelectItem value="تجاري">تجاري</SelectItem>
-                        <SelectItem value="صناعي">صناعي</SelectItem>
-                        <SelectItem value="حكومي">حكومي</SelectItem>
-                        <SelectItem value="مخازن/شبرات">مخازن / شبرات</SelectItem>
-                        <SelectItem value="مساجد">مساجد</SelectItem>
-                        <SelectItem value="مزارع">مزارع</SelectItem>
-                        <SelectItem value="شاليه">شاليه</SelectItem>
+                        {dynamicPropertyTypes.map(pt => (
+                          <SelectItem key={pt} value={pt}>{pt}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -3475,15 +3480,9 @@ export default function CRM() {
                     <Select value={editForm.serviceType} onValueChange={(v) => setEditForm(p => ({ ...p, serviceType: v }))}>
                       <SelectTrigger><SelectValue placeholder="اختر نوع الخدمة" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="بناء جديد">بناء جديد</SelectItem>
-                        <SelectItem value="هدم">هدم</SelectItem>
-                        <SelectItem value="تعديل">تعديل</SelectItem>
-                        <SelectItem value="إضافة">إضافة</SelectItem>
-                        <SelectItem value="تعديل وإضافة">تعديل وإضافة</SelectItem>
-                        <SelectItem value="إضافة مبنى قائم">إضافة مبنى قائم</SelectItem>
-                        <SelectItem value="إضافة مبنى قائم بدون ترخيص">إضافة مبنى قائم بدون ترخيص</SelectItem>
-                        <SelectItem value="إشراف">إشراف</SelectItem>
-                        <SelectItem value="تصميم واجهات">تصميم واجهات</SelectItem>
+                        {dynamicServiceTypes.map(st => (
+                          <SelectItem key={st} value={st}>{st}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -3789,15 +3788,9 @@ export default function CRM() {
                     <Select value={form.type} onValueChange={(v) => handleFormChange("type", v)}>
                       <SelectTrigger><SelectValue placeholder="اختر نوع العقار" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="سكن خاص">سكن خاص</SelectItem>
-                        <SelectItem value="استثماري">استثماري</SelectItem>
-                        <SelectItem value="تجاري">تجاري</SelectItem>
-                        <SelectItem value="صناعي">صناعي</SelectItem>
-                        <SelectItem value="حكومي">حكومي</SelectItem>
-                        <SelectItem value="مخازن/شبرات">مخازن / شبرات</SelectItem>
-                        <SelectItem value="مساجد">مساجد</SelectItem>
-                        <SelectItem value="مزارع">مزارع</SelectItem>
-                        <SelectItem value="شاليه">شاليه</SelectItem>
+                        {dynamicPropertyTypes.map(pt => (
+                          <SelectItem key={pt} value={pt}>{pt}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -3809,15 +3802,9 @@ export default function CRM() {
                     <Select value={form.serviceType} onValueChange={(v) => handleFormChange("serviceType", v)}>
                       <SelectTrigger><SelectValue placeholder="اختر نوع الخدمة" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="بناء جديد">بناء جديد</SelectItem>
-                        <SelectItem value="هدم">هدم</SelectItem>
-                        <SelectItem value="تعديل">تعديل</SelectItem>
-                        <SelectItem value="إضافة">إضافة</SelectItem>
-                        <SelectItem value="تعديل وإضافة">تعديل وإضافة</SelectItem>
-                        <SelectItem value="إضافة مبنى قائم">إضافة مبنى قائم</SelectItem>
-                        <SelectItem value="إضافة مبنى قائم بدون ترخيص">إضافة مبنى قائم بدون ترخيص</SelectItem>
-                        <SelectItem value="إشراف">إشراف</SelectItem>
-                        <SelectItem value="تصميم واجهات">تصميم واجهات</SelectItem>
+                        {dynamicServiceTypes.map(st => (
+                          <SelectItem key={st} value={st}>{st}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

@@ -1416,3 +1416,59 @@ export function useReviewDiscountRequest() {
     },
   });
 }
+
+// ── Service Types (أنواع الخدمات) ─────────────────────────────────────────────
+export interface ServiceTypeRow { id: number; name: string; sortOrder: number; }
+
+export function useServiceTypes() {
+  return useQuery<ServiceTypeRow[]>({
+    queryKey: ["service-types"],
+    queryFn: () => request("/api/service-types"),
+    initialData: [],
+    staleTime: 0,
+  });
+}
+export function useAddServiceType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) =>
+      request("/api/service-types", { method: "POST", body: JSON.stringify({ name }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["service-types"] }),
+  });
+}
+export function useDeleteServiceType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      request(`/api/service-types/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["service-types"] }),
+  });
+}
+
+// ── Property Types (أنواع العقار) ─────────────────────────────────────────────
+export interface PropertyTypeRow { id: number; name: string; sortOrder: number; }
+
+export function usePropertyTypes() {
+  return useQuery<PropertyTypeRow[]>({
+    queryKey: ["property-types"],
+    queryFn: () => request("/api/property-types"),
+    initialData: [],
+    staleTime: 0,
+  });
+}
+export function useAddPropertyType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) =>
+      request("/api/property-types", { method: "POST", body: JSON.stringify({ name }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["property-types"] }),
+  });
+}
+export function useDeletePropertyType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      request(`/api/property-types/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["property-types"] }),
+  });
+}

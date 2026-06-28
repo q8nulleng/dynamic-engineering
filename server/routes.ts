@@ -15,7 +15,8 @@ import {
   employees, employeeSessions,
   supervisionVisits, detailedDrawings, municipalitySubmissions,
   employeeNotifications, packages, governorateAreas,
-  contractPaymentSchedule, paymentCollections, discountRequests
+  contractPaymentSchedule, paymentCollections, discountRequests,
+  serviceTypes, propertyTypes
 } from "../drizzle/schema.js";
 import { nanoid } from "nanoid";
 import { storagePut } from "./storage.js";
@@ -2874,5 +2875,75 @@ apiRouter.patch("/discount-requests/:id/review", async (req, res) => {
       }
     }
     res.json({ message: status === "approved" ? "تمت الموافقة وتحديث السعر" : "تم رفض الطلب" });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Service Types (أنواع الخدمات) ─────────────────────────────────────────────
+
+// GET /api/service-types
+apiRouter.get("/api/service-types", async (_req, res) => {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(serviceTypes).orderBy(serviceTypes.sortOrder, serviceTypes.name);
+    res.json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/service-types
+apiRouter.post("/api/service-types", async (req, res) => {
+  try {
+    const db = getDb();
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: "الاسم مطلوب" });
+    const existing = await db.select().from(serviceTypes);
+    const dup = existing.find((r: any) => r.name === name.trim());
+    if (dup) return res.status(400).json({ error: "نوع الخدمة موجود بالفعل" });
+    await db.insert(serviceTypes).values({ name: name.trim(), sortOrder: existing.length + 1 });
+    const rows = await db.select().from(serviceTypes).orderBy(serviceTypes.sortOrder, serviceTypes.name);
+    res.status(201).json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/service-types/:id
+apiRouter.delete("/api/service-types/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    await db.delete(serviceTypes).where(eq(serviceTypes.id, parseInt(req.params.id)));
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Property Types (أنواع العقار) ─────────────────────────────────────────────
+
+// GET /api/property-types
+apiRouter.get("/api/property-types", async (_req, res) => {
+  try {
+    const db = getDb();
+    const rows = await db.select().from(propertyTypes).orderBy(propertyTypes.sortOrder, propertyTypes.name);
+    res.json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/property-types
+apiRouter.post("/api/property-types", async (req, res) => {
+  try {
+    const db = getDb();
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: "الاسم مطلوب" });
+    const existing = await db.select().from(propertyTypes);
+    const dup = existing.find((r: any) => r.name === name.trim());
+    if (dup) return res.status(400).json({ error: "نوع العقار موجود بالفعل" });
+    await db.insert(propertyTypes).values({ name: name.trim(), sortOrder: existing.length + 1 });
+    const rows = await db.select().from(propertyTypes).orderBy(propertyTypes.sortOrder, propertyTypes.name);
+    res.status(201).json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/property-types/:id
+apiRouter.delete("/api/property-types/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    await db.delete(propertyTypes).where(eq(propertyTypes.id, parseInt(req.params.id)));
+    res.json({ success: true });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });

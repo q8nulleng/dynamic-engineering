@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import {
   Plus, Trash2, Pencil, Save, X, MapPin, FileText, FileSignature, ClipboardList,
-  ChevronDown, ChevronUp, CheckCircle, Loader2, Building2,
+  ChevronDown, ChevronUp, CheckCircle, Loader2, Building2, Settings2,
   Bold, Underline, AlignRight, AlignLeft, AlignCenter, Type, Palette, Eye, Download
 } from "lucide-react";
 import { buildContractPreviewHtml, exportContractPdf } from "@/lib/pdf";
@@ -23,6 +23,8 @@ import {
   useContractTemplates, useCreateContractTemplate, useUpdateContractTemplate, useDeleteContractTemplate,
   useGovernorateAreas, useAddGovernorateArea, useUpdateGovernorateArea, useDeleteGovernorateArea,
   useAddGovernorate, useDeleteGovernorate,
+  useServiceTypes, useAddServiceType, useDeleteServiceType,
+  usePropertyTypes, useAddPropertyType, useDeletePropertyType,
   type DbPackage,
 } from "@/lib/api";
 
@@ -1000,12 +1002,165 @@ function GovernorateAreasTab() {
   );
 }
 
+// ── تبويب الخدمات والعقارات ──────────────────────────────────────────────────
+function LookupTypesTab() {
+  const { data: serviceTypesList = [] } = useServiceTypes();
+  const { data: propertyTypesList = [] } = usePropertyTypes();
+  const addServiceType = useAddServiceType();
+  const deleteServiceType = useDeleteServiceType();
+  const addPropertyType = useAddPropertyType();
+  const deletePropertyType = useDeletePropertyType();
+
+  const [newServiceType, setNewServiceType] = useState("");
+  const [newPropertyType, setNewPropertyType] = useState("");
+
+  const handleAddServiceType = async () => {
+    if (!newServiceType.trim()) return;
+    try {
+      await addServiceType.mutateAsync(newServiceType.trim());
+      setNewServiceType("");
+      toast.success("تم إضافة نوع الخدمة");
+    } catch (e: any) {
+      toast.error(e?.message || "حدث خطأ");
+    }
+  };
+
+  const handleAddPropertyType = async () => {
+    if (!newPropertyType.trim()) return;
+    try {
+      await addPropertyType.mutateAsync(newPropertyType.trim());
+      setNewPropertyType("");
+      toast.success("تم إضافة نوع العقار");
+    } catch (e: any) {
+      toast.error(e?.message || "حدث خطأ");
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6" dir="rtl">
+      {/* أنواع الخدمات */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Settings2 className="w-4 h-4 text-orange-500" />
+            أنواع الخدمات
+            <Badge variant="secondary">{serviceTypesList.length}</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* إضافة جديد */}
+          <div className="flex gap-2">
+            <Input
+              placeholder="اسم نوع الخدمة..."
+              value={newServiceType}
+              onChange={e => setNewServiceType(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleAddServiceType()}
+              className="flex-1 text-right"
+            />
+            <Button
+              size="sm"
+              onClick={handleAddServiceType}
+              disabled={addServiceType.isPending || !newServiceType.trim()}
+            >
+              {addServiceType.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            </Button>
+          </div>
+          {/* القائمة */}
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {serviceTypesList.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">لا توجد أنواع خدمات بعد</p>
+            ) : (
+              serviceTypesList.map(st => (
+                <div key={st.id} className="flex items-center justify-between p-2 rounded-lg border bg-muted/30">
+                  <span className="text-sm font-medium">{st.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                    onClick={() => {
+                      if (confirm(`هل تريد حذف "${st.name}"؟`)) {
+                        deleteServiceType.mutate(st.id, {
+                          onSuccess: () => toast.success("تم الحذف"),
+                          onError: () => toast.error("حدث خطأ"),
+                        });
+                      }
+                    }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* أنواع العقار */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Building2 className="w-4 h-4 text-blue-500" />
+            أنواع العقار
+            <Badge variant="secondary">{propertyTypesList.length}</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* إضافة جديد */}
+          <div className="flex gap-2">
+            <Input
+              placeholder="اسم نوع العقار..."
+              value={newPropertyType}
+              onChange={e => setNewPropertyType(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleAddPropertyType()}
+              className="flex-1 text-right"
+            />
+            <Button
+              size="sm"
+              onClick={handleAddPropertyType}
+              disabled={addPropertyType.isPending || !newPropertyType.trim()}
+            >
+              {addPropertyType.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            </Button>
+          </div>
+          {/* القائمة */}
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {propertyTypesList.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">لا توجد أنواع عقار بعد</p>
+            ) : (
+              propertyTypesList.map(pt => (
+                <div key={pt.id} className="flex items-center justify-between p-2 rounded-lg border bg-muted/30">
+                  <span className="text-sm font-medium">{pt.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                    onClick={() => {
+                      if (confirm(`هل تريد حذف "${pt.name}"؟`)) {
+                        deletePropertyType.mutate(pt.id, {
+                          onSuccess: () => toast.success("تم الحذف"),
+                          onError: () => toast.error("حدث خطأ"),
+                        });
+                      }
+                    }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ── الصفحة الرئيسية ───────────────────────────────────────────────────────────
 export default function Settings() {
   return (
     <div className="space-y-6" dir="rtl">
       <Tabs defaultValue="areas" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-6">
+        <TabsList className="grid w-full grid-cols-5 mb-6">
           <TabsTrigger value="quotations" className="flex items-center gap-2 text-xs sm:text-sm">
             <FileText className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline">عروض الأسعار</span>
@@ -1026,6 +1181,11 @@ export default function Settings() {
             <span className="hidden sm:inline">المناطق والمحافظات</span>
             <span className="sm:hidden">المناطق</span>
           </TabsTrigger>
+          <TabsTrigger value="lookup" className="flex items-center gap-2 text-xs sm:text-sm">
+            <Settings2 className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">الخدمات والعقارات</span>
+            <span className="sm:hidden">الأنواع</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="quotations">
@@ -1039,6 +1199,9 @@ export default function Settings() {
         </TabsContent>
         <TabsContent value="areas">
           <GovernorateAreasTab />
+        </TabsContent>
+        <TabsContent value="lookup">
+          <LookupTypesTab />
         </TabsContent>
       </Tabs>
     </div>
