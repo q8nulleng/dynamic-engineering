@@ -17,11 +17,11 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
-import { useProject, useUpdateTask, useCreateProjectMeeting, useProjectMeetings, useDocuments, useProjectBrief, usePhaseMeta, useUpdatePhaseMeta,
+import { useProject, useUpdateTask, useUpdateProject, useCreateProjectMeeting, useProjectMeetings, useDocuments, useProjectBrief, usePhaseMeta, useUpdatePhaseMeta,
   useMunicipalitySubmission, useUpdateMunicipality,
   useDetailedDrawings, useCreateDrawing, useUpdateDrawing,
   useSupervisionVisits, useCreateSupervisionVisit, useUpdateSupervisionVisit,
-  useEmployees } from "@/lib/api";
+  useEmployees, useServiceTypes, usePropertyTypes } from "@/lib/api";
 import type { Document, MunicipalitySubmission, DetailedDrawing, SupervisionVisit, EmployeeRecord } from "@/lib/api";
 
 /* ─── Types ─── */
@@ -3004,7 +3004,13 @@ interface ResidentialKanbanProps {
 export default function ResidentialKanban({ projectId }: ResidentialKanbanProps) {
   const { data: projectData, isLoading, refetch: refetchProject } = useProject(projectId);
   const updateTask = useUpdateTask(projectId);
+  const updateProject = useUpdateProject();
+  const { data: dbServiceTypes = [] } = useServiceTypes();
+  const { data: dbPropertyTypes = [] } = usePropertyTypes();
   const [activePopup, setActivePopup] = useState<number | null>(null);
+  const [showEditType, setShowEditType] = useState(false);
+  const [editType, setEditType] = useState("");
+  const [editServiceType, setEditServiceType] = useState("");
   // جلب زيارات الإشراف لحساب تقدم مرحلة الإشراف من الخارج
   const { data: supervisionVisitsData = [] } = useSupervisionVisits(projectId);
   // جلب مستندات المشروع لعرضها في كاردات المراحل
@@ -3023,6 +3029,25 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
         setTimeout(() => refetchProject(), 300);
       },
       onError: () => toast.error("حدث خطأ"),
+    });
+  };
+
+  const handleOpenEditType = () => {
+    if (!project) return;
+    setEditType(project.type || "");
+    setEditServiceType(project.serviceType || "");
+    setShowEditType(true);
+  };
+
+  const handleSaveProjectType = () => {
+    if (!project || !editType || !editServiceType) return;
+    updateProject.mutate({ id: projectId, type: editType, serviceType: editServiceType }, {
+      onSuccess: () => {
+        toast.success("تم تحديث نوع المشروع ✓");
+        setShowEditType(false);
+        refetchProject();
+      },
+      onError: () => toast.error("حدث خطأ أثناء التحديث"),
     });
   };
 
@@ -3133,6 +3158,76 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
           phase={project.phases[6]} project={project}
           onClose={() => setActivePopup(null)} onTaskUpdate={handleTaskUpdate} />
       )}
+      {/* ── Dialog: تعديل نوع المشروع ── */}
+      {showEditType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl" onClick={() => setShowEditType(false)}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-sm p-5 border" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold">تعديل نوع المشروع</h3>
+              <button onClick={() => setShowEditType(false)} className="w-6 h-6 rounded-full bg-muted/50 flex items-center justify-center">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {/* نوع العقار */}
+            <div className="mb-3">
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">نوع العقار</label>
+              <div className="flex flex-wrap gap-1.5">
+                {(dbPropertyTypes.length > 0 ? dbPropertyTypes.map(p => p.name) : ["سكن خاص", "استثماري", "تجاري", "صناعي", "كروكي"]).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setEditType(t)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                      editType === t
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-border hover:bg-muted/50"
+                    }`}
+                  >{t}</button>
+                ))}
+              </div>
+            </div>
+            {/* نوع الخدمة */}
+            <div className="mb-4">
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">نوع الخدمة</label>
+              <div className="flex flex-wrap gap-1.5">
+                {(dbServiceTypes.length > 0 ? dbServiceTypes.map(s => s.name) : ["بناء جديد", "هدم", "تعديل", "إضافة", "تعديل وإضافة", "إضافة مبنى قائم", "إشراف", "تصميم واجهات"]).map(s => (
+                  <button
+                    key={s}
+                    onClick={() => setEditServiceType(s)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                      editServiceType === s
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-border hover:bg-muted/50"
+                    }`}
+                  >{s}</button>
+                ))}
+              </div>
+            </div>
+            {/* معاينة */}
+            {(editType || editServiceType) && (
+              <div className="mb-4 p-2.5 rounded-lg bg-muted/30 border text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">النتيجة: </span>
+                {editType} {editType && editServiceType ? "•" : ""} {editServiceType}
+              </div>
+            )}
+            {/* أزرار */}
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveProjectType}
+                disabled={!editType || !editServiceType || updateProject.isPending}
+                className="flex-1 h-9 rounded-lg text-xs font-semibold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                {updateProject.isPending ? "جاري الحفظ..." : "حفظ التعديل"}
+              </button>
+              <button
+                onClick={() => setShowEditType(false)}
+                className="flex-1 h-9 rounded-lg text-xs font-semibold border hover:bg-muted/40 transition-colors"
+              >إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Header ── */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
@@ -3146,8 +3241,15 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
             <div className="flex items-center gap-2 flex-wrap mt-0.5">
               <span className="flex items-center gap-1 text-xs text-muted-foreground"><Users className="w-3 h-3" />{project.client}</span>
               {project.area && <span className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="w-3 h-3" />{project.area}</span>}
-              <Badge variant="outline" className="text-[10px] h-5">{project.type}</Badge>
-              <Badge variant="secondary" className="text-[10px] h-5">{project.serviceType}</Badge>
+              <button
+                onClick={handleOpenEditType}
+                className="flex items-center gap-1 group"
+                title="تعديل نوع المشروع"
+              >
+                <Badge variant="outline" className="text-[10px] h-5 group-hover:border-primary group-hover:text-primary transition-colors cursor-pointer">{project.type}</Badge>
+                <Badge variant="secondary" className="text-[10px] h-5 group-hover:bg-primary/10 transition-colors cursor-pointer">{project.serviceType}</Badge>
+                <Edit2 className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors opacity-0 group-hover:opacity-100" />
+              </button>
             </div>
           </div>
         </div>

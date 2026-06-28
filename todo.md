@@ -234,7 +234,25 @@
 - [x] نقطة برتقالية على زر "فرصة جديدة" عند وجود مسودة
 
 ## إدارة أنواع الخدمة والعقار في الإعدادات
-- [ ] إضافة جدولي service_types و property_types في schema.ts ورفعهما بـ db:push
-- [ ] إضافة tRPC procedures (list/add/delete) لكلا الجدولين في routers.ts
-- [ ] إضافة تبويب "الخدمات والعقارات" في Settings.tsx مع واجهة إضافة وحذف
-- [ ] تحديث CRM.tsx لجلب قوائم نوع الخدمة ونوع العقار ديناميكياً من قاعدة البيانات
+- [x] إضافة جدولي service_types و property_types في schema.ts ورفعهما بـ db:push
+- [x] إضافة tRPC procedures (list/add/delete) لكلا الجدولين في routers.ts
+- [x] إضافة تبويب "الخدمات والعقارات" في Settings.tsx مع واجهة إضافة وحذف
+- [x] تحديث CRM.tsx لجلب قوائم نوع الخدمة ونوع العقار ديناميكياً من قاعدة البيانات
+
+## إصلاح ResidentialKanban - تلوين الأقسام الفرعية
+- [x] إضافة متغيرات docsComplete وtechComplete وformsComplete كـ computed variables
+- [x] إصلاح التعليق غير المغلق في قسم "الفحوصات التقنية" (السطر 481)
+- [x] إصلاح التعليق غير المغلق في قسم "تعبئة نماذج البلدية" (السطر 646)
+- [x] الأقسام الثلاثة تتلون خضراء عند اكتمال مهامها ورفع ملفاتها
+
+## محرر العقد Inline في كرت CRM
+- [ ] فحص زر "تعديل العقد" وبنية terms_text في قاعدة البيانات
+- [ ] إنشاء محرر inline يعرض بنود العقد مع إمكانية تعديل/إضافة/حذف كل بند
+- [ ] إضافة API endpoint لحفظ تعديلات العقد في terms_text
+
+## تعديل نوع المشروع من داخل صفحة تفاصيل المشروع
+- [x] إضافة useUpdateProject وuseServiceTypes وusePropertyTypes إلى imports في ResidentialKanban
+- [x] إضافة state: showEditType, editType, editServiceType
+- [x] إضافة handlers: handleOpenEditType, handleSaveProjectType
+- [x] إضافة Dialog تعديل نوع المشروع (نوع العقار + نوع الخدمة) مع أزرار اختيار
+- [x] جعل badges نوع المشروع قابلة للضغط لفتح Dialog التعديل
