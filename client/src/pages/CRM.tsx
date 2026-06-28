@@ -235,6 +235,7 @@ function QuotationDialog({ lead, onClose, onSaved }: {
       const pkgForPdf = {
         ...(agreedPrice.trim() ? { ...selectedPkg, price: agreedPrice.trim() } : selectedPkg),
         features: editableFeatures,
+        ...(originalPriceBeforeDiscount && agreedPrice.trim() ? { originalPrice: originalPriceBeforeDiscount } : {}),
       };
       await exportQuotationPdf(lead, pkgForPdf);
     } catch (err: unknown) {
@@ -254,6 +255,7 @@ function QuotationDialog({ lead, onClose, onSaved }: {
       const pkgForPdf = {
         ...(agreedPrice.trim() ? { ...selectedPkg, price: agreedPrice.trim() } : selectedPkg),
         features: editableFeatures,
+        ...(originalPriceBeforeDiscount && agreedPrice.trim() ? { originalPrice: originalPriceBeforeDiscount } : {}),
       };
       await downloadQuotationPdf(lead, pkgForPdf);
       toast.success("تم تحميل PDF بنجاح", { id: tid });

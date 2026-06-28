@@ -552,6 +552,7 @@ export interface QuotationLead {
 export interface QuotationPackage {
   name: string;
   price: string;
+  originalPrice?: string; // السعر قبل الخصم (إذا وُجد)
   level?: string;
   features: string[];
 }
@@ -576,7 +577,20 @@ ${officialHeader()}
 <!-- Package -->
 <div style="border:2px solid #000;padding:16px 20px;margin-bottom:20px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-    <div style="font-size:30px;font-weight:900;color:#000;">${pkg.price} <span style="font-size:14px;font-weight:600;">د.ك</span></div>
+    <div style="font-family:'Space Grotesk',sans-serif;">
+      ${pkg.originalPrice ? `
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:11px;color:#999;font-family:'Noto Kufi Arabic',sans-serif;white-space:nowrap;">قبل الخصم:</span>
+            <span style="font-size:18px;color:#999;text-decoration:line-through;font-weight:600;">${pkg.originalPrice} <span style="font-size:11px;">د.ك</span></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:11px;color:#c00;font-family:'Noto Kufi Arabic',sans-serif;white-space:nowrap;font-weight:700;">بعد الخصم:</span>
+            <span style="font-size:30px;font-weight:900;color:#c00;">${pkg.price} <span style="font-size:14px;font-weight:600;color:#c00;">د.ك</span></span>
+          </div>
+        </div>
+      ` : `<div style="font-size:30px;font-weight:900;color:#000;">${pkg.price} <span style="font-size:14px;font-weight:600;">د.ك</span></div>`}
+    </div>
     <div style="text-align:right;">
       <div style="font-size:15px;font-weight:700;color:#000;">${pkg.name}</div>
       ${pkg.level && pkg.level !== "-" ? `<div style="font-size:11px;color:#555;margin-top:2px;">${pkg.level}</div>` : ""}
