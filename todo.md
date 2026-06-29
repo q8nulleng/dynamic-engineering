@@ -256,3 +256,12 @@
 - [x] إضافة handlers: handleOpenEditType, handleSaveProjectType
 - [x] إضافة Dialog تعديل نوع المشروع (نوع العقار + نوع الخدمة) مع أزرار اختيار
 - [x] جعل badges نوع المشروع قابلة للضغط لفتح Dialog التعديل
+
+## اكتمال الكروت عند رفع الملفات (منطق progress شامل)
+- [x] تحديث getPhaseProgress لمرحلة الواجهات والإنشائي (idx=2): تشمل columnsDone + facadeDone + fullStructuralDone من phase_meta
+- [x] تحديث getPhaseProgress لمرحلة تقديم البلدية (idx=4): تشمل رفع مستندات + تقديم + استلام رخصة
+- [x] تحديث getPhaseProgress لمرحلة المخططات التفصيلية (idx=5): تشمل رفع ملف + اعتماد جميع المخططات
+- [x] تحديث getPhaseStatus لجميع المراحل ذات الخطوات الإضافية (0,2,4,5) لتعتمد على 100% = مكتملة
+- [x] تحديث doneCount/totalCount في الكروت الخارجية لتعكس الخطوات الإضافية لكل مرحلة
+- [x] إضافة مؤشرات بصرية للمراحل 2,4,5 في الكروت الخارجية (أعمدة/واجهات/إنشائي، حالة البلدية، عدد المخططات)
+- [x] جلب facadeMetaData وmuniDataMain وdetailedDrawingsMain في المكون الرئيسي ResidentialKanban

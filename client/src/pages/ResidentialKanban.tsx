@@ -3018,6 +3018,13 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
   // جلب تواريخ الفحوصات لمرحلة تجهيز الملف
   const { data: fileMetaMain } = usePhaseMeta(projectId, "file_preparation");
   const fileMetaDataMain: Record<string, any> = (fileMetaMain as any)?.data || {};
+  // جلب بيانات مرحلة الواجهات والإنشائي (phase 2)
+  const { data: facadeMetaRow } = usePhaseMeta(projectId, "facade_structural");
+  const facadeMetaData: Record<string, any> = (facadeMetaRow as any)?.data || {};
+  // جلب بيانات تقديم البلدية (phase 4)
+  const { data: muniDataMain } = useMunicipalitySubmission(projectId);
+  // جلب المخططات التفصيلية (phase 5)
+  const { data: detailedDrawingsMain = [] } = useDetailedDrawings(projectId);
 
   const project = projectData as ProjectData | undefined;
 
@@ -3084,7 +3091,9 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
       const tasksDone = phase.tasks.filter(t => t.status === "done").length;
       const docsUploaded = allProjectDocsMain.filter((d: any) =>
         d.category === "بطاقة مدنية" || d.category === "وثيقة ملكية" ||
-        d.category === "خريطة الموقع" || d.category === "وثائق العقد"
+        d.category === "خريطة الموقع" || d.category === "خريطة موقع" ||
+        d.category === "وثائق العقد" || d.category === "وثيقة أخرى" ||
+        d.category === "وثائق المشروع" || d.category === "وثائق رسمية"
       ).length > 0 ? 1 : 0;
       const techUploaded = allProjectDocsMain.filter((d: any) =>
         d.category === "فحص تربة" || d.category === "كتاب كهرباء"
@@ -3094,6 +3103,54 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
       ).length > 0 ? 1 : 0;
       const extraDone = docsUploaded + techUploaded + formsUploaded;
       const extraTotal = 3;
+      const total = phase.tasks.length + extraTotal;
+      const done = tasksDone + extraDone;
+      return total > 0 ? Math.round((done / total) * 100) : 0;
+    }
+    // مرحلة الواجهات والإنشائي (idx 2): تعتمد على phase_meta (columnsDone + facadeDone + fullStructuralDone)
+    if (idx === 2) {
+      const columnsDone = facadeMetaData.columnsDone === true;
+      const facadeDone = facadeMetaData.facadeDone === true;
+      const fullStructuralDone = facadeMetaData.fullStructuralDone === true;
+      const extraStepsDone = (columnsDone ? 1 : 0) + (facadeDone ? 1 : 0) + (fullStructuralDone ? 1 : 0);
+      const extraStepsTotal = 3;
+      const tasksDone = phase.tasks.filter(t => t.status === "done").length;
+      const total = phase.tasks.length + extraStepsTotal;
+      const done = tasksDone + extraStepsDone;
+      return total > 0 ? Math.round((done / total) * 100) : 0;
+    }
+    // مرحلة تقديم البلدية (idx 4): تعتمد على muniStatus
+    if (idx === 4) {
+      const muniStatus = (muniDataMain as any)?.muniStatus || "not_submitted";
+      const muniDocs = allProjectDocsMain.filter((d: any) =>
+        d.category?.includes("بلدية") || d.category?.includes("رخصة")
+      ).length;
+      const tasksDone = phase.tasks.filter(t => t.status === "done").length;
+      // خطوتان إضافيتان: رفع مستندات + تقديم البلدية
+      const docsStep = muniDocs > 0 ? 1 : 0;
+      const submittedStep = muniStatus !== "not_submitted" ? 1 : 0;
+      const licenseStep = muniStatus === "license_received" ? 1 : 0;
+      const extraDone = docsStep + submittedStep + licenseStep;
+      const extraTotal = 3;
+      const total = phase.tasks.length + extraTotal;
+      const done = tasksDone + extraDone;
+      return total > 0 ? Math.round((done / total) * 100) : 0;
+    }
+    // مرحلة المخططات التفصيلية (idx 5): تعتمد على حالة المخططات
+    if (idx === 5) {
+      const tasksDone = phase.tasks.filter(t => t.status === "done").length;
+      const drawingDocs = allProjectDocsMain.filter((d: any) =>
+        d.category?.includes("مخطط تفصيلي") || d.category?.includes("كهرباء") || d.category?.includes("صحي")
+      ).length;
+      const drawingsApproved = (detailedDrawingsMain as any[]).filter(
+        d => d.drawingStatus === "approved" || d.drawingStatus === "completed"
+      ).length;
+      const drawingsTotal = (detailedDrawingsMain as any[]).length;
+      // خطوتان إضافيتان: رفع ملف + اعتماد مخطط
+      const docsStep = drawingDocs > 0 ? 1 : 0;
+      const approvedStep = drawingsTotal > 0 && drawingsApproved === drawingsTotal ? 1 : 0;
+      const extraDone = docsStep + approvedStep;
+      const extraTotal = 2;
       const total = phase.tasks.length + extraTotal;
       const done = tasksDone + extraDone;
       return total > 0 ? Math.round((done / total) * 100) : 0;
@@ -3113,7 +3170,14 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
       if (idx < project.currentPhase) return "past";
       return "upcoming";
     }
-    // المرحلة تعتبر مكتملة فقط إذا كانت تحتوي على مهام ونسبتها 100%
+    // المراحل ذات الخطوات الإضافية (0,2,4,5): تعتمد على النسبة فقط (100% = مكتملة)
+    if ([0, 2, 4, 5].includes(idx as number)) {
+      if (prog === 100) return "done";
+      if (prog > 0 || idx === project.currentPhase) return "current";
+      if (idx < project.currentPhase) return "past";
+      return "upcoming";
+    }
+    // باقي المراحل: مكتملة إذا كانت تحتوي على مهام ونسبتها 100%
     if (prog === 100 && phase.tasks.length > 0) return "done";
     if (idx === project.currentPhase) return "current";
     if (idx < project.currentPhase) return "past";
@@ -3321,13 +3385,49 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
             const isUpcoming = phaseStatus === "upcoming";
             // مرحلة الإشراف: استخدام بيانات الزيارات
             const isSupervisionPhase = idx === 6;
-            const supervisionDone = isSupervisionPhase
-              ? supervisionVisitsData.filter(v => v.visitStatus === "completed" || v.visitStatus === "approved").map(v => v.stageKey).filter((k, i, arr) => arr.indexOf(k) === i).length
-              : phase.tasks.filter(t => t.status === "done").length;
-            const supervisionTotal = isSupervisionPhase ? 18 : phase.tasks.length;
-            const doneCount = isSupervisionPhase ? supervisionDone : phase.tasks.filter(t => t.status === "done").length;
-            const totalCount = isSupervisionPhase ? supervisionTotal : phase.tasks.length;
+            const tasksDoneBase = phase.tasks.filter(t => t.status === "done").length;
             const inProgressCount = isSupervisionPhase ? 0 : phase.tasks.filter(t => t.status === "in_progress").length;
+
+            // حساب doneCount/totalCount بناءً على نوع المرحلة
+            let doneCount: number;
+            let totalCount: number;
+            if (isSupervisionPhase) {
+              doneCount = supervisionVisitsData.filter(v => v.visitStatus === "completed" || v.visitStatus === "approved").map(v => v.stageKey).filter((k, i, arr) => arr.indexOf(k) === i).length;
+              totalCount = 18;
+            } else if (idx === 0) {
+              // تجهيز الملف: مهام + 3 خطوات ملفات
+              const d1 = allProjectDocsMain.filter((d: any) => d.category === "بطاقة مدنية" || d.category === "وثيقة ملكية" || d.category === "خريطة الموقع" || d.category === "خريطة موقع" || d.category === "وثائق العقد" || d.category === "وثيقة أخرى" || d.category === "وثائق المشروع" || d.category === "وثائق رسمية").length > 0 ? 1 : 0;
+              const d2 = allProjectDocsMain.filter((d: any) => d.category === "فحص تربة" || d.category === "كتاب كهرباء").length > 0 ? 1 : 0;
+              const d3 = allProjectDocsMain.filter((d: any) => d.category === "نماذج بلدية" || d.category === "نماذج").length > 0 ? 1 : 0;
+              doneCount = tasksDoneBase + d1 + d2 + d3;
+              totalCount = phase.tasks.length + 3;
+            } else if (idx === 2) {
+              // الواجهات والإنشائي: مهام + 3 خطوات meta
+              const e1 = facadeMetaData.columnsDone === true ? 1 : 0;
+              const e2 = facadeMetaData.facadeDone === true ? 1 : 0;
+              const e3 = facadeMetaData.fullStructuralDone === true ? 1 : 0;
+              doneCount = tasksDoneBase + e1 + e2 + e3;
+              totalCount = phase.tasks.length + 3;
+            } else if (idx === 4) {
+              // تقديم البلدية: مهام + 3 خطوات
+              const muniStatus = (muniDataMain as any)?.muniStatus || "not_submitted";
+              const mDocs = allProjectDocsMain.filter((d: any) => d.category?.includes("بلدية") || d.category?.includes("رخصة")).length > 0 ? 1 : 0;
+              const mSub = muniStatus !== "not_submitted" ? 1 : 0;
+              const mLic = muniStatus === "license_received" ? 1 : 0;
+              doneCount = tasksDoneBase + mDocs + mSub + mLic;
+              totalCount = phase.tasks.length + 3;
+            } else if (idx === 5) {
+              // المخططات التفصيلية: مهام + 2 خطوات
+              const dDocs = allProjectDocsMain.filter((d: any) => d.category?.includes("مخطط تفصيلي") || d.category?.includes("كهرباء") || d.category?.includes("صحي")).length > 0 ? 1 : 0;
+              const dAll = (detailedDrawingsMain as any[]).length;
+              const dApp = (detailedDrawingsMain as any[]).filter(d => d.drawingStatus === "approved" || d.drawingStatus === "completed").length;
+              const dApprStep = dAll > 0 && dApp === dAll ? 1 : 0;
+              doneCount = tasksDoneBase + dDocs + dApprStep;
+              totalCount = phase.tasks.length + 2;
+            } else {
+              doneCount = tasksDoneBase;
+              totalCount = phase.tasks.length;
+            }
 
             return (
               <button
@@ -3396,11 +3496,10 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
 
                 {/* مؤشرات خاصة بمرحلة تجهيز الملف */}
                 {idx === 0 && (() => {
-                  const soilDocs = allProjectDocsMain.filter((d: any) => d.category === "فحص تربة");
-                  const elecDocs = allProjectDocsMain.filter((d: any) => d.category === "كتاب كهرباء");
                   const totalFileDocs = allProjectDocsMain.filter((d: any) =>
                     d.category === "فحص تربة" || d.category === "كتاب كهرباء" ||
-                    d.category === "بطاقة مدنية" || d.category === "وثيقة ملكية" || d.category === "خريطة موقع"
+                    d.category === "بطاقة مدنية" || d.category === "وثيقة ملكية" || d.category === "خريطة موقع" ||
+                    d.category === "نماذج بلدية"
                   ).length;
                   return (
                     <div className="space-y-1">
@@ -3422,6 +3521,54 @@ export default function ResidentialKanban({ projectId }: ResidentialKanbanProps)
                       )}
                     </div>
                   );
+                })()}
+
+                {/* مؤشرات خاصة بمرحلة الواجهات والإنشائي */}
+                {idx === 2 && (() => {
+                  const cDone = facadeMetaData.columnsDone === true;
+                  const fDone = facadeMetaData.facadeDone === true;
+                  const sDone = facadeMetaData.fullStructuralDone === true;
+                  return (
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1 text-[10px]" style={{ color: cDone ? "oklch(0.45 0.12 150)" : "hsl(var(--muted-foreground))" }}>
+                        {cDone ? <Check className="w-2.5 h-2.5" /> : <span className="w-2.5 h-2.5 text-center">·</span>}
+                        <span>أعمدة</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px]" style={{ color: fDone ? "oklch(0.45 0.12 150)" : "hsl(var(--muted-foreground))" }}>
+                        {fDone ? <Check className="w-2.5 h-2.5" /> : <span className="w-2.5 h-2.5 text-center">·</span>}
+                        <span>واجهات</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px]" style={{ color: sDone ? "oklch(0.45 0.12 150)" : "hsl(var(--muted-foreground))" }}>
+                        {sDone ? <Check className="w-2.5 h-2.5" /> : <span className="w-2.5 h-2.5 text-center">·</span>}
+                        <span>إنشائي</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* مؤشرات خاصة بمرحلة تقديم البلدية */}
+                {idx === 4 && (() => {
+                  const muniStatus = (muniDataMain as any)?.muniStatus || "not_submitted";
+                  const statusLabel = muniStatus === "license_received" ? "رخصة ✓" : muniStatus === "submitted" ? "قيد المراجعة" : "لم يُقدّم";
+                  const statusColor = muniStatus === "license_received" ? "oklch(0.45 0.12 150)" : muniStatus === "submitted" ? "oklch(0.55 0.15 250)" : "hsl(var(--muted-foreground))";
+                  return (
+                    <div className="flex items-center gap-1 text-[10px]" style={{ color: statusColor }}>
+                      {muniStatus === "license_received" && <Check className="w-2.5 h-2.5" />}
+                      <span>{statusLabel}</span>
+                    </div>
+                  );
+                })()}
+
+                {/* مؤشرات خاصة بمرحلة المخططات التفصيلية */}
+                {idx === 5 && (() => {
+                  const dAll = (detailedDrawingsMain as any[]).length;
+                  const dApp = (detailedDrawingsMain as any[]).filter(d => d.drawingStatus === "approved" || d.drawingStatus === "completed").length;
+                  return dAll > 0 ? (
+                    <div className="flex items-center gap-1 text-[10px]" style={{ color: dApp === dAll ? "oklch(0.45 0.12 150)" : "hsl(var(--muted-foreground))" }}>
+                      {dApp === dAll ? <Check className="w-2.5 h-2.5" /> : null}
+                      <span>{dApp}/{dAll} مخطط</span>
+                    </div>
+                  ) : null;
                 })()}
 
                 {/* Tap hint */}
